@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <script src="auth_guard.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>Währungsanalyse & Bias - Trading Journal</title>
+
+    <link rel="icon" type="image/png"
+        href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/trending_up_black_24dp.png"
+        sizes="32x32">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <script src="config.js"></script>
+    <script src="data_manager.js"></script>
+
+    <!-- v2.0 Module -->
+    <script src="backup_manager.js"></script>
+    <script src="performance_manager.js"></script>
+    <script src="import_export_manager.js"></script>
+    <script src="enhanced_auth.js"></script>
+    <script src="ui_feedback.js"></script>
+    <script src="sw-registration.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.0.6/tsparticles.slim.bundle.min.js"></script>
+</head>
+
+<body>
+    <div id="particles-js"></div>
+    <div class="page-overlay-glow"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Sidebar ein-/ausklappen">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="sidebar-header">
+            <a href="startseite.html" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                <div class="logo-icon">TJ</div>
+                <h2>Trading Journal</h2>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <div class="nav-group-title">Trading</div>
+                <a href="funded_journal.html"><i class="fas fa-money-bill-wave"></i><span class="nav-text">Funded</span></a>
+                <a href="ek_journal.html"><i class="fas fa-wallet"></i><span class="nav-text">Eigenkapital</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Analyse</div>
+                <a href="uebersicht.html"><i class="fas fa-chart-pie"></i><span class="nav-text">Dashboard</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Marktdaten</div>
+                <a href="cot_daten.html"><i class="fas fa-database"></i><span class="nav-text">COT Daten</span></a>
+                <a href="waehrungsanalyse.html" class="active-link"><i class="fas fa-newspaper"></i><span class="nav-text">Währungen & News</span></a>
+                <a href="kalender.html"><i class="fas fa-calendar-alt"></i><span class="nav-text">Kalender</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Tools</div>
+                <a href="machine_learning.html"><i class="fas fa-brain"></i><span class="nav-text">Machine Learning</span></a>
+                <a href="simulation.html"><i class="fas fa-calculator"></i><span class="nav-text">Simulation</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">System</div>
+                <a href="kontoeinstellungen.html"><i class="fas fa-cog"></i><span class="nav-text">Einstellungen</span></a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" id="theme-toggle-sidebar"><i class="fas fa-sun"></i><span>Theme</span></button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        <div class="top-bar">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+            <h1><i class="fas fa-newspaper"></i> Währungen & News</h1>
+            <div class="top-bar-actions"></div>
+        </div>
+
+        <main>
+            <!-- Quick Access Cards -->
+            <section class="dashboard-grid" style="margin-bottom: var(--space-lg);">
+                <div class="dashboard-card animated-card" style="animation-delay: 0.05s;" onclick="openPopup('bias-popup')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title"><i class="fas fa-bullseye"></i><span>Bias festlegen</span></div>
+                        <span class="dashboard-card-badge">Formular</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <p style="color: var(--color-text-muted); font-size: 0.85rem;">Trage den Tages-Bias je Währung ein und speichere in einem Schritt.</p>
+                        <div class="dashboard-card-hint"><i class="fas fa-window-restore"></i> Popup öffnen</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card animated-card" style="animation-delay: 0.1s;" onclick="scrollToSection('confluence-section')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title"><i class="fas fa-chart-line"></i><span>Confluence</span></div>
+                        <span class="dashboard-card-badge">Tabelle</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <p style="color: var(--color-text-muted); font-size: 0.85rem;">Manueller Bias, COT-Richtung und News-Bias in einer Übersicht.</p>
+                        <div class="dashboard-card-hint"><i class="fas fa-arrow-down"></i> Zur Tabelle scrollen</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card animated-card" style="animation-delay: 0.15s;" onclick="openPopup('history-popup')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title"><i class="fas fa-history"></i><span>Bias Historie</span></div>
+                        <span class="dashboard-card-badge">Log</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <p style="color: var(--color-text-muted); font-size: 0.85rem;">Letzte Bias-Einträge mit Löschfunktion.</p>
+                        <div class="dashboard-card-hint"><i class="fas fa-window-restore"></i> Popup öffnen</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card animated-card" style="animation-delay: 0.2s;" onclick="openPopup('news-popup')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title"><i class="fas fa-newspaper"></i><span>News-Bias</span></div>
+                        <span class="dashboard-card-badge">Neu</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <p style="color: var(--color-text-muted); font-size: 0.85rem;">Zinsen, Wirtschaftsnews und deren Einfluss auf Währungen eintragen.</p>
+                        <div class="dashboard-card-hint"><i class="fas fa-window-restore"></i> Popup öffnen</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card animated-card" style="animation-delay: 0.25s;" onclick="openPopup('interest-rates-popup')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title"><i class="fas fa-percentage"></i><span>Zinssätze</span></div>
+                        <span class="dashboard-card-badge">Settings</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <p style="color: var(--color-text-muted); font-size: 0.85rem;">Aktuelle Leitzinsen der Zentralbanken pflegen und Trends einstellen.</p>
+                        <div class="dashboard-card-hint"><i class="fas fa-window-restore"></i> Popup öffnen</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Confluence Übersicht -->
+            <section class="page-section animated-card" id="confluence-section" style="animation-delay: 0.2s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-fire-alt"></i> Confluence Übersicht</h2>
+                </div>
+                <div class="page-section-body compact">
+                    <div class="data-table-container" style="max-height: 360px; overflow: auto;">
+                        <table class="data-table" id="confluence-table">
+                            <thead>
+                                <tr>
+                                    <th>Währung</th>
+                                    <th>Manueller Bias</th>
+                                    <th>News-Bias</th>
+                                    <th>System-Bias</th>
+                                    <th>Confluence Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="confluence-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Automatische News-Auswertung Info -->
+            <section class="page-section animated-card" id="auto-news-section" style="animation-delay: 0.25s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-robot"></i> Automatische News-Analyse</h2>
+                </div>
+                <div class="page-section-body">
+                    <div class="info-banner" style="margin-bottom: var(--space-md);">
+                        <i class="fas fa-lightbulb"></i>
+                        <div>
+                            <strong>Automatische Bias-Berechnung:</strong> Das System analysiert aktuelle Zinsniveaus, Zinsdifferenzen und wichtige Wirtschaftsdaten um einen fundamentalen Bias pro Währung zu berechnen.
+                        </div>
+                    </div>
+                    <div id="auto-analysis-grid" class="auto-analysis-grid"></div>
+                </div>
+            </section>
+
+        </main>
+
+        <footer>
+            <div class="footer-branding">Kerim Trading Journal</div>
+            <p>© 2025</p>
+        </footer>
+    </div><!-- End main-content -->
+
+    <!-- Popup: Bias Formular -->
+    <div id="bias-popup" class="popup-overlay">
+        <div class="popup-container large">
+            <div class="popup-header">
+                <h2><i class="fas fa-bullseye"></i> Trading Bias festlegen</h2>
+                <button class="popup-close" onclick="closePopup('bias-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <form id="bias-form" class="form-section">
+                    <div class="form-row">
+                        <div class="form-field" style="max-width: 250px;">
+                            <label for="bias_date">Datum</label>
+                            <input type="date" id="bias_date" name="bias_date" required>
+                        </div>
+                    </div>
+
+                    <div class="data-table-container" style="margin-top: var(--space-md);">
+                        <table class="data-table" id="bias-input-table">
+                            <thead>
+                                <tr>
+                                    <th>Währung</th>
+                                    <th>Bias (Short/Long)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bias-input-tbody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="action-buttons" style="justify-content: flex-start; margin-top: var(--space-md);">
+                        <button type="submit" class="button primary-button"><i class="fas fa-save"></i> Bias speichern</button>
+                        <button type="button" class="button secondary-button" onclick="closePopup('bias-popup')">Schließen</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup: Bias Historie -->
+    <div id="history-popup" class="popup-overlay">
+        <div class="popup-container large">
+            <div class="popup-header">
+                <h2><i class="fas fa-history"></i> Bias Historie</h2>
+                <button class="popup-close" onclick="closePopup('history-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="data-table-container" style="max-height: 480px; overflow: auto;">
+                    <table class="data-table" id="bias-history-table">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Währung</th>
+                                <th>Bias</th>
+                                <th>Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bias-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('history-popup')">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup: News-Bias -->
+    <div id="news-popup" class="popup-overlay">
+        <div class="popup-container">
+            <div class="popup-header">
+                <h2><i class="fas fa-newspaper"></i> News-Bias eintragen</h2>
+                <button class="popup-close" onclick="closePopup('news-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <form id="news-form" class="form-section">
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="news_date">Datum</label>
+                            <input type="date" id="news_date" name="news_date" required>
+                        </div>
+                        <div class="form-field">
+                            <label for="news_currency">Währung</label>
+                            <select id="news_currency" name="news_currency" required>
+                                <option value="">-- Währung wählen --</option>
+                                <option value="EUR">EUR</option>
+                                <option value="USD">USD</option>
+                                <option value="GBP">GBP</option>
+                                <option value="JPY">JPY</option>
+                                <option value="AUD">AUD</option>
+                                <option value="CAD">CAD</option>
+                                <option value="CHF">CHF</option>
+                                <option value="NZD">NZD</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="news_sentiment">Richtung/Sentiment</label>
+                            <select id="news_sentiment" name="news_sentiment" required>
+                                <option value="Neutral">Neutral</option>
+                                <option value="Long">Bullish (Long)</option>
+                                <option value="Short">Bearish (Short)</option>
+                                <option value="Stark Long">Stark Bullish</option>
+                                <option value="Stark Short">Stark Bearish</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-field" style="flex: 1;">
+                            <label for="news_report">News/Ereignis (optional)</label>
+                            <textarea id="news_report" name="news_report" rows="3" placeholder="z.B. Fed Zinsentscheid, CPI Daten, Arbeitsmarkt..."></textarea>
+                        </div>
+                    </div>
+                    <div class="info-banner" style="margin-top: var(--space-sm);">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Der News-Bias wird in der Confluence-Tabelle angezeigt und hilft bei der Gesamtbewertung einer Währung.</span>
+                    </div>
+                    <div class="action-buttons" style="justify-content: flex-start; margin-top: var(--space-md);">
+                        <button type="submit" class="button primary-button"><i class="fas fa-save"></i> Speichern</button>
+                        <button type="button" class="button secondary-button" onclick="closePopup('news-popup')">Schließen</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Popup: Zinssätze verwalten -->
+    <div id="interest-rates-popup" class="popup-overlay">
+        <div class="popup-container large">
+            <div class="popup-header">
+                <h2><i class="fas fa-percentage"></i> Zinssätze verwalten</h2>
+                <button class="popup-close" onclick="closePopup('interest-rates-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="info-banner" style="margin-bottom: var(--space-md);">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Trage die aktuellen Leitzinsen der Zentralbanken ein. Diese Werte werden für die Confluence-Score-Berechnung verwendet.</span>
+                </div>
+                <form id="interest-rates-form" class="form-section">
+                    <div class="data-table-container">
+                        <table class="data-table" id="interest-rates-table">
+                            <thead>
+                                <tr>
+                                    <th>Währung</th>
+                                    <th>Zentralbank</th>
+                                    <th>Zinssatz (%)</th>
+                                    <th>Trend</th>
+                                    <th>Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="interest-rates-tbody"></tbody>
+                        </table>
+                    </div>
+                    <div class="action-buttons" style="justify-content: flex-start; margin-top: var(--space-md);">
+                        <button type="button" class="button primary-button" onclick="saveAllInterestRates()">
+                            <i class="fas fa-save"></i> Alle speichern
+                        </button>
+                        <button type="button" class="button secondary-button" onclick="closePopup('interest-rates-popup')">Schließen</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <a href="#" class="scroll-to-top-btn" title="Nach oben">
+        <i class="fas fa-arrow-up"></i>
+    </a>
+
+    <script src="global.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="config.js"></script>
+    <script src="db.js"></script>
+    <script src="data_manager.js"></script>
+    <script src="interest_rates.js"></script>
+    <script src="api_data_service.js"></script>
+    <script src="waehrungsanalyse.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            tsParticles.load("particles-js", {
+                fpsLimit: 60,
+                particles: {
+                    number: { value: 50, density: { enable: true, value_area: 900 } },
+                    color: { value: "#D4A853" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.25, random: true, anim: { enable: true, speed: 0.2, opacity_min: 0.05, sync: false } },
+                    size: { value: 2, random: true },
+                    move: {
+                        enable: true,
+                        speed: 0.2,
+                        direction: "none",
+                        random: true,
+                        straight: false,
+                        out_mode: "out",
+                        bounce: false,
+                    }
+                },
+                interactivity: { detect_on: "canvas", events: { onhover: { enable: false }, onclick: { enable: false }, resize: true } },
+                retina_detect: true,
+            });
+        });
+    </script>
+</body>
+
+</html>

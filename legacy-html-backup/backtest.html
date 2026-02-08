@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High-Speed Backtesting</title>
+    
+    <link rel="icon" type="image/png"
+        href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/trending_up_black_24dp.png"
+        sizes="32x32">
+    
+    <!-- IndexedDB Database Layer (ZUERST!) -->
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+    <script src="db.js"></script>
+    <script src="migration.js"></script>
+    <script src="data_manager.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    
+    <script src="config.js"></script>
+    <script src="ui_feedback.js"></script>
+    <script src="sidebar.js" defer></script>
+    
+    <style>
+        /* ========================================================
+           HIGH-SPEED BACKTESTING INTERFACE
+           Optimiert für schnelle Dateneingabe & Live-Feedback
+        ======================================================== */
+        
+        .backtest-container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: var(--space-lg);
+            height: calc(100vh - 180px);
+            overflow: hidden;
+        }
+        
+        /* ======== LEFT: Speed-Entry Form ======== */
+        .speed-entry-panel {
+            background: var(--color-card);
+            border-radius: var(--border-radius-lg);
+            padding: var(--space-lg);
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .session-header {
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.15) 0%, rgba(33, 150, 243, 0.15) 100%);
+            border-left: 4px solid var(--color-success);
+            padding: var(--space-md);
+            border-radius: var(--border-radius-md);
+            margin-bottom: var(--space-lg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .session-info h3 {
+            margin: 0;
+            color: var(--color-success);
+            font-size: 1.1em;
+        }
+        
+        .session-meta {
+            display: flex;
+            gap: var(--space-md);
+            margin-top: var(--space-xs);
+            font-size: 0.9em;
+            color: var(--color-text-secondary);
+        }
+        
+        .session-actions {
+            display: flex;
+            gap: var(--space-sm);
+        }
+        
+        /* Ultra-kompaktes Formular */
+        .speed-form {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-sm);
+        }
+        
+        .form-row-full {
+            grid-column: 1 / -1;
+        }
+        
+        .speed-form .form-group {
+            margin-bottom: 0;
+        }
+        
+        .speed-form label {
+            font-size: 0.85em;
+            margin-bottom: 4px;
+            color: var(--color-text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .speed-form input, 
+        .speed-form select,
+        .speed-form textarea {
+            font-size: 0.95em;
+            padding: 8px 12px;
+            height: auto;
+        }
+        
+        .speed-form textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+        
+        /* Quick-Action Buttons (L/S) */
+        .direction-toggle {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-xs);
+            margin-bottom: var(--space-sm);
+        }
+        
+        .direction-btn {
+            padding: 12px;
+            border: 2px solid transparent;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--border-radius-md);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 600;
+            font-size: 1em;
+        }
+        
+        .direction-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .direction-btn.active {
+            border-color: var(--color-success);
+            background: rgba(76, 175, 80, 0.15);
+            color: var(--color-success);
+        }
+        
+        .direction-btn.long {
+            color: var(--color-success);
+        }
+        
+        .direction-btn.short {
+            color: var(--color-danger);
+        }
+        
+        .direction-btn.short.active {
+            border-color: var(--color-danger);
+            background: rgba(244, 67, 54, 0.15);
+        }
+        
+        /* Screenshot-Paste Zone */
+        .paste-zone {
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: var(--border-radius-md);
+            padding: var(--space-md);
+            text-align: center;
+            background: rgba(255, 255, 255, 0.03);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .paste-zone:hover {
+            border-color: var(--color-primary);
+            background: rgba(33, 150, 243, 0.05);
+        }
+        
+        .paste-zone.has-image {
+            border-color: var(--color-success);
+            background: rgba(76, 175, 80, 0.05);
+            padding: 0;
+        }
+        
+        .paste-zone img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: var(--border-radius-md);
+            display: block;
+        }
+        
+        .paste-instruction {
+            color: var(--color-text-secondary);
+            font-size: 0.9em;
+        }
+        
+        /* Keyboard Shortcuts Hint */
+        .shortcuts-hint {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--border-radius-md);
+            padding: var(--space-sm);
+            margin-top: var(--space-md);
+            font-size: 0.85em;
+            color: var(--color-text-secondary);
+        }
+        
+        .shortcuts-hint kbd {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: var(--color-text);
+            margin: 0 2px;
+        }
+        
+        /* ======== RIGHT: Live Stats Panel ======== */
+        .live-stats-panel {
+            background: var(--color-card);
+            border-radius: var(--border-radius-lg);
+            padding: var(--space-lg);
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-lg);
+        }
+        
+        .stats-section h3 {
+            margin: 0 0 var(--space-md);
+            color: var(--color-primary);
+            font-size: 1em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+        
+        /* Performance Metrics */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-sm);
+        }
+        
+        .metric-card {
+            background: rgba(255, 255, 255, 0.03);
+            padding: var(--space-md);
+            border-radius: var(--border-radius-md);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .metric-label {
+            font-size: 0.75em;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: var(--color-text);
+        }
+        
+        .metric-value.positive {
+            color: var(--color-success);
+        }
+        
+        .metric-value.negative {
+            color: var(--color-danger);
+        }
+        
+        /* Mini Equity Curve */
+        .mini-chart {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--border-radius-md);
+            padding: var(--space-md);
+            height: 180px;
+            position: relative;
+        }
+        
+        .mini-chart canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        
+        /* Recent Trades List */
+        .recent-trades {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .trade-item {
+            background: rgba(255, 255, 255, 0.03);
+            padding: var(--space-sm);
+            border-radius: var(--border-radius-sm);
+            margin-bottom: var(--space-xs);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+            border-left: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+        
+        .trade-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .trade-item.win {
+            border-left-color: var(--color-success);
+        }
+        
+        .trade-item.loss {
+            border-left-color: var(--color-danger);
+        }
+        
+        .trade-info {
+            display: flex;
+            gap: var(--space-sm);
+            align-items: center;
+        }
+        
+        .trade-pair {
+            font-weight: 600;
+            color: var(--color-text);
+        }
+        
+        .trade-direction {
+            font-size: 0.85em;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        
+        .trade-direction.long {
+            background: rgba(76, 175, 80, 0.2);
+            color: var(--color-success);
+        }
+        
+        .trade-direction.short {
+            background: rgba(244, 67, 54, 0.2);
+            color: var(--color-danger);
+        }
+        
+        .trade-r {
+            font-weight: 700;
+            font-size: 1.1em;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .backtest-container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            
+            .live-stats-panel {
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                max-height: 400px;
+            }
+        }
+        
+        /* Animations */
+        @keyframes pulse-success {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+        }
+        
+        .pulse-on-save {
+            animation: pulse-success 0.6s ease-out;
+        }
+        
+        /* Winrate Visual */
+        .winrate-display {
+            text-align: center;
+            padding: var(--space-lg);
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(33, 150, 243, 0.1) 100%);
+            border-radius: var(--border-radius-lg);
+            border: 2px solid rgba(76, 175, 80, 0.3);
+        }
+        
+        .winrate-percent {
+            font-size: 3em;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: var(--space-xs);
+        }
+        
+        .winrate-label {
+            font-size: 0.9em;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .winrate-breakdown {
+            display: flex;
+            justify-content: center;
+            gap: var(--space-lg);
+            margin-top: var(--space-md);
+            font-size: 0.9em;
+        }
+        
+        .winrate-breakdown span {
+            color: var(--color-text-secondary);
+        }
+        
+        .winrate-breakdown strong {
+            color: var(--color-text);
+        }
+    </style>
+</head>
+<body>
+    <div id="particles-js"></div>
+    <div class="page-overlay-glow"></div>
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Sidebar ein-/ausklappen">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="sidebar-header">
+            <a href="startseite.html" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                <div class="logo-icon">TJ</div>
+                <h2>Trading Journal</h2>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <div class="nav-group-title">Trading</div>
+                <a href="funded_journal.html"><i class="fas fa-money-bill-wave"></i><span class="nav-text">Funded</span></a>
+                <a href="EK_journal.html"><i class="fas fa-wallet"></i><span class="nav-text">Eigenkapital</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Analyse</div>
+                <a href="uebersicht.html"><i class="fas fa-chart-pie"></i><span class="nav-text">Dashboard</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Testing</div>
+                <a href="backtest.html" class="active-link"><i class="fas fa-fast-forward"></i><span class="nav-text">Backtest</span></a>
+                <a href="simulation.html"><i class="fas fa-calculator"></i><span class="nav-text">Simulation</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Marktdaten</div>
+                <a href="cot_daten.html"><i class="fas fa-database"></i><span class="nav-text">COT Daten</span></a>
+                <a href="waehrungsanalyse.html"><i class="fas fa-newspaper"></i><span class="nav-text">Währungen & News</span></a>
+                <a href="kalender.html"><i class="fas fa-calendar-alt"></i><span class="nav-text">Kalender</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">System</div>
+                <a href="kontoeinstellungen.html"><i class="fas fa-cog"></i><span class="nav-text">Einstellungen</span></a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" id="theme-toggle-sidebar"><i class="fas fa-sun"></i><span>Theme</span></button>
+        </div>
+    </aside>
+    
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        <div class="top-bar">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+            <h1><i class="fas fa-fast-forward"></i> High-Speed Backtesting</h1>
+            <div class="top-bar-actions">
+                <button id="new-session-btn" class="button primary-button"><i class="fas fa-plus"></i> Neue Session</button>
+                <button id="save-session-btn" class="button secondary-button"><i class="fas fa-save"></i> Session speichern</button>
+                <button id="history-btn" class="button secondary-button"><i class="fas fa-history"></i> Verlauf</button>
+            </div>
+        </div>
+        
+        <main>
+            <div class="backtest-container">
+                <!-- LEFT: Speed-Entry Form -->
+                <div class="speed-entry-panel">
+                    <div class="session-header">
+                        <div class="session-info">
+                            <h3 id="session-name">Backtest Session</h3>
+                            <div class="session-meta">
+                                <span><i class="fas fa-clock"></i> <span id="session-time">00:00</span></span>
+                                <span><i class="fas fa-hashtag"></i> <span id="session-trades">0</span> Trades</span>
+                            </div>
+                        </div>
+                        <div class="session-actions">
+                            <button id="pause-btn" class="button secondary-button" style="padding: 8px 16px;">
+                                <i class="fas fa-pause"></i> Pause
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <form id="backtest-form" autocomplete="off">
+                        <!-- Direction Toggle (L/S Shortcuts) -->
+                        <div class="form-row-full">
+                            <label>Richtung (Shortcut: L / S)</label>
+                            <div class="direction-toggle">
+                                <button type="button" class="direction-btn long" data-direction="long">
+                                    <i class="fas fa-arrow-up"></i> LONG
+                                </button>
+                                <button type="button" class="direction-btn short" data-direction="short">
+                                    <i class="fas fa-arrow-down"></i> SHORT
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="speed-form">
+                            <!-- Row 1 -->
+                            <div class="form-group">
+                                <label><i class="fas fa-exchange-alt"></i> Währungspaar</label>
+                                <select id="pair" required>
+                                    <option value="EURUSD">EURUSD</option>
+                                    <option value="GBPUSD">GBPUSD</option>
+                                    <option value="USDJPY">USDJPY</option>
+                                    <option value="AUDUSD">AUDUSD</option>
+                                    <option value="USDCAD">USDCAD</option>
+                                    <option value="NZDUSD">NZDUSD</option>
+                                    <option value="EURGBP">EURGBP</option>
+                                    <option value="EURJPY">EURJPY</option>
+                                    <option value="GBPJPY">GBPJPY</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-calendar"></i> Datum</label>
+                                <input type="date" id="date" required>
+                            </div>
+                            
+                            <!-- Row 2 -->
+                            <div class="form-group">
+                                <label><i class="fas fa-trophy"></i> R-Multiple</label>
+                                <input type="number" id="rMultiple" step="0.1" placeholder="z.B. 2.5" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-chart-line"></i> Setup</label>
+                                <input type="text" id="setup" placeholder="z.B. FVG" list="setup-suggestions">
+                                <datalist id="setup-suggestions">
+                                    <option value="FVG">
+                                    <option value="BOS">
+                                    <option value="Supply/Demand">
+                                    <option value="Trendline Break">
+                                    <option value="Reversal">
+                                </datalist>
+                            </div>
+                            
+                            <!-- Row 3 -->
+                            <div class="form-group">
+                                <label><i class="fas fa-clock"></i> Timeframe</label>
+                                <select id="timeframe">
+                                    <option value="M15">M15</option>
+                                    <option value="H1">H1</option>
+                                    <option value="H4" selected>H4</option>
+                                    <option value="D1">D1</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-percentage"></i> Risiko %</label>
+                                <input type="number" id="riskPercent" step="0.1" value="1.0" placeholder="1.0">
+                            </div>
+                            
+                            <!-- Notes (Full Width) -->
+                            <div class="form-group form-row-full">
+                                <label><i class="fas fa-sticky-note"></i> Notizen (optional)</label>
+                                <textarea id="notes" placeholder="Notizen..."></textarea>
+                            </div>
+                            
+                            <!-- Screenshot Paste Zone -->
+                            <div class="form-group form-row-full">
+                                <label><i class="fas fa-camera"></i> Screenshot (Strg+V zum Einfügen)</label>
+                                <div class="paste-zone" id="paste-zone">
+                                    <div class="paste-instruction">
+                                        <i class="fas fa-paste" style="font-size: 2em; opacity: 0.5; margin-bottom: 8px;"></i>
+                                        <p>Screenshot hier einfügen (Strg+V)<br>oder klicken zum Hochladen</p>
+                                    </div>
+                                    <input type="file" id="screenshot-file" accept="image/*" style="display: none;">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Submit Button -->
+                        <button type="submit" class="button primary-button" style="width: 100%; margin-top: var(--space-md); font-size: 1.1em; padding: 14px;">
+                            <i class="fas fa-plus-circle"></i> Trade hinzufügen (Enter)
+                        </button>
+                        
+                        <!-- Keyboard Shortcuts -->
+                        <div class="shortcuts-hint">
+                            <strong>⌨️ Tastenkürzel:</strong><br>
+                            <kbd>L</kbd> Long • <kbd>S</kbd> Short • <kbd>Enter</kbd> Speichern • <kbd>Strg+V</kbd> Screenshot einfügen
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- RIGHT: Live Statistics -->
+                <div class="live-stats-panel">
+                    <!-- Winrate Display -->
+                    <div class="stats-section">
+                        <div class="winrate-display">
+                            <div class="winrate-percent" id="winrate-percent">-%</div>
+                            <div class="winrate-label">Winrate</div>
+                            <div class="winrate-breakdown">
+                                <span>Wins: <strong id="wins-count">0</strong></span>
+                                <span>Losses: <strong id="losses-count">0</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Performance Metrics -->
+                    <div class="stats-section">
+                        <h3><i class="fas fa-chart-bar"></i> Performance</h3>
+                        <div class="metrics-grid">
+                            <div class="metric-card">
+                                <div class="metric-label">Total R</div>
+                                <div class="metric-value" id="total-r">0.0</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Avg R</div>
+                                <div class="metric-value" id="avg-r">0.0</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Best R</div>
+                                <div class="metric-value positive" id="best-r">0.0</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Worst R</div>
+                                <div class="metric-value negative" id="worst-r">0.0</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Mini Equity Curve -->
+                    <div class="stats-section">
+                        <h3><i class="fas fa-chart-line"></i> Equity Curve</h3>
+                        <div class="mini-chart">
+                            <canvas id="equity-chart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Trades -->
+                    <div class="stats-section">
+                        <h3><i class="fas fa-history"></i> Letzte Trades</h3>
+                        <div class="recent-trades" id="recent-trades">
+                            <p style="text-align: center; color: var(--color-text-secondary); padding: var(--space-md);">
+                                Keine Trades in dieser Session
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Chart.js for Mini Equity Curve -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Backtest Logic -->
+    <script src="backtest.js"></script>
+</body>
+</html>

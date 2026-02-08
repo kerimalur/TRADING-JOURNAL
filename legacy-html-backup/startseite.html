@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <script src="auth_guard.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kerim Trading Journal | Startseite</title>
+
+    <link rel="icon" type="image/png"
+        href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/trending_up_black_24dp.png"
+        sizes="32x32">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Core Scripts -->
+    <script src="config.js"></script>
+    <script src="data_manager.js"></script>
+    <script src="backup_manager.js"></script>
+    <script src="performance_manager.js"></script>
+    <script src="import_export_manager.js"></script>
+    <script src="enhanced_auth.js"></script>
+    <script src="ui_feedback.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.0.6/tsparticles.bundle.min.js"></script>
+
+    <style>
+        /* ========================================================
+           PROFESSIONAL TRADING JOURNAL - STARTSEITE
+           Design-Philosophie: Disziplin. Fokus. Präzision.
+        ======================================================== */
+
+        /* 1. Hero-Sektion & Hintergrund */
+        #home {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            padding: 80px 20px;
+            margin: -120px -40px -60px -40px !important;
+            background: linear-gradient(180deg, 
+                var(--color-background) 0%, 
+                rgba(18, 21, 26, 1) 50%,
+                var(--color-background) 100%);
+        }
+
+        #particles-js {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0.3;
+        }
+
+        #home-bg-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('Trading Journal/Background.jpg');
+            background-size: cover;
+            background-position: center;
+            opacity: 0.05;
+            z-index: 0;
+        }
+
+        #grid-scan-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background:
+                linear-gradient(to right, rgba(212, 168, 83, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(212, 168, 83, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            padding: 48px 64px;
+            border-radius: 16px;
+            background: rgba(18, 21, 26, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--color-border);
+            box-shadow: 0 32px 64px rgba(0, 0, 0, 0.5);
+            max-width: 700px;
+        }
+
+        /* 2. Professioneller Titel ohne Glitch-Effekte */
+        .landing-title-small {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--color-accent-main);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+        }
+
+        .landing-title {
+            font-size: 3.5em;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            color: var(--color-text-light);
+            margin: 12px 0;
+            padding: 0;
+            border: 0;
+            background: none;
+            background-clip: unset;
+            -webkit-background-clip: unset;
+            -webkit-text-fill-color: unset;
+            animation: none;
+            line-height: 1.1;
+        }
+
+        .landing-title .highlight {
+            color: var(--color-accent-main);
+        }
+
+        /* Deaktiviere Glitch-Effekte für professionelles Erscheinungsbild */
+        .glitch-title::before,
+        .glitch-title::after {
+            display: none;
+        }
+
+        .landing-slogan-dynamic {
+            min-height: 32px;
+            margin-bottom: 32px;
+            font-size: 1.1rem;
+            font-weight: 400;
+            color: var(--color-text-subtle);
+            text-transform: none;
+            letter-spacing: 0.01em;
+        }
+
+        #dynamic-slogan {
+            display: inline-block;
+            color: var(--color-text-subtle);
+            transition: opacity 0.4s ease;
+        }
+
+        .landing-nav {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .landing-nav .button {
+            padding: 12px 28px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 6px;
+        }
+
+        .landing-nav .button.secondary-button {
+            background: transparent;
+            color: var(--color-text-light);
+            border: 1px solid var(--color-border);
+        }
+
+        .landing-nav .button.secondary-button:hover {
+            background: var(--color-surface-hover);
+            border-color: var(--color-border-light);
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--color-text-muted);
+            font-size: 1.2rem;
+            animation: floatDown 2s ease-in-out infinite;
+            z-index: 2;
+            opacity: 0.5;
+            transition: opacity 0.3s ease;
+        }
+
+        .scroll-indicator:hover {
+            opacity: 1;
+            color: var(--color-accent-main);
+        }
+
+        @keyframes floatDown {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(8px); }
+        }
+
+        /* 3. Dashboard Section - Clean & Professional */
+        .dashboard-section {
+            padding: 80px 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .dashboard-section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .bento-perspective-wrapper {
+            margin-top: 40px;
+        }
+
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: auto auto auto;
+            gap: 16px;
+        }
+
+        /* Professional Bento Items */
+        .bento-item {
+            position: relative;
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            background-color: var(--color-surface);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            transition: all 0.25s ease;
+            overflow: hidden;
+            text-decoration: none;
+            --bento-color: var(--color-accent-main);
+        }
+
+        /* Subtiler Akzent-Streifen statt animiertem Border */
+        .bento-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--bento-color);
+            opacity: 0.6;
+            transition: opacity 0.25s ease, width 0.25s ease;
+        }
+
+        .bento-item .bento-item-border {
+            display: none;
+        }
+
+        .bento-item:hover {
+            transform: translateY(-4px);
+            border-color: var(--color-border-light);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .bento-item:hover::before {
+            opacity: 1;
+            width: 4px;
+        }
+
+        /* Raster-Definitionen */
+        .bento-item--large-square {
+            grid-column: span 2;
+            grid-row: span 2;
+        }
+
+        .bento-item--medium-rect {
+            grid-column: span 2;
+            grid-row: span 1;
+        }
+
+        .bento-item--small-square {
+            grid-column: span 1;
+            grid-row: span 1;
+        }
+
+        .bento-item--medium-tall {
+            grid-column: span 1;
+            grid-row: span 2;
+        }
+
+        /* Professionelle Farben pro Kachel */
+        .bento-item--equity { --bento-color: var(--color-pnl-positive); }
+        .bento-item--setup { --bento-color: var(--color-accent-secondary); }
+        .bento-item--sim { --bento-color: #8B5CF6; }
+        .bento-item--prop { --bento-color: var(--color-accent-main); }
+        .bento-item--calendar { --bento-color: #F59E0B; }
+        .bento-item--cot { --bento-color: var(--color-pnl-negative); }
+
+        .bento-item h3 {
+            font-size: 1.1rem;
+            color: var(--color-text-light);
+            margin: 0 0 8px 0;
+            font-weight: 600;
+        }
+
+        .bento-item p {
+            color: var(--color-text-subtle);
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        .bento-item i {
+            font-size: 1.1rem;
+            margin-right: 8px;
+            transition: color 0.25s ease;
+            color: var(--bento-color);
+        }
+
+        @media (max-width: 992px) {
+            .bento-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .bento-item {
+                grid-column: span 1 !important;
+                grid-row: span 1 !important;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .bento-grid { grid-template-columns: 1fr; }
+            .landing-title { font-size: 2.5em; }
+            .hero-content { padding: 32px 24px; }
+        }
+
+        /* 4. KPI Demo - Professional */
+        #kpi-demo-section .kennzahl-card {
+            border-color: var(--color-border);
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        #kpi-demo-section .kennzahl-card .kpi-content {
+            flex-grow: 1;
+        }
+
+        #kpi-demo-section .kennzahl-card strong {
+            font-size: 2rem;
+        }
+
+        /* SVG Donut Chart Stile - Cleaner */
+        .kpi-donut-chart {
+            width: 64px;
+            height: 64px;
+            flex-shrink: 0;
+            transform: rotate(-90deg);
+        }
+
+        .kpi-donut-bg {
+            fill: none;
+            stroke: var(--color-surface-dark);
+            stroke-width: 8;
+        }
+
+        .kpi-donut-fg {
+            fill: none;
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 282.74;
+            stroke-dashoffset: 282.74;
+            transition: stroke-dashoffset 1.5s ease-out;
+        }
+
+        .kpi-donut--positive .kpi-donut-fg { stroke: var(--color-pnl-positive); }
+        .kpi-donut--negative .kpi-donut-fg { stroke: var(--color-pnl-negative); }
+        .kpi-donut--accent .kpi-donut-fg { stroke: var(--color-accent-main); }
+
+        /* Motivation Box - Professional */
+        .motivation-box {
+            background-color: var(--color-surface);
+            border: 1px solid var(--color-border);
+            padding: 32px 48px;
+            border-radius: 12px;
+            margin-top: 64px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+            position: relative;
+        }
+
+        .motivation-box::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 0;
+            width: 60px;
+            height: 3px;
+            background: var(--color-accent-main);
+            border-radius: 0 0 3px 3px;
+        }
+
+        .motivation-box h3 {
+            color: var(--color-text-light);
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+
+        .no-data-message {
+            color: var(--color-text-subtle);
+            font-style: italic;
+            font-size: 0.85rem;
+        }
+
+        /* Theme Toggle Button */
+        .theme-toggle-btn {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            cursor: pointer;
+            color: var(--color-accent-main);
+            font-size: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .theme-toggle-btn:hover {
+            background: var(--color-surface-hover);
+            border-color: var(--color-accent-main);
+            transform: scale(1.05);
+        }
+
+        #header-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Quick Stats Section */
+        .quick-stats-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 32px;
+        }
+
+        .quick-stat-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .quick-stat-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--color-accent-main);
+        }
+
+        .quick-stat-card i {
+            font-size: 1.5rem;
+            color: var(--color-accent-main);
+            margin-bottom: 8px;
+        }
+
+        .quick-stat-card .label {
+            font-size: 0.8rem;
+            color: var(--color-text-subtle);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .quick-stat-card .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-text-light);
+            margin-top: 4px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="particles-js"></div>
+
+    <header id="header" class="landing-header">
+        <div class="header-top">
+            <a href="startseite.html" style="text-decoration: none;">
+                <h1
+                    style="font-size: 1.5em; margin: 0; padding: 0; border: 0; text-shadow: none; color: var(--color-text-light);">
+                    Trading Journal
+                </h1>
+            </a>
+            <div id="header-status">
+                <button class="theme-toggle-btn" id="theme-toggle" title="Theme wechseln">
+                    <i class="fas fa-sun"></i>
+                </button>
+            </div>
+        </div>
+        <nav>
+            <a href="funded_journal.html"><i class="fas fa-money-bill-wave"></i> Funded Journal</a>
+            <a href="ek_journal.html"><i class="fas fa-file-invoice-dollar"></i> EK Journal</a>
+            <a href="uebersicht.html"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+            <a href="equity_curve.html"><i class="fas fa-chart-area"></i> Equity Curve</a>
+            <a href="waehrungsanalyse.html"><i class="fas fa-chart-bar"></i> Währungsanalyse</a>
+            <a href="cot_daten.html"><i class="fas fa-chart-line"></i> COT Daten</a>
+            <a href="kalender.html"><i class="fas fa-calendar-alt"></i> Kalender</a>
+            <a href="simulation.html"><i class="fas fa-calculator"></i> Simulation</a>
+            <a href="kontoeinstellungen.html"><i class="fas fa-cog"></i> Einstellungen</a>
+        </nav>
+    </header>
+
+    <main>
+
+        <section class="landing-section chart-background" id="home">
+
+            <div id="home-bg-image"></div>
+            <div id="grid-scan-overlay"></div>
+
+            <div class="hero-content">
+                <span class="landing-title-small">Professionelles</span>
+                <h1 class="landing-title" id="animated-title">TRADING <span class="highlight">JOURNAL</span></h1>
+
+                <p class="landing-slogan-dynamic">
+                    <span id="dynamic-slogan">Disziplin. Analyse. Performance.</span>
+                </p>
+
+                <div class="landing-nav">
+                    <a href="uebersicht.html" class="button">Dashboard öffnen</a>
+                    <a href="funded_journal.html" class="button secondary-button">Trade erfassen</a>
+                </div>
+
+                <!-- Quick Stats Preview -->
+                <div class="quick-stats-section">
+                    <div class="quick-stat-card">
+                        <i class="fas fa-chart-line"></i>
+                        <div class="label">Gesamt Trades</div>
+                        <div class="value" id="hero-total-trades">0</div>
+                    </div>
+                    <div class="quick-stat-card">
+                        <i class="fas fa-percentage"></i>
+                        <div class="label">Win Rate</div>
+                        <div class="value" id="hero-winrate">0%</div>
+                    </div>
+                    <div class="quick-stat-card">
+                        <i class="fas fa-coins"></i>
+                        <div class="label">Gesamt R</div>
+                        <div class="value" id="hero-total-r">0 R</div>
+                    </div>
+                </div>
+            </div>
+
+            <a href="#features" class="scroll-indicator scroll-link" title="Mehr erfahren">
+                <i class="fas fa-chevron-down"></i>
+            </a>
+        </section>
+
+        <div class="section-separator"></div>
+
+        <section class="dashboard-section" id="features">
+            <h2><i class="fas fa-server"></i> Modulares Analyse-Dashboard</h2>
+            <p class="section-subtitle">Ein Hub für alle deine Analyse-Tools. Vollständig interaktiv.</p>
+
+            <div class="bento-perspective-wrapper">
+                <div class="bento-grid">
+
+                    <a href="equity_curve.html"
+                        class="bento-item bento-item--large-square animated-card delay-1 bento-item--equity"
+                        style="--z-depth: 40px; --transform-hover: translateZ(80px) translateY(-5px);">
+                        <div class="bento-item-border"></div>
+                        <h3><i class="fas fa-chart-area"></i> Equity Curve & Trade Flow</h3>
+                        <p>Verfolge deine Performance über die Zeit, visualisiert in PnL- oder R-Multiples. Klicke auf
+                            Punkte in der interaktiven Kurve, um sofort zum Trade-Eintrag im Journal zu springen.</p>
+                    </a>
+
+                    <a href="simulation.html"
+                        class="bento-item bento-item--small-square animated-card delay-2 bento-item--sim"
+                        style="--z-depth: 20px; --transform-hover: translateZ(50px) translateY(-5px);">
+                        <div class="bento-item-border"></div>
+                        <h3><i class="fas fa-calculator"></i> Monte Carlo</h3>
+                        <p>Modelliere zukünftige Wahrscheinlichkeiten basierend auf deinen Metriken.</p>
+                    </a>
+
+                    <a href="cot_daten.html"
+                        class="bento-item bento-item--small-square animated-card delay-3 bento-item--cot"
+                        style="--z-depth: 20px; --transform-hover: translateZ(50px) translateY(-5px);">
+                        <div class="bento-item-border"></div>
+                        <h3><i class="fas fa-chart-line"></i> COT Daten</h3>
+                        <p>Importiere und visualisiere Commercial-Positionierungen.</p>
+                    </a>
+
+                    <a href="uebersicht.html"
+                        class="bento-item bento-item--medium-rect animated-card delay-4 bento-item--setup"
+                        style="--z-depth: 30px; --transform-hover: translateZ(60px) translateY(-5px);">
+                        <div class="bento-item-border"></div>
+                        <h3><i class="fas fa-bullseye"></i> Setup-Validierung & Edge</h3>
+                        <p>Finde deinen wahren Edge! Analysiere die Rentabilität deiner 5 Schlüssel-Setups (BOS, VA, GVA
+                            etc.) mit klaren Win-Rates und Gesamt-R Werten.</p>
+                    </a>
+
+                    <a href="funded_journal.html"
+                        class="bento-item bento-item--medium-rect animated-card delay-5 bento-item--prop"
+                        style="--z-depth: 30px; --transform-hover: translateZ(60px) translateY(-5px);">
+                        <div class="bento-item-border"></div>
+                        <h3><i class="fas fa-cogs"></i> Prop-Firm Challenge Tracker</h3>
+                        <p>Nie wieder Drawdown verpassen. Spezielle Zielverfolgung und Progress-Ringe für
+                            Prop-Firm-Herausforderungen (Profit-Ziel und Maximal-Drawdown-Puffer).</p>
+                    </a>
+
+                    <a href="kalender.html"
+                        class="bento-item bento-item--medium-tall animated-card delay-6 bento-item--calendar"
+                        style="--z-depth: 30px; --transform-hover: translateZ(60px) translateY(-5px);">
+                        <div class="bento-item-border"></div>
+                        <h3><i class="fas fa-calendar-alt"></i> Trade Kalender</h3>
+                        <p>Visualisiere deine Performance auf einen Blick. Sieh sofort, welche Tage profitabel waren und
+                            welche nicht, um Muster in deinem Trading-Verhalten zu erkennen.</p>
+                    </a>
+                </div>
+            </div>
+
+            <div class="clean-divider" style="margin-top: 60px; margin-bottom: 40px;"></div>
+
+            <section id="kpi-demo-section">
+                <h2><i class="fas fa-tachometer-alt"></i> Dein Live-Dashboard (Gesamt)</h2>
+                <p class="section-subtitle" id="demo-subtitle">Zeigt deine Gesamt-Performance aus allen Konten.</p>
+
+                <div class="bento-perspective-wrapper">
+                    <div class="kennzahlen-grid">
+
+                        <div class="kennzahl-card pnl-positive animated-card delay-1" id="demo-card-winrate">
+                            <div class="kpi-content">
+                                <i class="fas fa-percent icon-placeholder"></i>
+                                <div class="label">Win Rate (Gesamt)</div>
+                                <strong><span class="kpi-counter" id="demo-winrate-counter"
+                                        data-target="0">0</span>%</strong>
+                            </div>
+                            <svg class="kpi-donut-chart kpi-donut--positive" viewBox="0 0 100 100">
+                                <circle class="kpi-donut-bg" cx="50" cy="50" r="45"></circle>
+                                <circle class="kpi-donut-fg" id="demo-winrate-donut" data-offset="282.74" cx="50"
+                                    cy="50" r="45"></circle>
+                            </svg>
+                        </div>
+
+                        <div class="kennzahl-card pnl-positive animated-card delay-2" id="demo-card-pf">
+                            <div class="kpi-content">
+                                <i class="fas fa-balance-scale icon-placeholder"></i>
+                                <div class="label">Profit Factor (Gesamt)</div>
+                                <strong style="color: var(--color-pnl-positive);"><span class="kpi-counter"
+                                        id="demo-pf-counter" data-target="0">0</span></strong>
+                            </div>
+                            <svg class="kpi-donut-chart kpi-donut--positive" viewBox="0 0 100 100">
+                                <circle class="kpi-donut-bg" cx="50" cy="50" r="45"></circle>
+                                <circle class="kpi-donut-fg" id="demo-pf-donut" data-offset="282.74" cx="50" cy="50"
+                                    r="45"></circle>
+                            </svg>
+                        </div>
+
+                        <div class="kennzahl-card pnl-negative animated-card delay-3" id="demo-card-dd">
+                            <div class="kpi-content">
+                                <i class="fas fa-hand-holding-usd icon-placeholder pnl-negative"></i>
+                                <div class="label">Max. Drawdown (Gesamt)</div>
+                                <strong style="color: var(--color-pnl-negative);"><span class="kpi-counter"
+                                        id="demo-dd-counter" data-target="0">0</span> R</strong>
+                            </div>
+                            <svg class="kpi-donut-chart kpi-donut--negative" viewBox="0 0 100 100">
+                                <circle class="kpi-donut-bg" cx="50" cy="50" r="45"></circle>
+                                <circle class="kpi-donut-fg" id="demo-dd-donut" data-offset="282.74" cx="50" cy="50"
+                                    r="45"></circle>
+                            </svg>
+                        </div>
+
+                        <div class="kennzahl-card animated-card delay-4" id="demo-card-r"
+                            style="border-color: var(--color-accent-main);">
+                            <div class="kpi-content">
+                                <i class="fas fa-coins icon-placeholder" style="color: var(--color-accent-main);"></i>
+                                <div class="label">Kumuliertes R (Gesamt)</div>
+                                <strong style="color: var(--color-accent-main);"><span id="demo-r-prefix"></span><span
+                                        class="kpi-counter" id="demo-r-counter" data-target="0">0</span> R</strong>
+                            </div>
+                            <svg class="kpi-donut-chart kpi-donut--accent" viewBox="0 0 100 100">
+                                <circle class="kpi-donut-bg" cx="50" cy="50" r="45"></circle>
+                                <circle class="kpi-donut-fg" id="demo-r-donut" data-offset="282.74" cx="50" cy="50"
+                                    r="45"></circle>
+                            </svg>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
+
+            <div class="motivation-box animated-card" style="animation-delay: 0.5s; margin-top: 80px;">
+                <h3 style="color: var(--color-text-light); font-weight: 600;">Mindset is Key</h3>
+                <p style="font-size: 0.95rem; color: var(--color-text-subtle); margin-bottom: 0;">„Dein größter Feind an
+                    der Börse ist nicht der Markt, sondern dein eigenes Ego und deine Gier.“</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-branding">Kerim Trading Journal</div>
+        <p>© 2025 Alle Rechte vorbehalten. Designed with "Photon-Finale".</p>
+    </footer>
+
+    <a href="#" class="scroll-to-top-btn" title="Nach oben">
+        <i class="fas fa-arrow-up"></i>
+    </a>
+
+    <script src="global.js"></script>
+
+    <script>
+        // ======================================================
+        // PROFESSIONAL TRADING JOURNAL - JAVASCRIPT
+        // ======================================================
+        document.addEventListener('DOMContentLoaded', (event) => {
+
+            // 1. Partikel - Professionell & Subtil
+            tsParticles.load("particles-js", {
+                fpsLimit: 60,
+                particles: {
+                    number: { value: 50, density: { enable: true, value_area: 1000 } },
+                    color: { value: "#D4A853" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.3, random: true },
+                    size: { value: 1.5, random: true },
+                    move: { enable: true, speed: 0.3, direction: "none", random: true, straight: false, out_mode: "out" },
+                    links: { enable: true, distance: 180, color: "#525A67", opacity: 0.15, width: 1 }
+                },
+                interactivity: {
+                    detect_on: "canvas",
+                    events: { onhover: { enable: true, mode: "grab" }, onclick: { enable: false }, resize: true },
+                    modes: { grab: { distance: 140, links: { opacity: 0.3 } } }
+                },
+                retina_detect: true,
+            });
+
+            // 2. Smooth Scroll
+            document.querySelectorAll('a.scroll-link').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href');
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        const headerHeight = document.getElementById('header').offsetHeight;
+                        const targetPosition = targetElement.offsetTop - headerHeight - 20;
+                        window.scrollTo({ top: targetPosition, behavior: 'smooth' });
+                    }
+                });
+            });
+
+            // 3. Dynamischer Slogan-Wechsel - Professionell
+            const slogans = [
+                "Disziplin. Analyse. Performance.",
+                "Daten-getriebene Entscheidungen.",
+                "Systematisches Risikomanagement.",
+                "Kontinuierliche Verbesserung."
+            ];
+            let sloganIndex = 0;
+            const sloganEl = document.getElementById('dynamic-slogan');
+            if (sloganEl) {
+                function changeSlogan() {
+                    sloganEl.style.opacity = '0';
+                    setTimeout(() => {
+                        sloganIndex = (sloganIndex + 1) % slogans.length;
+                        sloganEl.textContent = slogans[sloganIndex];
+                        sloganEl.style.opacity = '1';
+                    }, 400);
+                }
+                setTimeout(() => {
+                    sloganEl.style.transition = 'opacity 0.4s ease';
+                    setInterval(changeSlogan, 4000);
+                }, 3000);
+            }
+
+            // 4. Header Scroll-Transparenz (Beibehalten)
+            const header = document.getElementById('header');
+            if (header) {
+                const defaultBg = 'rgba(22, 27, 34, 0.7)';
+                const transparentBg = 'rgba(22, 27, 34, 0.0)';
+                function updateHeaderScroll() {
+                    if (window.scrollY > 50) {
+                        header.classList.remove('landing-header');
+                        header.style.backgroundColor = defaultBg;
+                        header.style.borderBottom = '1px solid var(--color-border)';
+                    } else {
+                        header.classList.add('landing-header');
+                        header.style.backgroundColor = transparentBg;
+                        header.style.borderBottom = '1px solid transparent';
+                        header.style.borderTopColor = 'transparent';
+                    }
+                }
+                window.addEventListener('scroll', updateHeaderScroll);
+                updateHeaderScroll();
+            }
+
+            // 5. 3D Bento-Grid Maus-Steuerung (Beibehalten & Verbessert)
+            const wrapper = document.querySelector('.bento-perspective-wrapper');
+            const grid = document.querySelector('.bento-grid');
+            if (wrapper && grid) {
+                const tiltAngle = 8;
+                wrapper.addEventListener('mousemove', (e) => {
+                    const rect = wrapper.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const { width, height } = rect;
+                    const rotateX = (y / height - 0.5) * tiltAngle * -1;
+                    const rotateY = (x / width - 0.5) * tiltAngle;
+                    if (window.innerWidth > 992) {
+                        grid.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+                    }
+                });
+                wrapper.addEventListener('mouseleave', () => {
+                    grid.style.transform = `rotateX(0deg) rotateY(0deg)`;
+                });
+
+                // 3D-Tiefe (Z-Translate) beim Hovern setzen
+                document.querySelectorAll('.bento-item').forEach(item => {
+                    item.addEventListener('mouseenter', () => {
+                        const hoverTransform = item.style.getPropertyValue('--transform-hover');
+                        if (hoverTransform) {
+                            item.style.transform = hoverTransform;
+                        }
+                    });
+                    item.addEventListener('mouseleave', () => {
+                        const baseTransform = `translateZ(${item.style.getPropertyValue('--z-depth') || '20px'})`;
+                        item.style.transform = baseTransform;
+                    });
+                });
+            }
+
+
+            // 6. NEU: Live-Daten laden und Demo-KPIs vorbereiten
+
+            /**
+             * Kopie von uebersicht.js, um Metriken zu berechnen
+             */
+            function calculateKeyMetrics(trades) {
+                const totalTrades = trades.length;
+                let wins = 0;
+                let losses = 0;
+                let totalR = 0;
+                let totalWinR = 0;
+                let totalLossR = 0;
+                let peakBalanceR = 0;
+                let maxDrawdownR = 0;
+                let cumulativeR = 0;
+
+                if (totalTrades === 0) {
+                    return { totalTrades: 0, winRate: 0, totalR: 0, profitFactor: 0, avgWin: 0, avgLoss: 0, maxDrawdownR: 0, hasData: false };
+                }
+
+                trades.forEach(trade => {
+                    const r = parseFloat(trade.rMultiple) || 0;
+                    totalR += r;
+                    cumulativeR += r;
+                    if (cumulativeR > peakBalanceR) peakBalanceR = cumulativeR;
+                    const currentDrawdownR = peakBalanceR - cumulativeR;
+                    if (currentDrawdownR > maxDrawdownR) maxDrawdownR = currentDrawdownR;
+
+                    if (r > 0) { wins++; totalWinR += r; }
+                    else if (r < 0) { losses++; totalLossR += Math.abs(r); }
+                });
+
+                const winRate = (wins / totalTrades) * 100;
+                const profitFactor = (totalLossR > 0) ? (totalWinR / totalLossR) : (totalWinR > 0 ? Infinity : 0);
+                const avgWin = (wins > 0) ? (totalWinR / wins) : 0;
+                const avgLoss = (losses > 0) ? (totalLossR / losses) : 0;
+
+                return {
+                    totalTrades, winRate, totalR, profitFactor, avgWin,
+                    avgLoss: avgLoss * -1,
+                    maxDrawdownR: maxDrawdownR * -1,
+                    hasData: true
+                };
+            }
+
+            /**
+             * Füllt die Demo-KPIs mit ECHTEN Daten
+             */
+            function renderRealtimeDashboardDemo() {
+                if (typeof loadTrades !== 'function') {
+                    console.warn("data_manager.js nicht bereit.");
+                    return;
+                }
+
+                const allTrades = loadTrades();
+                const metrics = calculateKeyMetrics(allTrades);
+
+                if (!metrics.hasData) {
+                    document.getElementById('demo-subtitle').innerHTML =
+                        'Keine Trades gefunden. <a href="ek_journal.html" style="color: var(--color-accent-main);">Füge deinen ersten Trade hinzu!</a>';
+                    return;
+                }
+
+                const circumference = 282.74;
+
+                // --- 1. Win Rate ---
+                const winRate = metrics.winRate;
+                document.getElementById('demo-winrate-counter').setAttribute('data-target', winRate.toFixed(1));
+                const winRateOffset = circumference - (winRate / 100) * circumference;
+                document.getElementById('demo-winrate-donut').setAttribute('data-offset', winRateOffset);
+                const winRateCard = document.getElementById('demo-card-winrate');
+                winRateCard.classList.toggle('pnl-positive', winRate >= 50);
+                winRateCard.classList.toggle('pnl-negative', winRate < 50);
+
+                // --- 2. Profit Factor ---
+                const pf = metrics.profitFactor;
+                let pfText = pf.toFixed(2);
+                if (pf === Infinity) pfText = "∞";
+
+                document.getElementById('demo-pf-counter').setAttribute('data-target', pf.toFixed(2));
+                document.getElementById('demo-pf-counter').setAttribute('data-final-text', pfText); // Für den Kounter
+
+                const pfPercent = (pf > 2) ? 100 : (pf / 2) * 100; // Normalisiert auf 0-2 Skala
+                const pfOffset = circumference - (pfPercent / 100) * circumference;
+                document.getElementById('demo-pf-donut').setAttribute('data-offset', pfOffset);
+                const pfCard = document.getElementById('demo-card-pf');
+                pfCard.classList.toggle('pnl-positive', pf >= 1);
+                pfCard.classList.toggle('pnl-negative', pf < 1);
+
+                // --- 3. Max Drawdown ---
+                const maxDD = metrics.maxDrawdownR;
+                document.getElementById('demo-dd-counter').setAttribute('data-target', maxDD.toFixed(1));
+                const ddPercent = Math.min(Math.abs(maxDD) / 10, 1) * 100; // Normalisiert auf 0-10R Skala
+                const ddOffset = circumference - (ddPercent / 100) * circumference;
+                document.getElementById('demo-dd-donut').setAttribute('data-offset', ddOffset);
+
+                // --- 4. Total R ---
+                const totalR = metrics.totalR;
+                document.getElementById('demo-r-counter').setAttribute('data-target', totalR.toFixed(1));
+                if (totalR > 0) document.getElementById('demo-r-prefix').textContent = '+';
+                const rPercent = Math.min(Math.abs(totalR) / 50, 1) * 100; // Normalisiert auf 0-50R Skala
+                const rOffset = circumference - (rPercent / 100) * circumference;
+                document.getElementById('demo-r-donut').setAttribute('data-offset', rOffset);
+                const rCard = document.getElementById('demo-card-r');
+                rCard.classList.toggle('pnl-positive', totalR > 0);
+                rCard.classList.toggle('pnl-negative', totalR < 0);
+                if (totalR < 0) {
+                    rCard.style.borderColor = 'var(--color-pnl-negative)';
+                    rCard.querySelector('i').style.color = 'var(--color-pnl-negative)';
+                    rCard.querySelector('strong').style.color = 'var(--color-pnl-negative)';
+                    rCard.querySelector('.kpi-donut-fg').style.stroke = 'var(--color-pnl-negative)';
+                }
+            }
+
+            // Führe die Live-Daten-Befüllung aus
+            renderRealtimeDashboardDemo();
+            
+            // NEU: Hero Quick Stats befüllen
+            renderHeroQuickStats();
+
+            // NEU: Theme Toggle Setup
+            setupThemeToggle();
+
+
+            // 7. KPI-Kounter UND Donut-Chart Animation (Kombiniert)
+            const kpiObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const card = entry.target;
+
+                        // a) Zahlen-Kounter starten
+                        const counter = card.querySelector('.kpi-counter');
+                        if (counter && !counter.classList.contains('animated')) {
+                            counter.classList.add('animated');
+                            const target = +counter.getAttribute('data-target');
+                            const finalText = counter.getAttribute('data-final-text'); // z.B. "∞"
+
+                            const speed = 100;
+                            const isFloat = target.toString().includes('.');
+                            const decimalPlaces = isFloat ? target.toString().split('.')[1].length : 0;
+
+                            const updateCount = () => {
+                                const current = +counter.innerText;
+                                const increment = target / speed;
+
+                                if ((increment > 0 && current < target) || (increment < 0 && current > target)) {
+                                    let newValue = current + increment;
+                                    if ((increment > 0 && newValue > target) || (increment < 0 && newValue < target)) {
+                                        newValue = target;
+                                    }
+                                    counter.innerText = newValue.toFixed(decimalPlaces);
+                                    requestAnimationFrame(updateCount);
+                                } else {
+                                    counter.innerText = finalText ? finalText : target.toFixed(decimalPlaces);
+                                }
+                            };
+                            updateCount();
+                        }
+
+                        // b) Donut-Chart-Animation starten
+                        const donutFg = card.querySelector('.kpi-donut-fg');
+                        if (donutFg && !donutFg.classList.contains('animated')) {
+                            donutFg.classList.add('animated');
+                            const targetOffset = donutFg.getAttribute('data-offset');
+                            if (targetOffset !== undefined) {
+                                donutFg.style.strokeDashoffset = targetOffset;
+                            }
+                        }
+
+                        observer.unobserve(card);
+                    }
+                });
+            }, {
+                threshold: 0.5
+            });
+
+            document.querySelectorAll('#kpi-demo-section .kennzahl-card').forEach(card => {
+                kpiObserver.observe(card);
+            });
+
+        });
+        
+        // ======================================================
+        // NEU: Hero Quick Stats
+        // ======================================================
+        function renderHeroQuickStats() {
+            if (typeof loadTrades !== 'function') return;
+            
+            const allTrades = loadTrades();
+            const totalTrades = allTrades.length;
+            
+            let wins = 0;
+            let totalR = 0;
+            
+            allTrades.forEach(trade => {
+                const r = parseFloat(trade.rMultiple) || 0;
+                totalR += r;
+                if (r > 0) wins++;
+            });
+            
+            const winRate = totalTrades > 0 ? ((wins / totalTrades) * 100).toFixed(1) : 0;
+            
+            const heroTotalTrades = document.getElementById('hero-total-trades');
+            const heroWinrate = document.getElementById('hero-winrate');
+            const heroTotalR = document.getElementById('hero-total-r');
+            
+            if (heroTotalTrades) heroTotalTrades.textContent = totalTrades;
+            if (heroWinrate) {
+                heroWinrate.textContent = winRate + '%';
+                heroWinrate.style.color = winRate >= 50 ? 'var(--color-pnl-positive)' : 'var(--color-pnl-negative)';
+            }
+            if (heroTotalR) {
+                const prefix = totalR > 0 ? '+' : '';
+                heroTotalR.textContent = prefix + totalR.toFixed(1) + ' R';
+                heroTotalR.style.color = totalR >= 0 ? 'var(--color-pnl-positive)' : 'var(--color-pnl-negative)';
+            }
+        }
+        
+        // ======================================================
+        // NEU: Theme Toggle
+        // ======================================================
+        function setupThemeToggle() {
+            const toggleBtn = document.getElementById('theme-toggle');
+            if (!toggleBtn) return;
+            
+            // Lade gespeichertes Theme
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+            
+            toggleBtn.addEventListener('click', () => {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                updateThemeIcon(newTheme);
+            });
+        }
+        
+        function updateThemeIcon(theme) {
+            const toggleBtn = document.getElementById('theme-toggle');
+            if (!toggleBtn) return;
+            
+            const icon = toggleBtn.querySelector('i');
+            if (icon) {
+                icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            }
+        }

@@ -1,0 +1,43 @@
+# Temp files
+.tmp.driveupload/
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+dist-electron/
+*/dist/
+*/dist-electron/
+*.exe
+*.dmg
+*.AppImage
+
+# Release files (too large for GitHub)
+release/
+*/release/
+*.asar
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Cache
+.cache/
+.parcel-cache/

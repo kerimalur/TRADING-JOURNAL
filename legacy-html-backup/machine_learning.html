@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <script src="auth_guard.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>Machine Learning - Trading Journal</title>
+
+    <link rel="icon" type="image/png"
+        href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/trending_up_black_24dp.png"
+        sizes="32x32">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <script src="config.js"></script>
+    <script src="data_manager.js"></script>
+
+    <!-- v2.0 Module -->
+    <script src="backup_manager.js"></script>
+    <script src="performance_manager.js"></script>
+    <script src="import_export_manager.js"></script>
+    <script src="enhanced_auth.js"></script>
+    <script src="ui_feedback.js"></script>
+    <script src="sw-registration.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.0.6/tsparticles.slim.bundle.min.js"></script>
+</head>
+
+<body>
+    <div id="particles-js"></div>
+    <div class="page-overlay-glow"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Sidebar ein-/ausklappen">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="sidebar-header">
+            <a href="startseite.html" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                <div class="logo-icon">TJ</div>
+                <h2>Trading Journal</h2>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <div class="nav-group-title">Trading</div>
+                <a href="funded_journal.html"><i class="fas fa-money-bill-wave"></i><span class="nav-text">Funded</span></a>
+                <a href="ek_journal.html"><i class="fas fa-wallet"></i><span class="nav-text">Eigenkapital</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Analyse</div>
+                <a href="uebersicht.html"><i class="fas fa-chart-pie"></i><span class="nav-text">Dashboard</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Marktdaten</div>
+                <a href="cot_daten.html"><i class="fas fa-database"></i><span class="nav-text">COT Daten</span></a>
+                <a href="waehrungsanalyse.html"><i class="fas fa-newspaper"></i><span class="nav-text">Währungen & News</span></a>
+                <a href="kalender.html"><i class="fas fa-calendar-alt"></i><span class="nav-text">Kalender</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Tools</div>
+                <a href="machine_learning.html" class="active-link"><i class="fas fa-brain"></i><span class="nav-text">Machine Learning</span></a>
+                <a href="simulation.html"><i class="fas fa-calculator"></i><span class="nav-text">Simulation</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">System</div>
+                <a href="kontoeinstellungen.html"><i class="fas fa-cog"></i><span class="nav-text">Einstellungen</span></a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" id="theme-toggle-sidebar"><i class="fas fa-sun"></i><span>Theme</span></button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        <div class="top-bar">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+            <h1><i class="fas fa-brain"></i> Machine Learning</h1>
+            <div class="top-bar-actions"></div>
+        </div>
+
+        <main>
+            <!-- Hero Section -->
+            <section class="ml-hero page-section animated-card" style="animation-delay: 0.05s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-robot"></i> ML-Daten Pipeline</h2>
+                </div>
+                <div class="page-section-body">
+                    <div class="info-banner" style="margin-bottom: var(--space-lg);">
+                        <i class="fas fa-info-circle"></i>
+                        <div>
+                            <strong>Machine Learning für Trading:</strong> Exportiere deine Daten im ML-freundlichen Format für Python, TensorFlow, PyTorch oder andere ML-Frameworks. Die Daten werden automatisch von der API geholt und strukturiert.
+                        </div>
+                    </div>
+                    
+                    <div class="ml-stats-grid">
+                        <div class="ml-stat-card">
+                            <div class="ml-stat-icon"><i class="fas fa-database"></i></div>
+                            <div class="ml-stat-info">
+                                <span class="ml-stat-value" id="ml-cot-count">0</span>
+                                <span class="ml-stat-label">COT Einträge</span>
+                            </div>
+                        </div>
+                        <div class="ml-stat-card">
+                            <div class="ml-stat-icon"><i class="fas fa-newspaper"></i></div>
+                            <div class="ml-stat-info">
+                                <span class="ml-stat-value" id="ml-news-count">0</span>
+                                <span class="ml-stat-label">News Einträge</span>
+                            </div>
+                        </div>
+                        <div class="ml-stat-card">
+                            <div class="ml-stat-icon"><i class="fas fa-exchange-alt"></i></div>
+                            <div class="ml-stat-info">
+                                <span class="ml-stat-value" id="ml-trades-count">0</span>
+                                <span class="ml-stat-label">Trades</span>
+                            </div>
+                        </div>
+                        <div class="ml-stat-card">
+                            <div class="ml-stat-icon"><i class="fas fa-coins"></i></div>
+                            <div class="ml-stat-info">
+                                <span class="ml-stat-value" id="ml-currencies-count">8</span>
+                                <span class="ml-stat-label">Währungen</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Sources -->
+            <section class="dashboard-grid" style="margin-bottom: var(--space-lg);">
+                <div class="dashboard-card animated-card" style="animation-delay: 0.1s;" onclick="refreshAllData()">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title"><i class="fas fa-sync-alt"></i><span>Daten aktualisieren</span></div>
+                        <span class="dashboard-card-badge" style="background: var(--color-success);">API</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <p style="color: var(--color-text-muted); font-size: 0.85rem;">Alle Datenquellen von der API neu laden.</p>
+                        <div class="dashboard-card-hint"><i class="fas fa-satellite-dish"></i> Jetzt aktualisieren</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card animated-card" style="animation-delay: 0.15s;" onclick="downloadMLDataset()">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title"><i class="fas fa-download"></i><span>ML-Dataset</span></div>
+                        <span class="dashboard-card-badge">JSON</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <p style="color: var(--color-text-muted); font-size: 0.85rem;">Komplettes Dataset für Machine Learning.</p>
+                        <div class="dashboard-card-hint"><i class="fas fa-file-code"></i> JSON herunterladen</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card animated-card" style="animation-delay: 0.2s;" onclick="downloadCSV()">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title"><i class="fas fa-file-csv"></i><span>CSV Export</span></div>
+                        <span class="dashboard-card-badge">Tabelle</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <p style="color: var(--color-text-muted); font-size: 0.85rem;">Daten als CSV für Excel oder Pandas.</p>
+                        <div class="dashboard-card-hint"><i class="fas fa-table"></i> CSV herunterladen</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card animated-card" style="animation-delay: 0.25s;" onclick="openPopup('features-popup')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title"><i class="fas fa-cogs"></i><span>Feature Engineering</span></div>
+                        <span class="dashboard-card-badge" style="background: var(--color-primary);">Neu</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <p style="color: var(--color-text-muted); font-size: 0.85rem;">Generierte ML-Features anzeigen.</p>
+                        <div class="dashboard-card-hint"><i class="fas fa-window-restore"></i> Features ansehen</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- COT Data Preview -->
+            <section class="page-section animated-card" style="animation-delay: 0.3s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-database"></i> COT Commercial Positionen</h2>
+                    <div class="section-actions">
+                        <button class="button secondary-button" onclick="scrollToSection('news-section')">
+                            <i class="fas fa-arrow-down"></i> Zu News
+                        </button>
+                    </div>
+                </div>
+                <div class="page-section-body">
+                    <p style="color: var(--color-text-muted); margin-bottom: var(--space-md);">
+                        Die neuesten Commercial Net Positions aus dem CFTC COT Report. Diese Daten zeigen, wie die großen kommerziellen Händler (Hedger) positioniert sind.
+                    </p>
+                    <div class="data-table-container" style="max-height: 400px; overflow: auto;">
+                        <table class="data-table" id="ml-cot-table">
+                            <thead>
+                                <tr>
+                                    <th>Datum</th>
+                                    <th>Währung</th>
+                                    <th>Commercial Net</th>
+                                    <th>Trend</th>
+                                    <th>Quelle</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ml-cot-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- News Data Preview -->
+            <section class="page-section animated-card" id="news-section" style="animation-delay: 0.35s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-newspaper"></i> Wirtschaftsnews</h2>
+                </div>
+                <div class="page-section-body">
+                    <p style="color: var(--color-text-muted); margin-bottom: var(--space-md);">
+                        Aktuelle Wirtschaftsnachrichten mit Sentiment-Analyse für ML-Modelle.
+                    </p>
+                    <div class="data-table-container" style="max-height: 400px; overflow: auto;">
+                        <table class="data-table" id="ml-news-table">
+                            <thead>
+                                <tr>
+                                    <th>Datum</th>
+                                    <th>Währung</th>
+                                    <th>Event</th>
+                                    <th>Sentiment</th>
+                                    <th>Impact</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ml-news-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Trade History Preview -->
+            <section class="page-section animated-card" style="animation-delay: 0.4s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-exchange-alt"></i> Trade Historie (Labels)</h2>
+                </div>
+                <div class="page-section-body">
+                    <p style="color: var(--color-text-muted); margin-bottom: var(--space-md);">
+                        Deine Trades als Labels für supervised Learning. Jeder Trade kann als Feature oder Label verwendet werden.
+                    </p>
+                    <div class="data-table-container" style="max-height: 400px; overflow: auto;">
+                        <table class="data-table" id="ml-trades-table">
+                            <thead>
+                                <tr>
+                                    <th>Datum</th>
+                                    <th>Paar</th>
+                                    <th>Richtung</th>
+                                    <th>R-Multiple</th>
+                                    <th>Ergebnis</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ml-trades-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Python Code Example -->
+            <section class="page-section animated-card" style="animation-delay: 0.45s;">
+                <div class="page-section-header">
+                    <h2><i class="fab fa-python"></i> Python Integration</h2>
+                </div>
+                <div class="page-section-body">
+                    <p style="color: var(--color-text-muted); margin-bottom: var(--space-md);">
+                        Beispiel-Code zum Laden der exportierten Daten in Python:
+                    </p>
+                    <pre class="code-block"><code>import json
+import pandas as pd
+
+# JSON-Datei laden
+with open('trading_ml_data_2025-12-13.json', 'r') as f:
+    data = json.load(f)
+
+# COT Daten als DataFrame
+cot_df = pd.DataFrame([
+    {'date': d, 'currency': c, **v}
+    for c, entries in data['cot_data'].items()
+    for d, v in [(e['date'], e) for e in entries]
+])
+
+# News Daten als DataFrame
+news_df = pd.DataFrame([
+    {'date': d, 'currency': c, **v}
+    for c, entries in data['news_data'].items()
+    for d, v in [(e['date'], e) for e in entries]
+])
+
+# ML Features (Zeitreihen)
+features_df = pd.DataFrame(data['features'])
+
+# Trades als Labels
+trades_df = pd.DataFrame(data['trades'])
+
+print(f"COT Einträge: {len(cot_df)}")
+print(f"News Einträge: {len(news_df)}")
+print(f"Features: {len(features_df)}")
+print(f"Trades: {len(trades_df)}")</code></pre>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <div class="footer-branding">Kerim Trading Journal</div>
+            <p>© 2025</p>
+        </footer>
+    </div><!-- End main-content -->
+
+    <!-- Popup: Features -->
+    <div id="features-popup" class="popup-overlay">
+        <div class="popup-container large">
+            <div class="popup-header">
+                <h2><i class="fas fa-cogs"></i> Generierte ML-Features</h2>
+                <button class="popup-close" onclick="closePopup('features-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <p style="color: var(--color-text-muted); margin-bottom: var(--space-md);">
+                    Diese Features werden automatisch aus den Rohdaten generiert und können direkt für ML-Modelle verwendet werden:
+                </p>
+                <div class="features-list">
+                    <div class="feature-item">
+                        <strong>[CURRENCY]_cot_net</strong>
+                        <span>Commercial Net Position für jede Währung</span>
+                    </div>
+                    <div class="feature-item">
+                        <strong>[CURRENCY]_cot_change</strong>
+                        <span>Wöchentliche Änderung der Position</span>
+                    </div>
+                    <div class="feature-item">
+                        <strong>[CURRENCY]_news_sentiment</strong>
+                        <span>Durchschnittliches News-Sentiment (-2 bis +2)</span>
+                    </div>
+                    <div class="feature-item">
+                        <strong>[CURRENCY]_news_count</strong>
+                        <span>Anzahl der News-Events pro Tag</span>
+                    </div>
+                </div>
+                <div class="info-banner" style="margin-top: var(--space-md);">
+                    <i class="fas fa-lightbulb"></i>
+                    <div>
+                        <strong>Tipp:</strong> Kombiniere diese Features mit technischen Indikatoren für bessere Vorhersagen. Die COT-Daten sind besonders nützlich für Swing-Trading über mehrere Tage.
+                    </div>
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('features-popup')">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <a href="#" class="scroll-to-top-btn" title="Nach oben">
+        <i class="fas fa-arrow-up"></i>
+    </a>
+
+    <script src="global.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="config.js"></script>
+    <script src="data_manager.js"></script>
+    <script src="api_data_service.js"></script>
+    <script src="machine_learning.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            tsParticles.load("particles-js", {
+                fpsLimit: 60,
+                particles: {
+                    number: { value: 50, density: { enable: true, value_area: 900 } },
+                    color: { value: "#D4A853" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.25, random: true, anim: { enable: true, speed: 0.2, opacity_min: 0.05, sync: false } },
+                    size: { value: 2, random: true },
+                    move: {
+                        enable: true,
+                        speed: 0.2,
+                        direction: "none",
+                        random: true,
+                        straight: false,
+                        out_mode: "out",
+                        bounce: false,
+                    }
+                },
+                interactivity: { detect_on: "canvas", events: { onhover: { enable: false }, onclick: { enable: false }, resize: true } },
+                retina_detect: true,
+            });
+        });
+    </script>
+</body>
+
+</html>

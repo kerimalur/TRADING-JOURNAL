@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <script src="auth_guard.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>COT Daten - Trading Journal</title>
+
+    <link rel="icon" type="image/png"
+        href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/trending_up_black_24dp.png"
+        sizes="32x32">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <script src="config.js"></script>
+    <script src="data_manager.js"></script>
+
+    <!-- v2.0 Module -->
+    <script src="backup_manager.js"></script>
+    <script src="performance_manager.js"></script>
+    <script src="import_export_manager.js"></script>
+    <script src="enhanced_auth.js"></script>
+    <script src="ui_feedback.js"></script>
+    <script src="sw-registration.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.0.6/tsparticles.slim.bundle.min.js"></script>
+</head>
+
+<body>
+    <div id="particles-js"></div>
+    <div class="page-overlay-glow"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Sidebar ein-/ausklappen">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="sidebar-header">
+            <a href="startseite.html" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                <div class="logo-icon">TJ</div>
+                <h2>Trading Journal</h2>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <div class="nav-group-title">Trading</div>
+                <a href="funded_journal.html"><i class="fas fa-money-bill-wave"></i><span class="nav-text">Funded</span></a>
+                <a href="ek_journal.html"><i class="fas fa-wallet"></i><span class="nav-text">Eigenkapital</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Analyse</div>
+                <a href="uebersicht.html"><i class="fas fa-chart-pie"></i><span class="nav-text">Dashboard</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Marktdaten</div>
+                <a href="cot_daten.html" class="active-link"><i class="fas fa-database"></i><span class="nav-text">COT Daten</span></a>
+                <a href="waehrungsanalyse.html"><i class="fas fa-newspaper"></i><span class="nav-text">Währungen & News</span></a>
+                <a href="kalender.html"><i class="fas fa-calendar-alt"></i><span class="nav-text">Kalender</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Tools</div>
+                <a href="machine_learning.html"><i class="fas fa-brain"></i><span class="nav-text">Machine Learning</span></a>
+                <a href="simulation.html"><i class="fas fa-calculator"></i><span class="nav-text">Simulation</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">System</div>
+                <a href="kontoeinstellungen.html"><i class="fas fa-cog"></i><span class="nav-text">Einstellungen</span></a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" id="theme-toggle-sidebar"><i class="fas fa-sun"></i><span>Theme</span></button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        <div class="top-bar">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+            <h1><i class="fas fa-database"></i> COT Daten</h1>
+            <div class="top-bar-actions">
+                <button class="icon-button" onclick="openPopup('cot-import-popup')" title="JSON Import">
+                    <i class="fas fa-file-import"></i>
+                </button>
+                <button class="icon-button" onclick="openPopup('api-status-popup')" title="API Status">
+                    <i class="fas fa-satellite-dish"></i>
+                </button>
+                <button class="button primary-button" onclick="openPopup('cot-entry-popup')">
+                    <i class="fas fa-plus"></i> Eintrag
+                </button>
+            </div>
+        </div>
+
+        <main>
+            <!-- Info Banner -->
+            <div class="info-banner animated-card" style="animation-delay: 0.05s; margin-bottom: var(--space-lg);">
+                <i class="fas fa-info-circle"></i>
+                <div>
+                    <strong>COT Report (Commitment of Traders):</strong> Die CFTC veröffentlicht wöchentlich die Positionen der großen Marktteilnehmer. 
+                    <strong>Commercial Hedgers</strong> (Unternehmen die sich absichern) zeigen oft die "Smart Money" Richtung an. 
+                    Positive Werte = Netto-Long, Negative Werte = Netto-Short.
+                </div>
+            </div>
+
+            <!-- Währungsfilter -->
+            <section class="filter-bar animated-card" style="animation-delay: 0.1s; margin-bottom: var(--space-lg);">
+                <div class="filter-bar-inner">
+                    <div class="filter-group">
+                        <label>Währung:</label>
+                        <select id="currency-filter">
+                            <option value="all">Alle Währungen</option>
+                            <option value="EUR">EUR</option>
+                            <option value="USD">USD</option>
+                            <option value="GBP">GBP</option>
+                            <option value="JPY">JPY</option>
+                            <option value="AUD">AUD</option>
+                            <option value="CAD">CAD</option>
+                            <option value="CHF">CHF</option>
+                            <option value="NZD">NZD</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Zeitraum:</label>
+                        <select id="time-filter">
+                            <option value="4w">Letzte 4 Wochen</option>
+                            <option value="3m">Letzte 3 Monate</option>
+                            <option value="6m">Letzte 6 Monate</option>
+                            <option value="1y">Letztes Jahr</option>
+                            <option value="all">Alle Daten</option>
+                        </select>
+                    </div>
+                    <button class="button secondary-button" onclick="forceApiUpdate()">
+                        <i class="fas fa-sync-alt"></i> Aktualisieren
+                    </button>
+                </div>
+            </section>
+
+            <!-- COT Heatmap - Aktuelle Werte -->
+            <section class="page-section animated-card" id="cot-heatmap-section" style="animation-delay: 0.15s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-fire-alt"></i> Aktuelle Positionen</h2>
+                    <span class="section-badge" id="heatmap-date">--</span>
+                </div>
+                <div class="page-section-body">
+                    <div id="cot-heatmap" class="cot-heatmap-grid"></div>
+                </div>
+            </section>
+
+            <!-- Währungs-Chart (bei Einzelwährung) -->
+            <section class="page-section animated-card" id="currency-chart-section" style="animation-delay: 0.2s; display: none;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-chart-line"></i> <span id="chart-currency-title">Entwicklung</span></h2>
+                </div>
+                <div class="page-section-body">
+                    <div style="height: 300px;">
+                        <canvas id="currency-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Historie nach Datum gruppiert -->
+            <section class="page-section animated-card" style="animation-delay: 0.25s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-history"></i> Historie</h2>
+                    <span class="section-badge" id="history-count">0 Einträge</span>
+                </div>
+                <div class="page-section-body" style="padding: 0;">
+                    <div id="cot-history-grouped" class="cot-history-grouped">
+                        <!-- Wird via JS gefüllt -->
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <div class="footer-branding">Kerim Trading Journal</div>
+            <p>© 2025</p>
+        </footer>
+    </div><!-- End main-content -->
+
+    <!-- Popup: Manueller Eintrag -->
+    <div id="cot-entry-popup" class="popup-overlay">
+        <div class="popup-container">
+            <div class="popup-header">
+                <h2><i class="fas fa-plus"></i> COT Eintrag hinzufügen</h2>
+                <button class="popup-close" onclick="closePopup('cot-entry-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <form id="cot-form" class="form-section">
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="cot_date">Datum</label>
+                            <input type="date" id="cot_date" name="cot_date" required>
+                        </div>
+                        <div class="form-field">
+                            <label for="cot_symbol">Währung</label>
+                            <select id="cot_symbol" name="cot_symbol" required>
+                                <option value="">-- Währung wählen --</option>
+                                <option value="EUR">EUR</option>
+                                <option value="USD">USD</option>
+                                <option value="GBP">GBP</option>
+                                <option value="JPY">JPY</option>
+                                <option value="AUD">AUD</option>
+                                <option value="CAD">CAD</option>
+                                <option value="CHF">CHF</option>
+                                <option value="NZD">NZD</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-field" style="flex: 1;">
+                            <label for="net_position">Commercial Netto-Position</label>
+                            <input type="number" id="net_position" name="net_position" placeholder="z.B. 45000 oder -12000" required>
+                        </div>
+                    </div>
+                    <div class="action-buttons" style="justify-content: flex-start; margin-top: var(--space-sm);">
+                        <button type="submit" class="button primary-button"><i class="fas fa-save"></i> Speichern</button>
+                        <button type="button" class="button secondary-button" onclick="closePopup('cot-entry-popup')">Abbrechen</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup: JSON Import -->
+    <div id="cot-import-popup" class="popup-overlay">
+        <div class="popup-container">
+            <div class="popup-header">
+                <h2><i class="fas fa-file-import"></i> JSON Import</h2>
+                <button class="popup-close" onclick="closePopup('cot-import-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <p style="color: var(--color-text-subtle); margin-bottom: var(--space-md); font-size: 0.9rem;">Importiere COT-Daten aus einer JSON-Datei.</p>
+                <div class="form-section">
+                    <div class="form-row">
+                        <div class="form-field" style="flex: 1;">
+                            <label for="json-import-file">JSON-Datei auswählen</label>
+                            <input type="file" id="json-import-file" accept=".json" required>
+                        </div>
+                    </div>
+                    <div class="action-buttons" style="justify-content: flex-start; margin-top: var(--space-sm);">
+                        <button id="json-import-button" class="button primary-button"><i class="fas fa-upload"></i> Importieren</button>
+                        <button type="button" class="button" onclick="closePopup('cot-import-popup')">Abbrechen</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup: API Status -->
+    <div id="api-status-popup" class="popup-overlay">
+        <div class="popup-container">
+            <div class="popup-header">
+                <h2><i class="fas fa-satellite-dish"></i> API Status</h2>
+                <button class="popup-close" onclick="closePopup('api-status-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="api-status-grid">
+                    <div class="api-status-card">
+                        <div class="api-status-icon cot"><i class="fas fa-database"></i></div>
+                        <div class="api-status-info">
+                            <h4>COT Daten (CFTC)</h4>
+                            <p id="cot-last-update">Letztes Update: --</p>
+                            <p id="cot-next-update" style="font-size: 0.8rem; color: var(--color-text-muted);">Nächstes: --</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="info-banner" style="margin-top: var(--space-md);">
+                    <i class="fas fa-robot"></i>
+                    <div>
+                        Daten werden automatisch von der CFTC geladen. COT-Reports erscheinen freitags für die Vorwoche.
+                    </div>
+                </div>
+
+                <div class="action-buttons" style="justify-content: flex-start; margin-top: var(--space-md);">
+                    <button class="button primary-button" onclick="forceApiUpdate(); closePopup('api-status-popup');">
+                        <i class="fas fa-sync-alt"></i> Jetzt aktualisieren
+                    </button>
+                    <button class="button" onclick="closePopup('api-status-popup')">Schließen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup: Datum Details -->
+    <div id="date-detail-popup" class="popup-overlay">
+        <div class="popup-container">
+            <div class="popup-header">
+                <h2><i class="fas fa-calendar-day"></i> <span id="date-detail-title">--</span></h2>
+                <button class="popup-close" onclick="closePopup('date-detail-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div id="date-detail-content" class="date-detail-grid">
+                    <!-- Wird via JS gefüllt -->
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('date-detail-popup')">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <a href="#" class="scroll-to-top-btn" title="Nach oben">
+        <i class="fas fa-arrow-up"></i>
+    </a>
+
+    <script src="global.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="config.js"></script>
+    <script src="data_manager.js"></script>
+    <script src="api_data_service.js"></script>
+    <script src="cot_daten.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            tsParticles.load("particles-js", {
+                fpsLimit: 60,
+                particles: {
+                    number: { value: 50, density: { enable: true, value_area: 900 } },
+                    color: { value: "#D4A853" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.25, random: true, anim: { enable: true, speed: 0.2, opacity_min: 0.05, sync: false } },
+                    size: { value: 2, random: true },
+                    move: {
+                        enable: true,
+                        speed: 0.2,
+                        direction: "none",
+                        random: true,
+                        straight: false,
+                        out_mode: "out",
+                        bounce: false,
+                    }
+                },
+                interactivity: { detect_on: "canvas", events: { onhover: { enable: false }, onclick: { enable: false }, resize: true } },
+                retina_detect: true,
+            });
+        });
+    </script>
+</body>
+
+</html>

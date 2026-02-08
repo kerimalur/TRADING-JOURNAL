@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <script src="auth_guard.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>Dashboard - Trading Journal</title>
+
+    <link rel="icon" type="image/png"
+        href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/trending_up_black_24dp.png"
+        sizes="32x32">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="config.js"></script>
+    <script src="data_manager.js"></script>
+
+    <!-- v2.0 Module -->
+    <script src="backup_manager.js"></script>
+    <script src="performance_manager.js"></script>
+    <script src="import_export_manager.js"></script>
+    <script src="enhanced_auth.js"></script>
+    <script src="ui_feedback.js"></script>
+    <script src="sw-registration.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.0.6/tsparticles.slim.bundle.min.js"></script>
+</head>
+
+<body>
+
+    <div id="particles-js"></div>
+    <div class="page-overlay-glow"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Sidebar ein-/ausklappen">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="sidebar-header">
+            <a href="startseite.html" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                <div class="logo-icon">TJ</div>
+                <h2>Trading Journal</h2>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <div class="nav-group-title">Trading</div>
+                <a href="funded_journal.html"><i class="fas fa-money-bill-wave"></i><span class="nav-text">Funded</span></a>
+                <a href="ek_journal.html"><i class="fas fa-wallet"></i><span class="nav-text">Eigenkapital</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Analyse</div>
+                <a href="uebersicht.html" class="active-link"><i class="fas fa-chart-pie"></i><span class="nav-text">Dashboard</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Marktdaten</div>
+                <a href="cot_daten.html"><i class="fas fa-database"></i><span class="nav-text">COT Daten</span></a>
+                <a href="waehrungsanalyse.html"><i class="fas fa-newspaper"></i><span class="nav-text">Währungen & News</span></a>
+                <a href="kalender.html"><i class="fas fa-calendar-alt"></i><span class="nav-text">Kalender</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Tools</div>
+                <a href="machine_learning.html"><i class="fas fa-brain"></i><span class="nav-text">Machine Learning</span></a>
+                <a href="simulation.html"><i class="fas fa-calculator"></i><span class="nav-text">Simulation</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">System</div>
+                <a href="kontoeinstellungen.html"><i class="fas fa-cog"></i><span class="nav-text">Einstellungen</span></a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" id="theme-toggle-sidebar"><i class="fas fa-sun"></i><span>Theme</span></button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        <div class="top-bar">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+            <h1><i class="fas fa-chart-pie"></i> Dashboard</h1>
+            <div class="top-bar-actions">
+                <select id="account-selector" style="padding: 8px 12px; border-radius: var(--radius-md); background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text-light); font-size: 0.85rem;">
+                    <option value="all">Alle Konten</option>
+                    <option value="funded">Funded</option>
+                    <option value="ek">Eigenkapital</option>
+                </select>
+            </div>
+        </div>
+
+        <main>
+            <!-- Quick Stats Banner -->
+            <section class="quick-stats animated-card" style="animation-delay: 0.1s; margin-bottom: var(--space-lg);">
+                <div class="quick-stat" onclick="openPopup('kpi-popup')" style="cursor: pointer;" title="Details anzeigen">
+                    <span class="label">Win Rate</span>
+                    <span class="value positive" id="win-rate">0%</span>
+                </div>
+                <div class="quick-stat" onclick="openPopup('kpi-popup')" style="cursor: pointer;">
+                    <span class="label">Trades</span>
+                    <span class="value" id="total-trades">0</span>
+                </div>
+                <div class="quick-stat" onclick="openPopup('kpi-popup')" style="cursor: pointer;">
+                    <span class="label">Profit Factor</span>
+                    <span class="value" id="kpi-profit-factor">0.00</span>
+                </div>
+                <div class="quick-stat" onclick="openPopup('kpi-popup')" style="cursor: pointer;">
+                    <span class="label">Gesamt-R</span>
+                    <span class="value" id="total-r">0.0 R</span>
+                </div>
+            </section>
+
+            <!-- Dashboard Grid -->
+            <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-lg);">
+                
+                <!-- Weekly Forecast Card (NEU) -->
+                <div class="dashboard-card animated-card" style="animation-delay: 0.15s; grid-column: span 3;" onclick="openPopup('forecast-popup')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title">
+                            <i class="fas fa-calendar-plus"></i>
+                            <span>Weekly Forecast - Top 3 Paare</span>
+                        </div>
+                        <span class="dashboard-card-badge">KI-gestützt</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <div id="weekly-forecast-preview" class="forecast-preview">
+                            <!-- Top 3 Paare werden via JS eingefügt -->
+                        </div>
+                        <div class="dashboard-card-hint">
+                            <i class="fas fa-info-circle"></i> Basiert auf Confluence Score (Zinsen + COT + News)
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Wochentags-Analyse Card -->
+                <div class="dashboard-card animated-card" style="animation-delay: 0.2s;" onclick="openPopup('weekday-popup')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title">
+                            <i class="fas fa-calendar-week"></i>
+                            <span>Wochentage</span>
+                        </div>
+                        <span class="dashboard-card-badge" id="best-day-badge">-</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <div class="mini-weekday-chart" id="mini-weekday-chart">
+                            <!-- Mini-Bars werden via JS eingefügt -->
+                        </div>
+                        <div class="dashboard-card-hint">
+                            <i class="fas fa-info-circle"></i> Klicken für Details
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Setup-Analyse Card -->
+                <div class="dashboard-card animated-card" style="animation-delay: 0.25s;" onclick="openPopup('setup-popup')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title">
+                            <i class="fas fa-bullseye"></i>
+                            <span>Setup-Analyse</span>
+                        </div>
+                        <span class="dashboard-card-badge" id="best-setup-badge">-</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <div id="mini-setup-list" class="mini-list">
+                            <!-- Mini-Liste wird via JS eingefügt -->
+                        </div>
+                        <div class="dashboard-card-hint">
+                            <i class="fas fa-info-circle"></i> Klicken für Details
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Währungspaar Card -->
+                <div class="dashboard-card animated-card" style="animation-delay: 0.3s;" onclick="openPopup('pairs-popup')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title">
+                            <i class="fas fa-chart-bar"></i>
+                            <span>Währungspaare</span>
+                        </div>
+                        <span class="dashboard-card-badge" id="best-pair-badge">-</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <div id="mini-pairs-list" class="mini-list">
+                            <!-- Top 3 Paare werden via JS eingefügt -->
+                        </div>
+                        <div class="dashboard-card-hint">
+                            <i class="fas fa-info-circle"></i> Klicken für alle Paare
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Setup Heatmap (NEU) -->
+            <section class="page-section animated-card" style="animation-delay: 0.35s; margin-top: var(--space-lg);">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-th"></i> Setup Heatmap - Winrate nach Pair & Setup</h2>
+                </div>
+                <div class="page-section-body">
+                    <div class="info-banner" style="margin-bottom: var(--space-md);">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>Diese Heatmap zeigt die Winrate für jede Kombination aus Währungspaar und Setup. Grün = Hohe Winrate, Rot = Niedrige Winrate.</span>
+                    </div>
+                    <div id="setup-heatmap-container" class="setup-heatmap-container">
+                        <!-- Heatmap wird via JS eingefügt -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Letzte Trades Übersicht -->
+            <section class="page-section animated-card" style="animation-delay: 0.4s; margin-top: var(--space-lg);">
+                <div class="page-section-header" style="cursor: pointer;" onclick="openPopup('trades-popup')">
+                    <h2><i class="fas fa-history"></i> Letzte Trades</h2>
+                    <span style="font-size: 0.8rem; color: var(--color-text-muted);">Alle anzeigen <i class="fas fa-chevron-right"></i></span>
+                </div>
+                <div class="page-section-body compact">
+                    <div id="recent-trades-list" class="recent-trades-mini">
+                        <!-- Letzte 5 Trades werden via JS eingefügt -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Equity Curve Section -->
+            <section class="page-section animated-card" style="animation-delay: 0.45s; margin-top: var(--space-lg);">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-chart-area"></i> Equity Curve</h2>
+                    <div class="section-actions" style="display: flex; gap: var(--space-sm); align-items: center;">
+                        <select id="equity-period-filter" style="padding: 6px 12px; border-radius: var(--radius-md); background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text-light); font-size: 0.8rem;">
+                            <option value="all">Alle Zeit</option>
+                            <option value="7d">Letzte 7 Tage</option>
+                            <option value="30d">Letzte 30 Tage</option>
+                            <option value="90d">Letzte 90 Tage</option>
+                            <option value="ytd">Dieses Jahr</option>
+                        </select>
+                        <a href="equity_curve.html" class="button secondary-button" style="padding: 6px 12px; font-size: 0.8rem;">
+                            <i class="fas fa-expand"></i> Vollansicht
+                        </a>
+                    </div>
+                </div>
+                <div class="page-section-body">
+                    <div style="height: 300px;">
+                        <canvas id="dashboard-equity-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+    <!-- ====== POPUP: KPI Details ====== -->
+    <div id="kpi-popup" class="popup-overlay">
+        <div class="popup-container">
+            <div class="popup-header">
+                <h2><i class="fas fa-chart-line"></i> Performance-Kennzahlen</h2>
+                <button class="popup-close" onclick="closePopup('kpi-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="popup-info-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="popup-info-item">
+                        <div class="label">Win Rate</div>
+                        <div class="value" id="popup-win-rate">0%</div>
+                    </div>
+                    <div class="popup-info-item">
+                        <div class="label">Gesamt-Trades</div>
+                        <div class="value" id="popup-total-trades">0</div>
+                    </div>
+                    <div class="popup-info-item">
+                        <div class="label">Gewinne</div>
+                        <div class="value positive" id="popup-wins">0</div>
+                    </div>
+                    <div class="popup-info-item">
+                        <div class="label">Verluste</div>
+                        <div class="value negative" id="popup-losses">0</div>
+                    </div>
+                    <div class="popup-info-item">
+                        <div class="label">Break Even</div>
+                        <div class="value" id="popup-be">0</div>
+                    </div>
+                    <div class="popup-info-item">
+                        <div class="label">Profit Factor</div>
+                        <div class="value" id="popup-profit-factor">0.00</div>
+                    </div>
+                </div>
+                <div class="divider-text" style="margin: var(--space-lg) 0;"><span>R-Multiple Statistiken</span></div>
+                <div class="popup-info-grid" style="grid-template-columns: repeat(4, 1fr);">
+                    <div class="popup-info-item">
+                        <div class="label">Gesamt-R</div>
+                        <div class="value" id="popup-total-r">0.0 R</div>
+                    </div>
+                    <div class="popup-info-item">
+                        <div class="label">Ø Gewinn</div>
+                        <div class="value positive" id="popup-avg-win">0.0 R</div>
+                    </div>
+                    <div class="popup-info-item">
+                        <div class="label">Ø Verlust</div>
+                        <div class="value negative" id="popup-avg-loss">0.0 R</div>
+                    </div>
+                    <div class="popup-info-item">
+                        <div class="label">Max Drawdown</div>
+                        <div class="value negative" id="popup-max-dd">0.0 R</div>
+                    </div>
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('kpi-popup')">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== POPUP: Wochentags-Analyse ====== -->
+    <div id="weekday-popup" class="popup-overlay">
+        <div class="popup-container large">
+            <div class="popup-header">
+                <h2><i class="fas fa-calendar-week"></i> Wochentags-Analyse</h2>
+                <button class="popup-close" onclick="closePopup('weekday-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div id="weekday-chart-full" class="weekday-chart-full">
+                    <!-- Volle Wochentags-Chart wird via JS eingefügt -->
+                </div>
+                <div class="info-banner" style="margin-top: var(--space-lg);">
+                    <i class="fas fa-trophy banner-icon"></i>
+                    <div class="banner-content">
+                        <h4>Bester Trading-Tag</h4>
+                        <p id="popup-best-day-info">-</p>
+                    </div>
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('weekday-popup')">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== POPUP: Setup-Analyse ====== -->
+    <div id="setup-popup" class="popup-overlay">
+        <div class="popup-container large">
+            <div class="popup-header">
+                <h2><i class="fas fa-bullseye"></i> Setup-Analyse</h2>
+                <button class="popup-close" onclick="closePopup('setup-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="data-table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Setup</th>
+                                <th>Trades</th>
+                                <th>Win Rate</th>
+                                <th>Gesamt-R</th>
+                                <th>Ø R</th>
+                            </tr>
+                        </thead>
+                        <tbody id="popup-setup-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('setup-popup')">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== POPUP: Währungspaare ====== -->
+    <div id="pairs-popup" class="popup-overlay">
+        <div class="popup-container large">
+            <div class="popup-header">
+                <h2><i class="fas fa-chart-bar"></i> Währungspaar-Analyse</h2>
+                <button class="popup-close" onclick="closePopup('pairs-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="data-table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Paar</th>
+                                <th>Trades</th>
+                                <th>Win Rate</th>
+                                <th>Gesamt-R</th>
+                                <th>Ø R</th>
+                            </tr>
+                        </thead>
+                        <tbody id="popup-pairs-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('pairs-popup')">Schließen</button>
+                <a href="waehrungsanalyse.html" class="button primary-button"><i class="fas fa-external-link-alt"></i> Zur Währungsanalyse</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== POPUP: Markt-Bias & COT ====== -->
+    <div id="market-popup" class="popup-overlay">
+        <div class="popup-container large">
+            <div class="popup-header">
+                <h2><i class="fas fa-globe"></i> Markt-Bias & COT-Daten</h2>
+                <button class="popup-close" onclick="closePopup('market-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="popup-section">
+                    <div class="popup-section-title"><i class="fas fa-compass"></i> Aktueller Bias</div>
+                    <div id="popup-bias-grid" class="stat-grid cols-4" style="margin-top: var(--space-md);">
+                        <!-- Bias wird via JS eingefügt -->
+                    </div>
+                </div>
+                <div class="popup-section" style="margin-top: var(--space-xl);">
+                    <div class="popup-section-title"><i class="fas fa-database"></i> COT Netto-Position (Commercials)</div>
+                    <div id="popup-cot-grid" class="stat-grid cols-4" style="margin-top: var(--space-md);">
+                        <!-- COT wird via JS eingefügt -->
+                    </div>
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('market-popup')">Schließen</button>
+                <a href="cot_daten.html" class="button primary-button"><i class="fas fa-external-link-alt"></i> Zu COT-Daten</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== POPUP: Letzte Trades ====== -->
+    <div id="trades-popup" class="popup-overlay">
+        <div class="popup-container large">
+            <div class="popup-header">
+                <h2><i class="fas fa-history"></i> Alle Trades</h2>
+                <button class="popup-close" onclick="closePopup('trades-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="data-table-container" style="max-height: 400px; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Paar</th>
+                                <th>Ergebnis</th>
+                                <th>R-Multiple</th>
+                                <th>Konto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="popup-trades-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('trades-popup')">Schließen</button>
+                <a href="funded_journal.html" class="button"><i class="fas fa-external-link-alt"></i> Funded Journal</a>
+                <a href="ek_journal.html" class="button"><i class="fas fa-external-link-alt"></i> EK Journal</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- ====== POPUP: Weekly Forecast (NEU) ====== -->
+    <div id="forecast-popup" class="popup-overlay">
+        <div class="popup-container large">
+            <div class="popup-header">
+                <h2><i class="fas fa-calendar-plus"></i> Weekly Forecast - Top Währungspaare</h2>
+                <button class="popup-close" onclick="closePopup('forecast-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="info-banner" style="margin-bottom: var(--space-md);">
+                    <i class="fas fa-robot"></i>
+                    <span>Diese Prognose basiert auf dem Confluence Score (Zinsdifferenzen + COT-Positionen + News-Sentiment). Währungspaare mit den höchsten Scores werden empfohlen.</span>
+                </div>
+                <div id="forecast-full-list" class="forecast-list">
+                    <!-- Vollständige Liste wird via JS eingefügt -->
+                </div>
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('forecast-popup')">Schließen</button>
+                <a href="waehrungsanalyse.html" class="button primary-button"><i class="fas fa-external-link-alt"></i> Zur Währungsanalyse</a>
+            </div>
+        </div>
+    </div>
+
+        <footer>
+            <div class="footer-branding">Kerim Trading Journal</div>
+            <p>© 2025</p>
+        </footer>
+    </div><!-- End main-content -->
+
+    <a href="#" class="scroll-to-top-btn" title="Nach oben">
+        <i class="fas fa-arrow-up"></i>
+    </a>
+
+    <script src="global.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="db.js"></script>
+    <script src="interest_rates.js"></script>
+    <script src="uebersicht.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            tsParticles.load("particles-js", {
+                fpsLimit: 60,
+                particles: {
+                    number: { value: 50, density: { enable: true, value_area: 900 } },
+                    color: { value: "#D4A853" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.25, random: true, anim: { enable: true, speed: 0.2, opacity_min: 0.05, sync: false } },
+                    size: { value: 2, random: true },
+                    move: {
+                        enable: true,
+                        speed: 0.2,
+                        direction: "none",
+                        random: true,
+                        straight: false,
+                        out_mode: "out",
+                        bounce: false,
+                    }
+                },
+                interactivity: { detect_on: "canvas", events: { onhover: { enable: false }, onclick: { enable: false }, resize: true } },
+                retina_detect: true,
+            });
+        });
+    </script>
+</body>
+
+</html>

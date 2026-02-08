@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <script src="auth_guard.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>Funded Journal</title>
+
+    <link rel="icon" type="image/png"
+        href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/trending_up_black_24dp.png"
+        sizes="32x32">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="print.css" media="print">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="config.js"></script>
+    <script src="data_manager.js"></script>
+
+    <!-- v2.0 Module -->
+    <script src="backup_manager.js"></script>
+    <script src="performance_manager.js"></script>
+    <script src="import_export_manager.js"></script>
+    <script src="enhanced_auth.js"></script>
+    <script src="ui_feedback.js"></script>
+    <script src="sw-registration.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.0.6/tsparticles.slim.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+
+<body>
+    <div id="particles-js"></div>
+    <div class="page-overlay-glow"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Sidebar ein-/ausklappen">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="sidebar-header">
+            <a href="startseite.html" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                <div class="logo-icon">TJ</div>
+                <h2>Trading Journal</h2>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <div class="nav-group-title">Trading</div>
+                <a href="funded_journal.html" class="active-link"><i class="fas fa-money-bill-wave"></i><span class="nav-text">Funded</span></a>
+                <a href="ek_journal.html"><i class="fas fa-wallet"></i><span class="nav-text">Eigenkapital</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Analyse</div>
+                <a href="uebersicht.html"><i class="fas fa-chart-pie"></i><span class="nav-text">Dashboard</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Marktdaten</div>
+                <a href="cot_daten.html"><i class="fas fa-database"></i><span class="nav-text">COT Daten</span></a>
+                <a href="waehrungsanalyse.html"><i class="fas fa-newspaper"></i><span class="nav-text">Währungen & News</span></a>
+                <a href="kalender.html"><i class="fas fa-calendar-alt"></i><span class="nav-text">Kalender</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Tools</div>
+                <a href="machine_learning.html"><i class="fas fa-brain"></i><span class="nav-text">Machine Learning</span></a>
+                <a href="simulation.html"><i class="fas fa-calculator"></i><span class="nav-text">Simulation</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">System</div>
+                <a href="kontoeinstellungen.html"><i class="fas fa-cog"></i><span class="nav-text">Einstellungen</span></a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" id="theme-toggle-sidebar"><i class="fas fa-sun"></i><span>Theme</span></button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        <div class="top-bar">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+            <h1><i class="fas fa-money-bill-wave"></i> Funded Journal</h1>
+            <div class="top-bar-actions">
+                <button id="add-trade-btn" class="button primary-button"><i class="fas fa-plus"></i> Trade</button>
+                <button id="add-transaction-btn" class="button secondary-button"><i class="fas fa-exchange-alt"></i> Transaktion</button>
+            </div>
+        </div>
+
+        <main>
+            <!-- Quick Stats -->
+            <section class="quick-stats animated-card" style="animation-delay: 0.1s; margin-bottom: var(--space-lg);">
+                <div class="quick-stat">
+                    <span class="label">Kapital</span>
+                    <span class="value" id="quick-balance">-</span>
+                </div>
+                <div class="quick-stat">
+                    <span class="label">Trades</span>
+                    <span class="value" id="quick-trades">0</span>
+                </div>
+                <div class="quick-stat">
+                    <span class="label">Win Rate</span>
+                    <span class="value positive" id="quick-winrate">0%</span>
+                </div>
+                <div class="quick-stat">
+                    <span class="label">Gesamt-R</span>
+                    <span class="value" id="quick-total-r">0 R</span>
+                </div>
+            </section>
+
+            <!-- Account Goals (Kompakt) -->
+            <section id="account-goals-container" class="animated-card" style="animation-delay: 0.15s; margin-bottom: var(--space-lg);">
+            </section>
+
+            <!-- Filter & View Controls -->
+            <section class="page-section animated-card" style="animation-delay: 0.2s;">
+                <div class="page-section-body compact" style="padding: var(--space-md);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md);">
+                        <div class="filter-compact">
+                            <select id="filter-result">
+                                <option value="all">Alle Ergebnisse</option>
+                                <option value="win">Gewinne</option>
+                                <option value="loss">Verluste</option>
+                                <option value="breakeven">Break Even</option>
+                            </select>
+                            <select id="filter-pair">
+                                <option value="all">Alle Paare</option>
+                            </select>
+                            <div class="filter-chip" data-filter="setup_daily_bos">BOS</div>
+                            <div class="filter-chip" data-filter="setup_value_area">VA</div>
+                            <div class="filter-chip" data-filter="setup_market_structure">MS</div>
+                            <div class="filter-chip" data-filter="setup_weekly_gva">W-GVA</div>
+                            <div class="filter-chip" data-filter="setup_3day_gva">3D-GVA</div>
+                            <button id="reset-filters" class="btn-icon" title="Filter zurücksetzen">
+                                <i class="fas fa-undo"></i>
+                            </button>
+                        </div>
+                        <div class="view-toggle">
+                            <button class="view-toggle-btn active" data-view="cards" title="Kartenansicht">
+                                <i class="fas fa-th-large"></i>
+                            </button>
+                            <button class="view-toggle-btn" data-view="table" title="Tabellenansicht">
+                                <i class="fas fa-list"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Trade Cards Grid -->
+            <section id="trades-cards-section" class="animated-card" style="animation-delay: 0.25s;">
+                <div id="trade-cards-container" class="trade-cards-grid">
+                    <!-- Trade Cards werden hier via JS eingefügt -->
+                </div>
+            </section>
+
+            <!-- Trade Table (Hidden by default) -->
+            <section id="trades-table-section" class="page-section animated-card" style="animation-delay: 0.25s; display: none;">
+                <div class="page-section-body">
+                    <div class="data-table-container">
+                        <table class="data-table" id="trade-table">
+                            <thead>
+                                <tr>
+                                    <th>Datum</th>
+                                    <th>Paar</th>
+                                    <th>R-Mult</th>
+                                    <th>Ergebnis</th>
+                                    <th>Risiko %</th>
+                                    <th>Setups</th>
+                                    <th>Tags</th>
+                                    <th>Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trade-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+    <!-- ====== POPUP: Neuer Trade ====== -->
+    <div id="trade-form-popup" class="popup-overlay">
+        <div class="popup-container form-popup">
+            <div class="popup-header">
+                <h2><i class="fas fa-plus-circle"></i> <span id="form-popup-title">Neuer Trade</span></h2>
+                <button class="popup-close" onclick="closePopup('trade-form-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <form id="trade-form" class="popup-form">
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="pair">Währungspaar</label>
+                            <select id="pair" name="pair" required>
+                                <option value="">-- Wähle Paar --</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="date">Datum</label>
+                            <input type="date" id="date" name="date" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="result">Ergebnis</label>
+                            <select id="result" name="result" required>
+                                <option value="">-- Ergebnis --</option>
+                                <option value="win">Gewinn (Win)</option>
+                                <option value="loss">Verlust (Loss)</option>
+                                <option value="breakeven">Break Even</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="r-multiple">R-Multiple</label>
+                            <input type="number" id="r-multiple" name="r-multiple" step="0.1" required placeholder="z.B. 1.5">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field" style="flex: 1;">
+                            <label for="risk-percent">Risiko (% vom Konto)</label>
+                            <input type="number" id="risk-percent" name="risk-percent" step="0.1" placeholder="Optional - Standard wird verwendet">
+                        </div>
+                    </div>
+
+                    <div class="divider-text"><span>Setup auswählen</span></div>
+                    
+                    <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-bottom: var(--space-md);">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="setup_daily_bos" name="setup_daily_bos">
+                            <span>Daily BOS</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="setup_value_area" name="setup_value_area">
+                            <span>Value Area</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="setup_market_structure" name="setup_market_structure">
+                            <span>Market Structure</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="setup_weekly_gva" name="setup_weekly_gva">
+                            <span>Weekly GVA</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="setup_3day_gva" name="setup_3day_gva">
+                            <span>3Day GVA</span>
+                        </label>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field" style="flex: 1;">
+                            <label for="tags">Freie Tags (kommagetrennt)</label>
+                            <input type="text" id="tags" name="tags" placeholder="z.B. Psychologie, News">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field" style="flex: 1;">
+                            <label for="notes">Notizen & Learnings</label>
+                            <textarea id="notes" name="notes" rows="3" placeholder="Was hast du gelernt?"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field" style="flex: 1;">
+                            <label for="screenshot">Screenshot</label>
+                            <input type="file" id="screenshot" name="screenshot" accept="image/png, image/jpeg, image/webp">
+                            <img id="screenshot-preview" class="screenshot-preview" src="" alt="Vorschau" style="display: none; margin-top: 10px; max-width: 100%; border-radius: var(--radius-md);" />
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="popup-footer">
+                <button type="button" class="button secondary-button" onclick="closePopup('trade-form-popup')">Abbrechen</button>
+                <button type="submit" form="trade-form" class="button primary-button"><i class="fas fa-save"></i> Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== POPUP: Trade Details ====== -->
+    <div id="trade-detail-popup" class="popup-overlay">
+        <div class="popup-container large">
+            <div class="popup-header">
+                <h2><i class="fas fa-chart-line"></i> Trade Details</h2>
+                <button class="popup-close" onclick="closePopup('trade-detail-popup')">&times;</button>
+            </div>
+            <div class="popup-body" id="trade-detail-content">
+                <!-- Content wird via JS eingefügt -->
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('trade-detail-popup')">Schließen</button>
+                <button id="detail-edit-btn" class="button"><i class="fas fa-edit"></i> Bearbeiten</button>
+                <button id="detail-delete-btn" class="button" style="background: var(--color-pnl-negative-bg); border-color: var(--color-pnl-negative); color: var(--color-pnl-negative);"><i class="fas fa-trash"></i> Löschen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== POPUP: Transaktion ====== -->
+    <div id="transaction-popup" class="popup-overlay">
+        <div class="popup-container small">
+            <div class="popup-header">
+                <h2><i class="fas fa-exchange-alt"></i> Transaktion buchen</h2>
+                <button class="popup-close" onclick="closePopup('transaction-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <form id="transaction-form" class="popup-form">
+                    <div class="form-field">
+                        <label for="txn-date">Datum</label>
+                        <input type="date" id="txn-date" name="txn-date" required>
+                    </div>
+                    <div class="form-field">
+                        <label for="txn-type">Typ</label>
+                        <select id="txn-type" name="txn-type" required>
+                            <option value="deposit">Einzahlung</option>
+                            <option value="withdrawal">Auszahlung</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="txn-amount">Betrag</label>
+                        <input type="number" id="txn-amount" name="txn-amount" step="0.01" min="0" required placeholder="z.B. 500.00">
+                    </div>
+                    <div class="form-field">
+                        <label for="txn-note">Notiz (optional)</label>
+                        <input type="text" id="txn-note" name="txn-note" placeholder="z.B. Payout #1">
+                    </div>
+                </form>
+            </div>
+            <div class="popup-footer">
+                <button type="button" class="button secondary-button" onclick="closePopup('transaction-popup')">Abbrechen</button>
+                <button type="submit" form="transaction-form" class="button primary-button"><i class="fas fa-save"></i> Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== POPUP: Transaktions-Historie ====== -->
+    <div id="transactions-history-popup" class="popup-overlay">
+        <div class="popup-container">
+            <div class="popup-header">
+                <h2><i class="fas fa-history"></i> Transaktions-Historie</h2>
+                <button class="popup-close" onclick="closePopup('transactions-history-popup')">&times;</button>
+            </div>
+            <div class="popup-body">
+                <ul id="transaction-history" class="transaction-list"></ul>
+            </div>
+            <div class="popup-footer">
+                <button class="button secondary-button" onclick="closePopup('transactions-history-popup')">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <footer>
+        <div class="footer-branding">Kerim Trading Journal</div>
+        <p>© 2025</p>
+    </footer>
+    </div><!-- End main-content -->
+
+    <a href="#" class="scroll-to-top-btn" title="Nach oben">
+        <i class="fas fa-arrow-up"></i>
+    </a>
+
+    <script>
+        const ACCOUNT_TYPE = 'funded';
+    </script>
+    <script src="global.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="journal.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            tsParticles.load("particles-js", {
+                fpsLimit: 60,
+                particles: {
+                    number: { value: 50, density: { enable: true, value_area: 900 } },
+                    color: { value: "#D4A853" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.25, random: true, anim: { enable: true, speed: 0.2, opacity_min: 0.05, sync: false } },
+                    size: { value: 2, random: true },
+                    move: {
+                        enable: true,
+                        speed: 0.2,
+                        direction: "none",
+                        random: true,
+                        straight: false,
+                        out_mode: "out",
+                        bounce: false,
+                    }
+                },
+                interactivity: { detect_on: "canvas", events: { onhover: { enable: false }, onclick: { enable: false }, resize: true } },
+                retina_detect: true,
+            });
+        });
+    </script>
+
+</body>
+
+</html>

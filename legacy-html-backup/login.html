@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Trading Journal</title>
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/trending_up_black_24dp.png" sizes="32x32">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <!-- v2.0 Module (Login benötigt nur Auth & UI) -->
+    <script src="enhanced_auth.js"></script>
+    <script src="ui_feedback.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.0.6/tsparticles.slim.bundle.min.js"></script>
+</head>
+<body class="login-body">
+    
+    <div id="particles-js"></div>
+    <div class="page-overlay-glow"></div>
+
+    <main class="login-container">
+        <section class="page-section animated-card" style="width: 100%; max-width: 420px; text-align: center;">
+            <div class="page-section-body" style="padding: var(--space-xl);">
+                <div class="logo-icon" style="width: 60px; height: 60px; font-size: 1.5rem; margin: 0 auto var(--space-lg);">TJ</div>
+                <h1 class="login-title" style="font-size: 1.5rem; letter-spacing: 0.2em;">TRADING JOURNAL</h1>
+                <p class="login-subtitle" style="color: var(--color-text-subtle); margin-bottom: var(--space-lg);">Bitte authentifizieren</p>
+                
+                <form id="login-form" class="form-section">
+                    <div class="form-field" style="text-align: left;">
+                        <label for="password">Passwort</label>
+                        <input type="password" id="password" name="password" required placeholder="••••••••">
+                    </div>
+                    
+                    <button type="submit" class="button primary-button" style="width: 100%; margin-top: var(--space-md);">
+                        <i class="fas fa-sign-in-alt"></i> Einloggen
+                    </button>
+                    
+                    <p id="login-error-msg" class="login-error"></p>
+                </form>
+                
+                <p class="login-footer-hint" style="margin-top: var(--space-lg); font-size: 0.75rem; color: var(--color-text-subtle);">
+                    Noch kein Passwort? Setze es in den <a href="kontoeinstellungen.html" style="color: var(--color-accent);">Einstellungen</a>.
+                </p>
+            </div>
+        </section>
+    </main>
+    
+    <script src="login.js"></script>
+    <script>
+        // Partikel (wie auf der Startseite)
+        document.addEventListener('DOMContentLoaded', (event) => {
+            tsParticles.load("particles-js", {
+                fpsLimit: 60,
+                particles: {
+                    number: { value: 50, density: { enable: true, value_area: 900 } },
+                    color: { value: "#D4A853" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.3, random: true, anim: { enable: true, speed: 0.2, opacity_min: 0.05, sync: false } },
+                    size: { value: 2, random: true },
+                    move: {
+                        enable: true,
+                        speed: 0.2, 
+                        direction: "none",
+                        random: true,
+                        straight: false,
+                        out_mode: "out",
+                        bounce: false,
+                    }
+                },
+                interactivity: { detect_on: "canvas", events: { onhover: { enable: false }, onclick: { enable: false }, resize: true } },
+                retina_detect: true,
+            });
+        });
+    </script>
+</body>
+</html>

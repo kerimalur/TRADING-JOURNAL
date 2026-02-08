@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>Kontoeinstellungen - Trading Journal</title>
+    
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/trending_up_black_24dp.png" sizes="32x32">
+    <link rel="stylesheet" href="styles.css"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    
+    <script src="config.js"></script>
+    <script src="data_manager.js"></script>
+
+    <!-- v2.0 Module -->
+    <script src="backup_manager.js"></script>
+    <script src="performance_manager.js"></script>
+    <script src="import_export_manager.js"></script>
+    <script src="enhanced_auth.js"></script>
+    <script src="ui_feedback.js"></script>
+    <script src="sw-registration.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.0.6/tsparticles.slim.bundle.min.js"></script>
+</head>
+<body>
+
+    <div id="particles-js"></div>
+    <div class="page-overlay-glow"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Sidebar ein-/ausklappen">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="sidebar-header">
+            <a href="startseite.html" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                <div class="logo-icon">TJ</div>
+                <h2>Trading Journal</h2>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <div class="nav-group-title">Trading</div>
+                <a href="funded_journal.html"><i class="fas fa-money-bill-wave"></i><span class="nav-text">Funded</span></a>
+                <a href="ek_journal.html"><i class="fas fa-wallet"></i><span class="nav-text">Eigenkapital</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Analyse</div>
+                <a href="uebersicht.html"><i class="fas fa-chart-pie"></i><span class="nav-text">Dashboard</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Marktdaten</div>
+                <a href="cot_daten.html"><i class="fas fa-database"></i><span class="nav-text">COT Daten</span></a>
+                <a href="waehrungsanalyse.html"><i class="fas fa-newspaper"></i><span class="nav-text">Währungen & News</span></a>
+                <a href="kalender.html"><i class="fas fa-calendar-alt"></i><span class="nav-text">Kalender</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Tools</div>
+                <a href="machine_learning.html"><i class="fas fa-brain"></i><span class="nav-text">Machine Learning</span></a>
+                <a href="simulation.html"><i class="fas fa-calculator"></i><span class="nav-text">Simulation</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">System</div>
+                <a href="kontoeinstellungen.html" class="active-link"><i class="fas fa-cog"></i><span class="nav-text">Einstellungen</span></a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" id="theme-toggle-sidebar"><i class="fas fa-sun"></i><span>Theme</span></button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        <div class="top-bar">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+            <h1><i class="fas fa-cog"></i> Kontoeinstellungen</h1>
+            <div class="top-bar-actions">
+            </div>
+        </div>
+
+        <main>
+    
+        <!-- Passwort-Sicherheit -->
+        <section class="page-section animated-card" style="animation-delay: 0.1s;">
+            <div class="page-section-header">
+                <h2><i class="fas fa-shield-alt"></i> Journal-Sicherheit</h2>
+            </div>
+            <div class="page-section-body">
+                <form id="password-form" class="form-section">
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="new-password">Neues Passwort</label>
+                            <input type="password" id="new-password" name="new-password" required placeholder="••••••••">
+                        </div>
+                        <div class="form-field">
+                            <label for="confirm-password">Passwort bestätigen</label>
+                            <input type="password" id="confirm-password" name="confirm-password" required placeholder="••••••••">
+                        </div>
+                    </div>
+                    <div class="action-buttons" style="justify-content: flex-start; margin-top: var(--space-sm);">
+                        <button type="submit" class="button primary-button"><i class="fas fa-key"></i> Passwort speichern</button>
+                    </div>
+                    <p id="password-error-msg" class="login-error" style="margin-top: var(--space-sm);"></p>
+                </form>
+            </div>
+        </section>
+
+        <!-- EK Konfiguration -->
+        <section class="page-section animated-card" style="animation-delay: 0.15s;">
+            <div class="page-section-header">
+                <h2><i class="fas fa-wallet"></i> EK Journal Konfiguration</h2>
+                <span class="section-badge">Live/Demo</span>
+            </div>
+            <div class="page-section-body">
+                <form id="ek-config-form" class="form-section">
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="ek-initial-balance">Startkapital</label>
+                            <input type="number" id="ek-initial-balance" name="initialStartBalance" step="1.00" required placeholder="z.B. 1000">
+                        </div>
+                        <div class="form-field">
+                            <label for="ek-default-risk">Risiko pro Trade (%)</label>
+                            <input type="number" id="ek-default-risk" name="defaultRiskPerTrade" step="0.1" required placeholder="z.B. 1.0">
+                        </div>
+                        <div class="form-field">
+                            <label for="ek-currency">Währung</label>
+                            <select id="ek-currency" name="currency">
+                                <option value="USD">USD ($)</option>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="CHF">CHF (Fr.)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="action-buttons" style="justify-content: flex-start; margin-top: var(--space-sm);">
+                        <button type="submit" class="button secondary-button"><i class="fas fa-save"></i> EK speichern</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Funded Konfiguration -->
+        <section class="page-section animated-card" style="animation-delay: 0.2s;">
+            <div class="page-section-header">
+                <h2><i class="fas fa-money-bill-wave"></i> Funded Account Konfiguration</h2>
+                <span class="section-badge tag-success">Challenge/Prop</span>
+            </div>
+            <div class="page-section-body">
+                <form id="funded-config-form" class="form-section">
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="funded-initial-balance">Kontogröße</label>
+                            <input type="number" id="funded-initial-balance" name="initialStartBalance" step="1.00" required placeholder="z.B. 50000">
+                        </div>
+                        <div class="form-field">
+                            <label for="funded-default-risk">Risiko pro Trade (%)</label>
+                            <input type="number" id="funded-default-risk" name="defaultRiskPerTrade" step="0.1" required placeholder="z.B. 1.0">
+                        </div>
+                        <div class="form-field">
+                            <label for="funded-currency">Währung</label>
+                            <select id="funded-currency" name="currency">
+                                <option value="USD">USD ($)</option>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="CHF">CHF (Fr.)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="divider-text"><span>Zieldefinitionen</span></div>
+                    
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="funded-profit-target-value">Profit-Ziel Wert</label>
+                            <input type="number" id="funded-profit-target-value" name="profitTargetValue" step="0.01" required placeholder="z.B. 8">
+                        </div>
+                        <div class="form-field">
+                            <label for="funded-profit-target-type">Profit-Ziel Typ</label>
+                            <select id="funded-profit-target-type" name="profitTargetType">
+                                <option value="absolute">Absoluter Betrag ($)</option>
+                                <option value="percent">Prozent vom Startkapital (%)</option>
+                                <option value="r_multiple">R-Multiple (R)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="funded-max-drawdown-value">Max. Drawdown Wert</label>
+                            <input type="number" id="funded-max-drawdown-value" name="maxDrawdownValue" step="0.01" required placeholder="z.B. 10">
+                        </div>
+                        <div class="form-field">
+                            <label for="funded-max-drawdown-type">Max. Drawdown Typ</label>
+                            <select id="funded-max-drawdown-type" name="maxDrawdownType">
+                                <option value="absolute">Absoluter Betrag ($)</option>
+                                <option value="percent">Prozent vom Startkapital (%)</option>
+                                <option value="r_multiple">R-Multiple (R)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="action-buttons" style="justify-content: flex-start; margin-top: var(--space-sm);">
+                        <button type="submit" class="button primary-button"><i class="fas fa-save"></i> Funded speichern</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+        
+        <!-- Backup -->
+        <section class="page-section animated-card" style="animation-delay: 0.25s;">
+            <div class="page-section-header">
+                <h2><i class="fas fa-database"></i> Daten-Backup</h2>
+            </div>
+            <div class="page-section-body compact">
+                <p style="color: var(--color-text-subtle); margin-bottom: var(--space-md); font-size: 0.85rem;">
+                    Sichere alle deine Trades, Analysen und Kontostände in einer einzigen JSON-Datei.
+                </p>
+                <div class="action-buttons" style="justify-content: flex-start;">
+                    <button id="export-button" class="button primary-button"><i class="fas fa-download"></i> Backup Exportieren</button>
+                    <button id="import-button" class="button secondary-button"><i class="fas fa-upload"></i> Backup Importieren</button>
+                    <input type="file" id="import-file" accept=".json" style="display: none;">
+                </div>
+            </div>
+        </section>
+        
+        <!-- Gefahrenzone -->
+        <section class="page-section animated-card" style="animation-delay: 0.3s; border: 1px solid rgba(239, 83, 80, 0.3);">
+            <div class="page-section-header" style="background: rgba(239, 83, 80, 0.1);">
+                <h2 style="color: var(--color-pnl-negative);"><i class="fas fa-exclamation-triangle"></i> Gefahrenzone</h2>
+            </div>
+            <div class="page-section-body compact">
+                <p style="color: var(--color-text-subtle); margin-bottom: var(--space-md); font-size: 0.85rem;">
+                    Achtung: Diese Aktionen löschen alle Trades und Transaktionen unwiderruflich.
+                </p>
+                <div class="action-buttons" style="justify-content: flex-start;">
+                    <button id="reset-ek-btn" class="button secondary-button" style="border-color: var(--color-pnl-negative); color: var(--color-pnl-negative);">
+                        <i class="fas fa-trash-alt"></i> EK zurücksetzen
+                    </button>
+                    <button id="reset-funded-btn" class="button" style="background: var(--color-pnl-negative); background-image: none;">
+                        <i class="fas fa-trash-alt"></i> Funded zurücksetzen
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        </main>
+
+        <footer>
+            <div class="footer-branding">Kerim Trading Journal</div>
+            <p>© 2025</p>
+        </footer>
+    </div><!-- End main-content -->
+
+    <a href="#" class="scroll-to-top-btn" title="Nach oben">
+        <i class="fas fa-arrow-up"></i>
+    </a>
+    
+    <script src="global.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="kontoeinstellungen.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            tsParticles.load("particles-js", {
+                fpsLimit: 60,
+                particles: {
+                    number: { value: 50, density: { enable: true, value_area: 900 } },
+                    color: { value: "#D4A853" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.25, random: true, anim: { enable: true, speed: 0.2, opacity_min: 0.05, sync: false } },
+                    size: { value: 2, random: true },
+                    move: {
+                        enable: true,
+                        speed: 0.2,
+                        direction: "none",
+                        random: true,
+                        straight: false,
+                        out_mode: "out",
+                        bounce: false,
+                    }
+                },
+                interactivity: { detect_on: "canvas", events: { onhover: { enable: false }, onclick: { enable: false }, resize: true } },
+                retina_detect: true,
+            });
+        });
+    </script>
+</body>
+</html>

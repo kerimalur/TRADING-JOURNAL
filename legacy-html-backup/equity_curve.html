@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <script src="auth_guard.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>Equity Curve - Kerims Trading Journal</title>
+
+    <link rel="icon" type="image/png"
+        href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/trending_up_black_24dp.png"
+        sizes="32x32">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <script src="config.js"></script>
+    <script src="data_manager.js"></script>
+
+    <!-- v2.0 Module -->
+    <script src="backup_manager.js"></script>
+    <script src="performance_manager.js"></script>
+    <script src="import_export_manager.js"></script>
+    <script src="enhanced_auth.js"></script>
+    <script src="ui_feedback.js"></script>
+    <script src="sw-registration.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.0.6/tsparticles.slim.bundle.min.js"></script>
+</head>
+
+<body>
+    <div id="particles-js"></div>
+    <div class="page-overlay-glow"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Sidebar ein-/ausklappen">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="sidebar-header">
+            <a href="startseite.html" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                <div class="logo-icon">TJ</div>
+                <h2>Trading Journal</h2>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <div class="nav-group-title">Trading</div>
+                <a href="funded_journal.html"><i class="fas fa-money-bill-wave"></i><span class="nav-text">Funded</span></a>
+                <a href="ek_journal.html"><i class="fas fa-wallet"></i><span class="nav-text">Eigenkapital</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Analyse</div>
+                <a href="uebersicht.html" class="active-link"><i class="fas fa-chart-pie"></i><span class="nav-text">Dashboard</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Marktdaten</div>
+                <a href="cot_daten.html"><i class="fas fa-database"></i><span class="nav-text">COT Daten</span></a>
+                <a href="waehrungsanalyse.html"><i class="fas fa-newspaper"></i><span class="nav-text">Währungen & News</span></a>
+                <a href="kalender.html"><i class="fas fa-calendar-alt"></i><span class="nav-text">Kalender</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Tools</div>
+                <a href="machine_learning.html"><i class="fas fa-brain"></i><span class="nav-text">Machine Learning</span></a>
+                <a href="simulation.html"><i class="fas fa-calculator"></i><span class="nav-text">Simulation</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">System</div>
+                <a href="kontoeinstellungen.html"><i class="fas fa-cog"></i><span class="nav-text">Einstellungen</span></a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" id="theme-toggle-sidebar"><i class="fas fa-sun"></i><span>Theme</span></button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        <div class="top-bar">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+            <h1><i class="fas fa-chart-area"></i> Equity Curve</h1>
+            <div class="top-bar-actions"></div>
+        </div>
+
+        <main>
+            <!-- Chart-Einstellungen -->
+            <section class="page-section animated-card" style="animation-delay: 0.1s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-sliders-h"></i> Chart-Einstellungen</h2>
+                </div>
+                <div class="page-section-body">
+                    <div class="form-row" style="align-items: flex-end; flex-wrap: wrap; gap: var(--space-md);">
+                        <div class="form-field">
+                            <label for="account-selector">Konto</label>
+                            <select id="account-selector">
+                                <option value="ek">EK Account</option>
+                                <option value="funded">Funded Account</option>
+                            </select>
+                        </div>
+                        <div class="form-field" style="flex: 0 0 auto;">
+                            <label class="checkbox-label" style="padding: 10px 0;">
+                                <input type="checkbox" id="r-multiple-toggle" name="r-multiple-toggle">
+                                <span>Kumulierte R-Multiple anzeigen</span>
+                            </label>
+                        </div>
+                    </div>
+                    <!-- Datumsfilter -->
+                    <div class="form-row" style="margin-top: var(--space-md); align-items: flex-end; flex-wrap: wrap; gap: var(--space-md);">
+                        <div class="form-field">
+                            <label for="date-from">Von Datum</label>
+                            <input type="date" id="date-from">
+                        </div>
+                        <div class="form-field">
+                            <label for="date-to">Bis Datum</label>
+                            <input type="date" id="date-to">
+                        </div>
+                        <div class="form-field" style="flex: 0 0 auto;">
+                            <button class="button secondary-button" id="apply-date-filter">
+                                <i class="fas fa-filter"></i> Filter anwenden
+                            </button>
+                        </div>
+                        <div class="form-field" style="flex: 0 0 auto;">
+                            <button class="button" id="reset-date-filter">
+                                <i class="fas fa-times"></i> Zurücksetzen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Chart -->
+            <section class="page-section animated-card" style="animation-delay: 0.15s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-chart-line"></i> Performance-Chart</h2>
+                    <div class="section-actions" id="time-filter-controls" style="gap: var(--space-sm);">
+                        <button class="button primary-button time-filter-btn active" data-filter="all">Gesamt</button>
+                        <button class="button secondary-button time-filter-btn" data-filter="month">Letzter Monat</button>
+                        <button class="button secondary-button time-filter-btn" data-filter="week">Letzte Woche</button>
+                        <button class="button secondary-button time-filter-btn" data-filter="day">Heute</button>
+                    </div>
+                </div>
+                <div class="page-section-body">
+                    <div class="chart-container" style="height: 450px;">
+                        <canvas id="equity-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Trade-Statistiken -->
+            <section class="page-section animated-card" style="animation-delay: 0.2s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-chart-bar"></i> Zeitraum-Statistiken</h2>
+                </div>
+                <div class="page-section-body">
+                    <div class="kennzahlen-grid" id="equity-stats-grid">
+                        <div class="kennzahl-card">
+                            <i class="fas fa-hashtag icon-placeholder"></i>
+                            <div class="label">Trades im Zeitraum</div>
+                            <strong id="stat-trades">0</strong>
+                        </div>
+                        <div class="kennzahl-card">
+                            <i class="fas fa-percent icon-placeholder"></i>
+                            <div class="label">Win Rate</div>
+                            <strong id="stat-winrate">0%</strong>
+                        </div>
+                        <div class="kennzahl-card">
+                            <i class="fas fa-coins icon-placeholder"></i>
+                            <div class="label">Gesamt R</div>
+                            <strong id="stat-total-r">0 R</strong>
+                        </div>
+                        <div class="kennzahl-card">
+                            <i class="fas fa-arrow-down icon-placeholder"></i>
+                            <div class="label">Max Drawdown</div>
+                            <strong id="stat-drawdown">0 R</strong>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <div class="footer-branding">Kerim Trading Journal</div>
+            <p>© 2025</p>
+        </footer>
+    </div><!-- End main-content -->
+
+    <a href="#" class="scroll-to-top-btn" title="Nach oben">
+        <i class="fas fa-arrow-up"></i>
+    </a>
+
+    <script src="global.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="equity_curve.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            tsParticles.load("particles-js", {
+                fpsLimit: 60,
+                particles: {
+                    number: { value: 50, density: { enable: true, value_area: 900 } },
+                    color: { value: "#D4A853" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.25, random: true, anim: { enable: true, speed: 0.2, opacity_min: 0.05, sync: false } },
+                    size: { value: 2, random: true },
+                    move: {
+                        enable: true,
+                        speed: 0.2,
+                        direction: "none",
+                        random: true,
+                        straight: false,
+                        out_mode: "out",
+                        bounce: false,
+                    }
+                },
+                interactivity: { detect_on: "canvas", events: { onhover: { enable: false }, onclick: { enable: false }, resize: true } },
+                retina_detect: true,
+            });
+        });
+    </script>
+</body>
+
+</html>

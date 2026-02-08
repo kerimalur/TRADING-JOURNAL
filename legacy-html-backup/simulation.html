@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <script src="auth_guard.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>Monte Carlo Simulation - Kerims Trading Journal</title>
+
+    <link rel="icon" type="image/png"
+        href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/trending_up_black_24dp.png"
+        sizes="32x32">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <script src="config.js"></script>
+    <script src="data_manager.js"></script>
+
+    <!-- v2.0 Module -->
+    <script src="backup_manager.js"></script>
+    <script src="performance_manager.js"></script>
+    <script src="import_export_manager.js"></script>
+    <script src="enhanced_auth.js"></script>
+    <script src="ui_feedback.js"></script>
+    <script src="sw-registration.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.0.6/tsparticles.slim.bundle.min.js"></script>
+</head>
+
+<body>
+
+    <div id="particles-js"></div>
+    <div class="page-overlay-glow"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Sidebar ein-/ausklappen">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <div class="sidebar-header">
+            <a href="startseite.html" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                <div class="logo-icon">TJ</div>
+                <h2>Trading Journal</h2>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <div class="nav-group-title">Trading</div>
+                <a href="funded_journal.html"><i class="fas fa-money-bill-wave"></i><span class="nav-text">Funded</span></a>
+                <a href="ek_journal.html"><i class="fas fa-wallet"></i><span class="nav-text">Eigenkapital</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Analyse</div>
+                <a href="uebersicht.html"><i class="fas fa-chart-pie"></i><span class="nav-text">Dashboard</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Marktdaten</div>
+                <a href="cot_daten.html"><i class="fas fa-database"></i><span class="nav-text">COT Daten</span></a>
+                <a href="waehrungsanalyse.html"><i class="fas fa-newspaper"></i><span class="nav-text">Währungen & News</span></a>
+                <a href="kalender.html"><i class="fas fa-calendar-alt"></i><span class="nav-text">Kalender</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Tools</div>
+                <a href="machine_learning.html"><i class="fas fa-brain"></i><span class="nav-text">Machine Learning</span></a>
+                <a href="simulation.html" class="active-link"><i class="fas fa-calculator"></i><span class="nav-text">Simulation</span></a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">System</div>
+                <a href="kontoeinstellungen.html"><i class="fas fa-cog"></i><span class="nav-text">Einstellungen</span></a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" id="theme-toggle-sidebar"><i class="fas fa-sun"></i><span>Theme</span></button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        <div class="top-bar">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+            <h1><i class="fas fa-calculator"></i> Monte Carlo Simulation</h1>
+            <div class="top-bar-actions">
+            </div>
+        </div>
+
+        <main>
+            <!-- Quick Access Cards -->
+            <section class="dashboard-grid" style="margin-bottom: var(--space-lg);">
+                <div class="dashboard-card animated-card" style="animation-delay: 0.05s;" onclick="openPopup('sim-params-popup')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title"><i class="fas fa-sliders-h"></i><span>Parameter</span></div>
+                        <span class="dashboard-card-badge">Setup</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <p style="color: var(--color-text-muted); font-size: 0.85rem;">Konto-Basis, Anzahl Pfade und Trades konfigurieren.</p>
+                        <div class="dashboard-card-hint"><i class="fas fa-window-restore"></i> Popup öffnen</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card animated-card" style="animation-delay: 0.1s;" onclick="scrollToSection('sim-stats-section')">
+                    <div class="dashboard-card-header">
+                        <div class="dashboard-card-title"><i class="fas fa-chart-bar"></i><span>Basis-Statistik</span></div>
+                        <span class="dashboard-card-badge">Live</span>
+                    </div>
+                    <div class="dashboard-card-body">
+                        <p style="color: var(--color-text-muted); font-size: 0.85rem;">WinRate, ØWin/ØLoss aus deinen Trades.</p>
+                        <div class="dashboard-card-hint"><i class="fas fa-arrow-down"></i> Zu den Werten scrollen</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Basis Statistik -->
+            <section class="page-section animated-card" id="sim-stats-section" style="animation-delay: 0.15s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-chart-bar"></i> Basis-Statistik</h2>
+                </div>
+                <div class="page-section-body">
+                    <div id="sim-stats" class="info-banner" style="margin-top: 0; display: none;">
+                        <i class="fas fa-chart-bar"></i>
+                        <div>
+                            <strong>Berechnete Basis-Statistik:</strong>
+                            <span id="stats-output"></span>
+                        </div>
+                    </div>
+                    <p style="color: var(--color-text-muted); margin-top: var(--space-md);">Die Werte aktualisieren sich nach jeder Simulation.</p>
+                </div>
+            </section>
+
+            <!-- Chart Section -->
+            <section class="page-section animated-card" style="animation-delay: 0.2s;">
+                <div class="page-section-header">
+                    <h2><i class="fas fa-chart-area"></i> Simulations-Ergebnis</h2>
+                </div>
+                <div class="page-section-body">
+                    <div class="chart-container" style="height: 450px;">
+                        <canvas id="simulation-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Popup: Parameter -->
+        <div id="sim-params-popup" class="popup-overlay">
+            <div class="popup-container large">
+                <div class="popup-header">
+                    <h2><i class="fas fa-sliders-h"></i> Simulations-Parameter</h2>
+                    <button class="popup-close" onclick="closePopup('sim-params-popup')">&times;</button>
+                </div>
+                <div class="popup-body">
+                    <div class="form-section">
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="sim-account">Datenbasis (Konto)</label>
+                                <select id="sim-account">
+                                    <option value="all">Alle Konten</option>
+                                    <option value="funded">Funded Account</option>
+                                    <option value="ek">EK Account</option>
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label for="sim-paths">Anzahl Simulationen</label>
+                                <input type="number" id="sim-paths" value="100" step="10" placeholder="100">
+                            </div>
+                            <div class="form-field">
+                                <label for="sim-trades">Trades pro Simulation</label>
+                                <input type="number" id="sim-trades" value="200" step="10" placeholder="200">
+                            </div>
+                        </div>
+                        <div class="action-buttons" style="justify-content: flex-start; margin-top: var(--space-md);">
+                            <button id="run-simulation" class="button primary-button"><i class="fas fa-play"></i> Simulation starten</button>
+                            <button type="button" class="button secondary-button" onclick="closePopup('sim-params-popup')">Schließen</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <footer>
+            <div class="footer-branding">Kerim Trading Journal</div>
+            <p> 2025</p>
+        </footer>
+    </div><!-- End main-content -->
+
+    <a href="#" class="scroll-to-top-btn" title="Nach oben">
+        <i class="fas fa-arrow-up"></i>
+    </a>
+
+    <script src="global.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="simulation.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            tsParticles.load("particles-js", {
+                fpsLimit: 60,
+                particles: {
+                    number: { value: 50, density: { enable: true, value_area: 900 } },
+                    color: { value: "#D4A853" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.25, random: true, anim: { enable: true, speed: 0.2, opacity_min: 0.05, sync: false } },
+                    size: { value: 2, random: true },
+                    move: {
+                        enable: true,
+                        speed: 0.2,
+                        direction: "none",
+                        random: true,
+                        straight: false,
+                        out_mode: "out",
+                        bounce: false,
+                    }
+                },
+                interactivity: { detect_on: "canvas", events: { onhover: { enable: false }, onclick: { enable: false }, resize: true } },
+                retina_detect: true,
+            });
+        });
+    </script>
+</body>
+
+</html>
