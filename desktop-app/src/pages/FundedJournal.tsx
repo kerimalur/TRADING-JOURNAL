@@ -116,23 +116,23 @@ export function FundedJournal() {
       const user = session.user;
       
       // MAPPING: APP -> DB
-      const dbPayload = {
-  // 1. Die fehlenden Pflichtfelder (Die Ursache für deinen Fehler)
-  entry_price: Number(tradeData.entryPrice), 
-  exit_price: Number(tradeData.exitPrice),
-  quantity: Number(tradeData.quantity),
-  symbol: tradeData.pair,     // Prüfe kurz: heißt es bei dir .pair oder .symbol?
-  direction: tradeData.direction,
-  quantity: Number(tradeData.quantity),
+     const dbPayload = {
+  // --- PFLICHTFELDER (laut deinem DB-Screenshot) ---
+  quantity: Number(tradeData.quantity), // Fix für den aktuellen Fehler
+  entry_price: Number(tradeData.entryPrice),
+  symbol: tradeData.pair,               // DB nennt es 'symbol', deine App 'pair'
+  side: tradeData.direction,            // DB nennt es 'side', deine App 'direction'
   
-  // 2. Deine bestehenden Felder
+  // Wichtig: Falls der User nicht automatisch erkannt wird, muss hier die ID hin.
+  // Wenn 'user' in deiner Komponente nicht verfügbar ist, lösch die nächste Zeile vorerst.
+  // user_id: user.id, 
+
+  // --- OPTIONALE FELDER ---
+  exit_price: tradeData.exitPrice ? Number(tradeData.exitPrice) : null,
   date: tradeData.date,
   notes: tradeData.notes || '',
   status: 'closed',
-  type: 'funded',
-  
-  // 3. WICHTIG: Damit der Trade dir gehört (falls nicht anders gelöst)
-  // user_id: session.user.id  <-- Falls du die user_id hier griffbereit hast, füge sie ein.
+  type: 'funded'
 };
       };
 
