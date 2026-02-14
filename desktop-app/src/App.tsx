@@ -37,6 +37,9 @@ import { Outlook } from '@/pages/Outlook';
 import { StrategyBuilder } from '@/pages/StrategyBuilder';
 import { RiskManagement } from '@/pages/RiskManagement';
 
+// Debug
+import { AuthDebug } from '@/components/AuthDebug';
+
 // Utils
 import { isElectron } from '@/services/webApi';
 
@@ -203,6 +206,7 @@ function AppContent() {
 
   return (
     <div className="flex flex-col h-screen bg-background text-text-primary overflow-hidden">
+      <AuthDebug />
       {/* Draggable Title Bar - nur für Electron */}
       {inElectron && (
         <div 
