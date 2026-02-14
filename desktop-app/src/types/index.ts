@@ -34,8 +34,16 @@ export interface Trade {
   runningBalance?: number;
   // Price levels
   entryPrice?: number;
+  exitPrice?: number;
   stopLoss?: number;
   takeProfit?: number;
+  quantity?: number;
+  lotSize?: number;       // Lot Size des Trades
+  // Status & P/L
+  status?: 'open' | 'closed';
+  pnl?: number;
+  // Chapter
+  chapterId?: string;
   // Setup flags (legacy)
   htfBias?: boolean;
   d1Zone?: boolean;
@@ -84,6 +92,14 @@ export interface TradeFilters {
 // ACCOUNT TYPES
 // ============================================================
 
+export interface AccountChapter {
+  id: string;
+  startBalance: number;
+  startDate: string;
+  endDate?: string;      // null = aktives Kapitel
+  reason: string;        // z.B. "Neuer 50k Account", "Inaktivität - Neustart"
+}
+
 export interface AccountConfig {
   initialStartBalance: number;
   currentBalance: number;
@@ -97,6 +113,8 @@ export interface AccountConfig {
   maxDrawdownType?: 'percent' | 'absolute';
   profitTarget?: number;
   maxDrawdown?: number;
+  chapters?: AccountChapter[];
+  activeChapterId?: string;
 }
 
 export interface AccountConfigs {

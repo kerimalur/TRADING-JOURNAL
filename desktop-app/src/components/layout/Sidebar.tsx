@@ -1,16 +1,16 @@
 /**
  * ========================================================================
- * Trading Journal - Sidebar Component
+ * Trading Journal - Sidebar Component (Enhanced with Animations)
  * ========================================================================
  */
 
-import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Wallet, 
-  DollarSign, 
-  TrendingUp, 
-  Globe2, 
+import { NavLink, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Wallet,
+  DollarSign,
+  TrendingUp,
+  Globe2,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -21,10 +21,10 @@ import {
   Brain,
   Newspaper,
   Lightbulb,
-  Shield,
   Target,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useUIStore } from '@/stores/uiStore';
 
 interface NavItem {
@@ -48,11 +48,9 @@ const navItems: NavItem[] = [
   { path: '/simulation', label: 'Simulation', icon: <Activity size={18} />, group: 'Tools' },
   { path: '/strategy', label: 'Strategie', icon: <Lightbulb size={18} />, group: 'Tools' },
   { path: '/ml', label: 'ML Bereich', icon: <Brain size={18} />, group: 'Tools' },
-  { path: '/risk', label: 'Risk Management', icon: <Shield size={18} />, group: 'Tools' },
   { path: '/settings', label: 'Einstellungen', icon: <Settings size={18} />, group: 'System' },
 ];
 
-// Group nav items
 const groupedItems = navItems.reduce((acc, item) => {
   const group = item.group || 'Other';
   if (!acc[group]) acc[group] = [];
@@ -62,27 +60,36 @@ const groupedItems = navItems.reduce((acc, item) => {
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
+  const location = useLocation();
 
   return (
-    <aside 
-      className={clsx(
-        'flex flex-col transition-all duration-200',
-        'bg-background-surface-solid border-r border-border',
-        sidebarCollapsed ? 'w-[64px]' : 'w-[220px]'
-      )}
+    <motion.aside
+      animate={{ width: sidebarCollapsed ? 64 : 220 }}
+      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+      className="flex flex-col bg-background-surface-solid border-r border-border overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between h-14 px-4 border-b border-border">
-        {!sidebarCollapsed && (
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-accent-primary flex items-center justify-center">
-              <span className="text-white font-bold text-xs">TJ</span>
-            </div>
-            <span className="font-semibold text-sm text-text-primary">Trading Journal</span>
-          </div>
-        )}
-        
-        <button 
+        <AnimatePresence mode="wait">
+          {!sidebarCollapsed && (
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.15 }}
+              className="flex items-center gap-2"
+            >
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center shadow-glow-sm"
+                style={{ background: 'linear-gradient(135deg, #8B5CF6, #06B6D4)' }}
+              >
+                <span className="text-white font-bold text-xs">TJ</span>
+              </div>
+              <span className="font-semibold text-sm text-text-primary whitespace-nowrap">Trading Journal</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <button
           onClick={toggleSidebar}
           className={clsx(
             'p-1.5 rounded-lg text-text-muted',
@@ -99,32 +106,73 @@ export function Sidebar() {
       <nav className="flex-1 py-3 overflow-y-auto">
         {Object.entries(groupedItems).map(([group, items]) => (
           <div key={group} className="mb-4">
-            {!sidebarCollapsed && (
-              <div className="px-4 mb-1.5 text-[10px] font-medium text-text-muted uppercase tracking-wider">
-                {group}
-              </div>
-            )}
-            
-            <div className="space-y-0.5 px-2">
-              {items.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) => clsx(
-                    'flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors duration-150',
-                    isActive 
-                      ? 'bg-accent-primary/15 text-accent-primary' 
-                      : 'text-text-subtle hover:text-text-primary hover:bg-background-surface-hover',
-                    sidebarCollapsed && 'justify-center px-0'
-                  )}
-                  title={sidebarCollapsed ? item.label : undefined}
+            <AnimatePresence mode="wait">
+              {!sidebarCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.1 }}
+                  className="px-4 mb-1.5 text-[10px] font-medium text-text-muted uppercase tracking-wider"
                 >
-                  {item.icon}
-                  {!sidebarCollapsed && (
-                    <span className="text-sm">{item.label}</span>
-                  )}
-                </NavLink>
-              ))}
+                  {group}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="space-y-0.5 px-2">
+              {items.map((item) => {
+                const isActive = location.pathname === item.path;
+
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={clsx(
+                      'relative flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all duration-150',
+                      isActive
+                        ? 'text-accent-primary'
+                        : 'text-text-subtle hover:text-text-primary hover:bg-background-surface-hover',
+                      sidebarCollapsed && 'justify-center px-0'
+                    )}
+                    title={sidebarCollapsed ? item.label : undefined}
+                  >
+                    {/* Active indicator line */}
+                    {isActive && (
+                      <motion.div
+                        layoutId="sidebar-active-indicator"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                        style={{ background: 'linear-gradient(180deg, #8B5CF6, #06B6D4)' }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                      />
+                    )}
+
+                    {/* Active background */}
+                    {isActive && (
+                      <motion.div
+                        layoutId="sidebar-active-bg"
+                        className="absolute inset-0 bg-accent-primary/10 rounded-lg"
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                      />
+                    )}
+
+                    <span className="relative z-10">{item.icon}</span>
+                    <AnimatePresence mode="wait">
+                      {!sidebarCollapsed && (
+                        <motion.span
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: 'auto' }}
+                          exit={{ opacity: 0, width: 0 }}
+                          transition={{ duration: 0.15 }}
+                          className="relative z-10 text-sm whitespace-nowrap overflow-hidden"
+                        >
+                          {item.label}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </NavLink>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -132,16 +180,30 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-3 border-t border-border">
-        {!sidebarCollapsed ? (
-          <div className="text-center text-xs text-text-muted">
-            v1.3.0
-          </div>
-        ) : (
-          <div className="text-center text-[10px] text-text-muted">
-            1.3
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {!sidebarCollapsed ? (
+            <motion.div
+              key="full"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-center text-xs text-text-muted"
+            >
+              v1.4.0
+            </motion.div>
+          ) : (
+            <motion.div
+              key="collapsed"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-center text-[10px] text-text-muted"
+            >
+              1.4
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </aside>
+    </motion.aside>
   );
 }

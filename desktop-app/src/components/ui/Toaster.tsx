@@ -4,7 +4,6 @@
  * ========================================================================
  */
 
-import { useEffect } from 'react';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useUIStore } from '@/stores/uiStore';

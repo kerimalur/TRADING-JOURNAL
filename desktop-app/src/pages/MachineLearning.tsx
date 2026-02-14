@@ -2,7 +2,7 @@
  * ========================================================================
  * Trading Journal - ML Intelligence Center
  * ========================================================================
- * 
+ *
  * Echtes Machine Learning für Trading:
  * - COT History Tracking & Prediction
  * - Trade Context Learning (COT + News + Zinsen bei Trade-Eröffnung)
@@ -11,35 +11,35 @@
  * - Selbstlernendes System das Erwartungen vs Realität vergleicht
  */
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { 
+import { useState, useMemo, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import {
   Brain,
   Database,
   TrendingUp,
-  TrendingDown,
   Target,
   AlertTriangle,
   Zap,
   BarChart3,
-  RefreshCw,
   CheckCircle2,
   XCircle,
   Clock,
   Lightbulb,
   History,
   LineChart,
-  ArrowRight,
-  ChevronRight,
   Percent,
   BookOpen,
   Sparkles,
   Download,
-  Calendar,
   Activity
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useTradeStore } from '@/stores/tradeStore';
 import { getApi } from '@/services/webApi';
+import { PageTransition } from '@/components/ui/PageTransition';
+import { BentoGrid, BentoCell } from '@/components/ui/BentoGrid';
+import { MetricDisplay } from '@/components/ui/MetricDisplay';
+import { Gauge } from '@/components/ui/Gauge';
 
 // ============================================================================
 // TYPES
@@ -161,6 +161,23 @@ const CURRENCIES = [
 ];
 
 // ============================================================================
+// ANIMATION VARIANTS
+// ============================================================================
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06 },
+  },
+};
+
+const staggerItem = {
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+};
+
+// ============================================================================
 // COMPONENT
 // ============================================================================
 
@@ -178,14 +195,14 @@ export function MachineLearning() {
     setIsCollecting(true);
     try {
       const response = await getApi().fetchCOTData();
-      
+
       if (!response?.current || !response?.history) {
         console.warn('No COT data received');
         return;
       }
 
       const snapshots: COTSnapshot[] = [];
-      
+
       // Aktuelle Daten verarbeiten
       response.current.forEach((item: any) => {
         snapshots.push({
@@ -216,22 +233,22 @@ export function MachineLearning() {
 
       if (snapshots.length > 0) {
         const updated = { ...mlData };
-        
+
         // Entferne Duplikate
         const existingKeys = new Set(
           updated.cotHistory.map(h => `${h.date}-${h.currency}`)
         );
-        
+
         const newSnapshots = snapshots.filter(s => !existingKeys.has(`${s.date}-${s.currency}`));
         updated.cotHistory = [...updated.cotHistory, ...newSnapshots];
-        
+
         // Maximal 52 Wochen pro Währung speichern
         const byCurrency: Record<string, COTSnapshot[]> = {};
         updated.cotHistory.forEach(h => {
           if (!byCurrency[h.currency]) byCurrency[h.currency] = [];
           byCurrency[h.currency].push(h);
         });
-        
+
         updated.cotHistory = Object.values(byCurrency)
           .flatMap(arr => arr.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 52));
 
@@ -249,10 +266,10 @@ export function MachineLearning() {
     if (closedTrades.length < 10) return;
 
     const patterns: LearnedPattern[] = [];
-    
+
     // Pattern 1: Direction Bias per Pair
     const pairDirectionStats: Record<string, { long: { wins: number; losses: number; pnl: number }; short: { wins: number; losses: number; pnl: number } }> = {};
-    
+
     closedTrades.forEach(trade => {
       const pair = trade.pair;
       if (!pairDirectionStats[pair]) {
@@ -261,10 +278,10 @@ export function MachineLearning() {
           short: { wins: 0, losses: 0, pnl: 0 }
         };
       }
-      
+
       const dir = trade.direction;
       const isWin = (trade.pnl || 0) > 0;
-      
+
       pairDirectionStats[pair][dir].pnl += trade.pnl || 0;
       if (isWin) {
         pairDirectionStats[pair][dir].wins++;
@@ -276,17 +293,17 @@ export function MachineLearning() {
     Object.entries(pairDirectionStats).forEach(([pair, stats]) => {
       const longTotal = stats.long.wins + stats.long.losses;
       const shortTotal = stats.short.wins + stats.short.losses;
-      
+
       if (longTotal >= 5 && shortTotal >= 5) {
         const longWR = stats.long.wins / longTotal;
         const shortWR = stats.short.wins / shortTotal;
-        
+
         if (Math.abs(longWR - shortWR) > 0.15) {
           const betterDir = longWR > shortWR ? 'long' : 'short';
           const betterStats = betterDir === 'long' ? stats.long : stats.short;
           const worseStats = betterDir === 'long' ? stats.short : stats.long;
           const betterTotal = betterDir === 'long' ? longTotal : shortTotal;
-          
+
           patterns.push({
             id: `pair-direction-${pair}`,
             name: `${pair} ${betterDir.toUpperCase()} Bias`,
@@ -319,7 +336,7 @@ export function MachineLearning() {
       if (hour >= 0 && hour < 8) session = 'asian';
       else if (hour >= 8 && hour < 14) session = 'london';
       else if (hour >= 14 && hour < 22) session = 'newyork';
-      
+
       if (sessionStats[session]) {
         sessionStats[session].pnl += trade.pnl || 0;
         if ((trade.pnl || 0) > 0) sessionStats[session].wins++;
@@ -359,9 +376,9 @@ export function MachineLearning() {
     let maxConsecLosses = 0;
     let currentConsec = 0;
     let recoveryAfterLosses: { after: number; nextWin: boolean }[] = [];
-    
+
     const sortedTrades = [...closedTrades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
+
     sortedTrades.forEach((trade, i) => {
       if ((trade.pnl || 0) < 0) {
         currentConsec++;
@@ -405,7 +422,7 @@ export function MachineLearning() {
     const currencyHistory = mlData.cotHistory
       .filter(h => h.currency === currency)
       .sort((a, b) => b.date.localeCompare(a.date));
-    
+
     if (currencyHistory.length < 2) return;
 
     const latest = currencyHistory[0];
@@ -480,11 +497,11 @@ export function MachineLearning() {
   const evaluatePrediction = useCallback((predictionId: string, actualDirection: 'up' | 'down' | 'flat', priceChange: number) => {
     const updated = { ...mlData };
     const idx = updated.predictions.findIndex(p => p.id === predictionId);
-    
+
     if (idx !== -1) {
       const pred = updated.predictions[idx];
       let wasCorrect = false;
-      
+
       if (pred.prediction === 'bullish' && actualDirection === 'up') wasCorrect = true;
       if (pred.prediction === 'bearish' && actualDirection === 'down') wasCorrect = true;
       if (pred.prediction === 'neutral' && actualDirection === 'flat') wasCorrect = true;
@@ -508,12 +525,12 @@ export function MachineLearning() {
   const stats = useMemo(() => {
     const evaluatedPredictions = mlData.predictions.filter(p => p.outcome);
     const correctPredictions = evaluatedPredictions.filter(p => p.outcome?.wasCorrect);
-    
+
     return {
       cotDataPoints: mlData.cotHistory.length,
       totalPredictions: mlData.predictions.length,
       evaluatedPredictions: evaluatedPredictions.length,
-      predictionAccuracy: evaluatedPredictions.length > 0 
+      predictionAccuracy: evaluatedPredictions.length > 0
         ? (correctPredictions.length / evaluatedPredictions.length * 100).toFixed(1)
         : 'N/A',
       tradeContexts: mlData.tradeContexts.length,
@@ -536,99 +553,152 @@ export function MachineLearning() {
       if (p.outcome) return false;
       const created = new Date(p.createdAt);
       const daysOld = (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
-      
+
       // Abhängig vom Timeframe
       if (p.timeframe === '1week' && daysOld >= 7) return true;
       if (p.timeframe === '2weeks' && daysOld >= 14) return true;
       if (p.timeframe === '1month' && daysOld >= 30) return true;
-      
+
       return false;
     });
   }, [mlData.predictions]);
 
+  // ============================================================================
+  // TAB CONFIG
+  // ============================================================================
+
+  const tabs = [
+    { id: 'overview' as const, label: 'Ubersicht', icon: <BarChart3 size={14} /> },
+    { id: 'cot-learning' as const, label: 'COT Learning', icon: <Database size={14} /> },
+    { id: 'trade-patterns' as const, label: 'Trade Patterns', icon: <Lightbulb size={14} /> },
+    { id: 'predictions' as const, label: 'Predictions', icon: <Target size={14} /> },
+  ];
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
   return (
+    <PageTransition>
     <div className="page-container">
-      {/* Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">
-            <Brain className="text-accent-primary" />
-            ML Intelligence Center
-          </h1>
-          <p className="text-sm text-text-muted mt-1">
-            Selbstlernendes System für Marktanalyse und Trade-Optimierung
-          </p>
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+            className="p-2.5 rounded-xl bg-accent-primary/15 border border-accent-primary/20"
+          >
+            <Brain size={22} className="text-accent-primary" />
+          </motion.div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-text-primary">
+              ML Intelligence Center
+            </h1>
+            <p className="text-[10px] uppercase tracking-[0.15em] text-text-muted mt-0.5">
+              Selbstlernendes System &middot; Marktanalyse &middot; Trade-Optimierung
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={collectCOTData}
             disabled={isCollecting}
-            className="btn-secondary flex items-center gap-2"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                       bg-white/[0.04] border border-border hover:border-border-light
+                       hover:bg-white/[0.07] transition-all disabled:opacity-40"
           >
-            <Download size={16} className={isCollecting ? 'animate-spin' : ''} />
-            COT Daten sammeln
+            <Download size={13} className={isCollecting ? 'animate-spin' : ''} />
+            COT Daten
           </button>
           <button
             onClick={analyzeTradePatterns}
-            className="btn-primary flex items-center gap-2"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                       bg-accent-primary/15 text-accent-primary border border-accent-primary/25
+                       hover:bg-accent-primary/25 transition-all"
           >
-            <Sparkles size={16} />
+            <Sparkles size={13} />
             Patterns analysieren
           </button>
         </div>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-6 gap-4 mb-6">
-        <div className="card text-center">
-          <Database size={20} className="mx-auto text-accent-primary mb-2" />
-          <div className="text-2xl font-bold">{stats.cotDataPoints}</div>
-          <div className="text-xs text-text-muted">COT Datenpunkte</div>
-        </div>
-        <div className="card text-center">
-          <Target size={20} className="mx-auto text-accent-blue mb-2" />
-          <div className="text-2xl font-bold">{stats.totalPredictions}</div>
-          <div className="text-xs text-text-muted">Predictions</div>
-        </div>
-        <div className="card text-center">
-          <Percent size={20} className="mx-auto text-pnl-positive mb-2" />
-          <div className="text-2xl font-bold">{stats.predictionAccuracy}%</div>
-          <div className="text-xs text-text-muted">Trefferquote</div>
-        </div>
-        <div className="card text-center">
-          <CheckCircle2 size={20} className="mx-auto text-pnl-positive mb-2" />
-          <div className="text-2xl font-bold">{stats.evaluatedPredictions}</div>
-          <div className="text-xs text-text-muted">Evaluiert</div>
-        </div>
-        <div className="card text-center">
-          <Activity size={20} className="mx-auto text-accent-gold mb-2" />
-          <div className="text-2xl font-bold">{stats.tradeContexts}</div>
-          <div className="text-xs text-text-muted">Trade Contexts</div>
-        </div>
-        <div className="card text-center">
-          <Lightbulb size={20} className="mx-auto text-accent-primary mb-2" />
-          <div className="text-2xl font-bold">{stats.learnedPatterns}</div>
-          <div className="text-xs text-text-muted">Gelernte Muster</div>
-        </div>
-      </div>
+      {/* ── Metrics BentoGrid ── */}
+      <BentoGrid cols={4} className="mb-6">
+        <BentoCell size="wide" delay={0} className="bg-white/[0.03]">
+          <div className="flex items-center justify-between h-full">
+            <MetricDisplay
+              label="COT Datenpunkte"
+              value={stats.cotDataPoints}
+              size="xl"
+              icon={<Database size={13} />}
+            />
+            <div className="h-16 w-px bg-border mx-6" />
+            <MetricDisplay
+              label="Predictions"
+              value={stats.totalPredictions}
+              size="xl"
+              icon={<Target size={13} />}
+            />
+          </div>
+        </BentoCell>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-border pb-2">
-        {[
-          { id: 'overview', label: 'Übersicht', icon: <BarChart3 size={16} /> },
-          { id: 'cot-learning', label: 'COT Learning', icon: <Database size={16} /> },
-          { id: 'trade-patterns', label: 'Trade Patterns', icon: <Lightbulb size={16} /> },
-          { id: 'predictions', label: 'Predictions', icon: <Target size={16} /> },
-        ].map(tab => (
+        <BentoCell delay={0.06} className="bg-white/[0.03]">
+          <div className="flex flex-col items-center justify-center h-full">
+            <Gauge
+              value={stats.predictionAccuracy !== 'N/A' ? parseFloat(stats.predictionAccuracy as string) : 0}
+              label="Trefferquote"
+              sublabel={stats.predictionAccuracy === 'N/A' ? 'Keine Daten' : undefined}
+              size="sm"
+              color={
+                stats.predictionAccuracy === 'N/A' ? 'default'
+                : parseFloat(stats.predictionAccuracy as string) >= 60 ? 'success'
+                : parseFloat(stats.predictionAccuracy as string) >= 50 ? 'warning'
+                : 'danger'
+              }
+            />
+          </div>
+        </BentoCell>
+
+        <BentoCell delay={0.12} className="bg-white/[0.03]">
+          <div className="flex flex-col justify-between h-full">
+            <MetricDisplay
+              label="Evaluiert"
+              value={stats.evaluatedPredictions}
+              size="md"
+              icon={<CheckCircle2 size={13} />}
+            />
+            <div className="flex items-center gap-3 mt-auto pt-2 border-t border-border/50">
+              <div className="flex items-center gap-1">
+                <Activity size={11} className="text-accent-gold" />
+                <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Kontexte</span>
+              </div>
+              <span className="font-mono tabular-nums text-sm font-bold">{stats.tradeContexts}</span>
+            </div>
+            <div className="flex items-center gap-3 mt-1">
+              <div className="flex items-center gap-1">
+                <Lightbulb size={11} className="text-accent-primary" />
+                <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Muster</span>
+              </div>
+              <span className="font-mono tabular-nums text-sm font-bold">{stats.learnedPatterns}</span>
+            </div>
+          </div>
+        </BentoCell>
+      </BentoGrid>
+
+      {/* ── Pill Segment Control ── */}
+      <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-white/[0.04] border border-border mb-6">
+        {tabs.map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as typeof activeTab)}
+            onClick={() => setActiveTab(tab.id)}
             className={clsx(
-              'flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all',
-              activeTab === tab.id 
-                ? 'bg-accent-primary/20 text-accent-primary border-b-2 border-accent-primary' 
-                : 'text-text-muted hover:text-text-primary hover:bg-white/5'
+              'flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+              activeTab === tab.id
+                ? 'bg-accent-primary/20 text-accent-primary shadow-sm shadow-accent-primary/10'
+                : 'text-text-muted hover:text-text-secondary hover:bg-white/[0.04]'
             )}
           >
             {tab.icon}
@@ -637,580 +707,805 @@ export function MachineLearning() {
         ))}
       </div>
 
-      {/* Tab Content */}
+      {/* ================================================================== */}
+      {/* TAB: OVERVIEW                                                       */}
+      {/* ================================================================== */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-2 gap-6">
-          {/* Pending Evaluations */}
+        <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-5">
+          {/* ── Pending Evaluations Alert ── */}
           {pendingPredictions.length > 0 && (
-            <div className="col-span-2 card border-l-4 border-l-accent-gold bg-accent-gold/5">
+            <motion.div
+              variants={staggerItem}
+              className="rounded-xl bg-accent-gold/[0.06] border border-accent-gold/20 p-4"
+            >
               <div className="flex items-center gap-2 mb-3">
-                <Clock size={18} className="text-accent-gold" />
-                <span className="font-semibold">Predictions zur Evaluierung bereit</span>
-                <span className="text-sm text-text-muted">({pendingPredictions.length})</span>
+                <div className="p-1 rounded-md bg-accent-gold/20">
+                  <Clock size={14} className="text-accent-gold" />
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-accent-gold">
+                  Auswertung bereit
+                </span>
+                <span className="text-[10px] text-text-muted font-mono tabular-nums">
+                  {pendingPredictions.length}
+                </span>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {pendingPredictions.slice(0, 3).map(pred => (
-                  <div key={pred.id} className="flex items-center justify-between p-3 rounded-lg bg-background-surface">
-                    <div>
-                      <span className="font-medium">{pred.currency}</span>
-                      <span className="text-text-muted mx-2">•</span>
+                  <div key={pred.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-white/[0.03]">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-mono font-bold">{pred.currency}</span>
+                      <span className="text-text-muted">/</span>
                       <span className={clsx(
-                        'text-sm',
+                        'font-medium',
                         pred.prediction === 'bullish' && 'text-pnl-positive',
                         pred.prediction === 'bearish' && 'text-pnl-negative',
                         pred.prediction === 'neutral' && 'text-text-muted'
                       )}>
                         {pred.prediction}
                       </span>
-                      <span className="text-text-muted mx-2">•</span>
-                      <span className="text-sm text-text-muted">
+                      <span className="text-[10px] text-text-muted font-mono">
                         {new Date(pred.createdAt).toLocaleDateString('de-DE')}
                       </span>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                       <button
                         onClick={() => evaluatePrediction(pred.id, 'up', 0)}
-                        className="px-2 py-1 text-xs rounded bg-pnl-positive/20 text-pnl-positive hover:bg-pnl-positive/30"
+                        className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-pnl-positive/10 text-pnl-positive
+                                   border border-pnl-positive/20 hover:bg-pnl-positive/20 transition-all"
                       >
-                        ↑ Gestiegen
+                        Gestiegen
                       </button>
                       <button
                         onClick={() => evaluatePrediction(pred.id, 'down', 0)}
-                        className="px-2 py-1 text-xs rounded bg-pnl-negative/20 text-pnl-negative hover:bg-pnl-negative/30"
+                        className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-pnl-negative/10 text-pnl-negative
+                                   border border-pnl-negative/20 hover:bg-pnl-negative/20 transition-all"
                       >
-                        ↓ Gefallen
+                        Gefallen
                       </button>
                       <button
                         onClick={() => evaluatePrediction(pred.id, 'flat', 0)}
-                        className="px-2 py-1 text-xs rounded bg-text-muted/20 text-text-muted hover:bg-text-muted/30"
+                        className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-white/[0.06] text-text-muted
+                                   border border-border hover:bg-white/[0.1] transition-all"
                       >
-                        — Neutral
+                        Neutral
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           )}
 
-          {/* Learned Patterns */}
-          <div className="card">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Lightbulb size={18} className="text-accent-primary" />
-              Gelernte Trading-Muster
-            </h3>
-            {mlData.learnedPatterns.length === 0 ? (
-              <div className="text-center py-8 text-text-muted">
-                <Brain size={32} className="mx-auto mb-2 opacity-50" />
-                <p>Noch keine Muster gelernt.</p>
-                <p className="text-sm">Klicke "Patterns analysieren" um deine Trades zu analysieren.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {mlData.learnedPatterns.map(pattern => (
-                  <div 
-                    key={pattern.id}
-                    className={clsx(
-                      'p-3 rounded-lg border',
-                      pattern.recommendation === 'trade' && 'bg-pnl-positive/5 border-pnl-positive/30',
-                      pattern.recommendation === 'avoid' && 'bg-pnl-negative/5 border-pnl-negative/30',
-                      pattern.recommendation === 'neutral' && 'bg-background-surface border-border'
-                    )}
-                  >
-                    <div className="flex items-start justify-between mb-1">
-                      <span className="font-medium">{pattern.name}</span>
-                      <span className={clsx(
-                        'text-xs px-2 py-0.5 rounded',
-                        pattern.recommendation === 'trade' && 'bg-pnl-positive/20 text-pnl-positive',
-                        pattern.recommendation === 'avoid' && 'bg-pnl-negative/20 text-pnl-negative'
-                      )}>
-                        {pattern.confidence}% Konfidenz
-                      </span>
-                    </div>
-                    <p className="text-sm text-text-muted">{pattern.description}</p>
-                    <div className="flex gap-4 mt-2 text-xs text-text-muted">
-                      <span>{pattern.stats.occurrences} Trades</span>
-                      <span>{pattern.stats.wins}W / {pattern.stats.losses}L</span>
-                    </div>
+          <div className="grid grid-cols-5 gap-4">
+            {/* ── Learned Patterns (wider column) ── */}
+            <motion.div variants={staggerItem} className="col-span-3">
+              <div className="rounded-xl bg-white/[0.03] border border-border p-4 h-full">
+                <div className="flex items-center gap-2 mb-4">
+                  <Lightbulb size={14} className="text-accent-primary" />
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                    Gelernte Trading-Muster
+                  </span>
+                </div>
+
+                {mlData.learnedPatterns.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-text-muted">
+                    <Brain size={28} className="opacity-30 mb-2" />
+                    <p className="text-xs">Noch keine Muster gelernt.</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">Klicke "Patterns analysieren" um deine Trades zu analysieren.</p>
                   </div>
-                ))}
+                ) : (
+                  <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-2.5">
+                    {mlData.learnedPatterns.map(pattern => (
+                      <motion.div
+                        key={pattern.id}
+                        variants={staggerItem}
+                        className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.03] border border-border/50
+                                   hover:border-border-light transition-all group"
+                      >
+                        {/* Confidence bar */}
+                        <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0">
+                          <div className="w-1.5 rounded-full bg-white/[0.06] h-12 relative overflow-hidden">
+                            <motion.div
+                              initial={{ height: 0 }}
+                              animate={{ height: `${pattern.confidence}%` }}
+                              transition={{ duration: 0.6, delay: 0.2 }}
+                              className={clsx(
+                                'absolute bottom-0 w-full rounded-full',
+                                pattern.recommendation === 'trade' && 'bg-pnl-positive',
+                                pattern.recommendation === 'avoid' && 'bg-pnl-negative',
+                                pattern.recommendation === 'neutral' && 'bg-accent-primary',
+                              )}
+                            />
+                          </div>
+                          <span className="text-[9px] font-mono tabular-nums text-text-muted">{pattern.confidence}%</span>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold truncate">{pattern.name}</span>
+                            <span className={clsx(
+                              'shrink-0 text-[9px] px-1.5 py-0.5 rounded-md font-semibold uppercase tracking-wider',
+                              pattern.recommendation === 'trade' && 'bg-pnl-positive/15 text-pnl-positive',
+                              pattern.recommendation === 'avoid' && 'bg-pnl-negative/15 text-pnl-negative',
+                              pattern.recommendation === 'neutral' && 'bg-accent-primary/15 text-accent-primary',
+                            )}>
+                              {pattern.recommendation === 'trade' ? 'Handeln' : pattern.recommendation === 'avoid' ? 'Meiden' : 'Neutral'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-text-muted leading-relaxed line-clamp-2">{pattern.description}</p>
+                          <div className="flex gap-3 mt-1.5 text-[10px] text-text-muted font-mono tabular-nums">
+                            <span>{pattern.stats.occurrences} Trades</span>
+                            <span className="text-pnl-positive">{pattern.stats.wins}W</span>
+                            <span className="text-pnl-negative">{pattern.stats.losses}L</span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                )}
               </div>
-            )}
+            </motion.div>
+
+            {/* ── Recent Predictions Feed ── */}
+            <motion.div variants={staggerItem} className="col-span-2">
+              <div className="rounded-xl bg-white/[0.03] border border-border p-4 h-full">
+                <div className="flex items-center gap-2 mb-4">
+                  <Target size={14} className="text-accent-blue" />
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                    Letzte Predictions
+                  </span>
+                </div>
+
+                {mlData.predictions.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-text-muted">
+                    <Target size={28} className="opacity-30 mb-2" />
+                    <p className="text-xs">Noch keine Predictions erstellt.</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">Gehe zu "COT Learning" um Predictions zu erstellen.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {mlData.predictions.slice(0, 6).map((pred, i) => (
+                      <motion.div
+                        key={pred.id}
+                        initial={{ opacity: 0, x: 8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="flex items-center gap-2.5 py-2 px-2.5 rounded-lg hover:bg-white/[0.03] transition-all"
+                      >
+                        {/* Status dot */}
+                        <div className={clsx(
+                          'w-1.5 h-1.5 rounded-full shrink-0',
+                          pred.outcome
+                            ? pred.outcome.wasCorrect ? 'bg-pnl-positive' : 'bg-pnl-negative'
+                            : 'bg-text-muted/40'
+                        )} />
+
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold w-8">{pred.currency}</span>
+                          <span className={clsx(
+                            'text-[10px] px-1.5 py-0.5 rounded-md font-medium',
+                            pred.prediction === 'bullish' && 'bg-pnl-positive/10 text-pnl-positive',
+                            pred.prediction === 'bearish' && 'bg-pnl-negative/10 text-pnl-negative',
+                            pred.prediction === 'neutral' && 'bg-white/[0.06] text-text-muted'
+                          )}>
+                            {pred.prediction}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {pred.outcome ? (
+                            pred.outcome.wasCorrect ? (
+                              <CheckCircle2 size={12} className="text-pnl-positive" />
+                            ) : (
+                              <XCircle size={12} className="text-pnl-negative" />
+                            )
+                          ) : (
+                            <Clock size={12} className="text-text-muted/50" />
+                          )}
+                          <span className="text-[10px] text-text-muted font-mono tabular-nums">
+                            {new Date(pred.createdAt).toLocaleDateString('de-DE')}
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
           </div>
 
-          {/* Recent Predictions */}
-          <div className="card">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Target size={18} className="text-accent-blue" />
-              Letzte Predictions
-            </h3>
-            {mlData.predictions.length === 0 ? (
-              <div className="text-center py-8 text-text-muted">
-                <Target size={32} className="mx-auto mb-2 opacity-50" />
-                <p>Noch keine Predictions erstellt.</p>
-                <p className="text-sm">Gehe zu "COT Learning" um Predictions zu erstellen.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {mlData.predictions.slice(0, 6).map(pred => (
-                  <div 
-                    key={pred.id}
-                    className="flex items-center justify-between p-2 rounded-lg bg-background-surface"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium w-10">{pred.currency}</span>
-                      <span className={clsx(
-                        'text-sm px-2 py-0.5 rounded',
-                        pred.prediction === 'bullish' && 'bg-pnl-positive/20 text-pnl-positive',
-                        pred.prediction === 'bearish' && 'bg-pnl-negative/20 text-pnl-negative',
-                        pred.prediction === 'neutral' && 'bg-text-muted/20 text-text-muted'
-                      )}>
-                        {pred.prediction}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {pred.outcome ? (
-                        pred.outcome.wasCorrect ? (
-                          <CheckCircle2 size={16} className="text-pnl-positive" />
-                        ) : (
-                          <XCircle size={16} className="text-pnl-negative" />
-                        )
-                      ) : (
-                        <Clock size={16} className="text-text-muted" />
-                      )}
-                      <span className="text-xs text-text-muted">
-                        {new Date(pred.createdAt).toLocaleDateString('de-DE')}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ML Insight */}
-          <div className="col-span-2 card bg-gradient-to-r from-accent-primary/10 to-accent-blue/10">
+          {/* ── System Info Banner ── */}
+          <motion.div
+            variants={staggerItem}
+            className="rounded-xl bg-gradient-to-r from-accent-primary/[0.06] via-accent-blue/[0.04] to-transparent
+                       border border-accent-primary/15 p-5"
+          >
             <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-accent-primary/20">
-                <Brain size={24} className="text-accent-primary" />
+              <div className="p-2.5 rounded-lg bg-accent-primary/15 shrink-0">
+                <Brain size={18} className="text-accent-primary" />
               </div>
-              <div>
-                <h3 className="font-semibold mb-1">So funktioniert das System</h3>
-                <p className="text-sm text-text-muted mb-3">
-                  Das ML Intelligence Center sammelt Daten und lernt aus deinen Trades:
-                </p>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <div className="font-medium text-accent-primary">1. Daten Sammeln</div>
-                    <p className="text-text-muted">COT-Daten werden wöchentlich gespeichert und historisch analysiert.</p>
-                  </div>
-                  <div>
-                    <div className="font-medium text-accent-primary">2. Predictions Erstellen</div>
-                    <p className="text-text-muted">Basierend auf COT-Positioning werden Markterwartungen erstellt.</p>
-                  </div>
-                  <div>
-                    <div className="font-medium text-accent-primary">3. Lernen & Verbessern</div>
-                    <p className="text-text-muted">Durch Evaluierung der Predictions verbessert sich die Trefferquote.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'cot-learning' && (
-        <div className="grid grid-cols-3 gap-6">
-          {/* Currency Selector & History */}
-          <div className="col-span-2 card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <History size={18} />
-                COT History
-              </h3>
-              <select
-                value={selectedCurrency}
-                onChange={(e) => setSelectedCurrency(e.target.value)}
-                className="px-3 py-1.5 bg-background border border-border rounded-lg text-sm"
-              >
-                {CURRENCIES.map(c => (
-                  <option key={c.code} value={c.code}>{c.code} - {c.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {currencyCOTHistory.length === 0 ? (
-              <div className="text-center py-8 text-text-muted">
-                <Database size={32} className="mx-auto mb-2 opacity-50" />
-                <p>Keine COT-Daten für {selectedCurrency}.</p>
-                <p className="text-sm">Klicke "COT Daten sammeln" um zu starten.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="py-2 text-left">Datum</th>
-                      <th className="py-2 text-right">Comm Long</th>
-                      <th className="py-2 text-right">Comm Short</th>
-                      <th className="py-2 text-right">Net Position</th>
-                      <th className="py-2 text-right">Veränderung</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currencyCOTHistory.map((snapshot, i) => {
-                      const prev = currencyCOTHistory[i + 1];
-                      const change = prev ? snapshot.commercialsNet - prev.commercialsNet : 0;
-                      
-                      return (
-                        <tr key={`${snapshot.date}-${snapshot.currency}`} className="border-b border-border/50">
-                          <td className="py-2">{new Date(snapshot.date).toLocaleDateString('de-DE')}</td>
-                          <td className="py-2 text-right text-pnl-positive">{snapshot.commercialsLong.toLocaleString()}</td>
-                          <td className="py-2 text-right text-pnl-negative">{snapshot.commercialsShort.toLocaleString()}</td>
-                          <td className={clsx('py-2 text-right font-medium', snapshot.commercialsNet >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
-                            {snapshot.commercialsNet.toLocaleString()}
-                          </td>
-                          <td className={clsx('py-2 text-right', change > 0 ? 'text-pnl-positive' : change < 0 ? 'text-pnl-negative' : 'text-text-muted')}>
-                            {change > 0 ? '+' : ''}{change.toLocaleString()}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Create Prediction */}
-          <div className="card">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Target size={18} className="text-accent-primary" />
-              Neue Prediction
-            </h3>
-
-            {currencyCOTHistory.length < 2 ? (
-              <p className="text-sm text-text-muted">Mindestens 2 Datenpunkte benötigt.</p>
-            ) : newPrediction ? (
-              <div className="space-y-4">
-                <div className="p-3 rounded-lg bg-background-surface">
-                  <div className="text-sm text-text-muted mb-1">Währung</div>
-                  <div className="font-medium">{newPrediction.currency}</div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-background-surface">
-                  <div className="text-sm text-text-muted mb-1">COT Net Position</div>
-                  <div className={clsx('font-medium', (newPrediction.cotNetAtPrediction || 0) >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
-                    {newPrediction.cotNetAtPrediction?.toLocaleString()}
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-background-surface">
-                  <div className="text-sm text-text-muted mb-1">Wöchentliche Veränderung</div>
-                  <div className={clsx('font-medium', (newPrediction.cotChange || 0) >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
-                    {(newPrediction.cotChange || 0) > 0 ? '+' : ''}{newPrediction.cotChange?.toLocaleString()}
-                  </div>
-                </div>
-
-                <div className={clsx(
-                  'p-3 rounded-lg border-2',
-                  newPrediction.prediction === 'bullish' && 'bg-pnl-positive/10 border-pnl-positive',
-                  newPrediction.prediction === 'bearish' && 'bg-pnl-negative/10 border-pnl-negative',
-                  newPrediction.prediction === 'neutral' && 'bg-text-muted/10 border-text-muted'
-                )}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-lg capitalize">{newPrediction.prediction}</span>
-                    <span className="text-sm">{newPrediction.confidence}% Konfidenz</span>
-                  </div>
-                  <p className="text-sm text-text-muted">{newPrediction.reasoning}</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-text-muted mb-1">Timeframe</label>
-                  <select
-                    value={newPrediction.timeframe}
-                    onChange={(e) => setNewPrediction(prev => prev ? { ...prev, timeframe: e.target.value as COTPrediction['timeframe'] } : null)}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg"
-                  >
-                    <option value="1week">1 Woche</option>
-                    <option value="2weeks">2 Wochen</option>
-                    <option value="1month">1 Monat</option>
-                  </select>
-                </div>
-
-                <div className="flex gap-2">
-                  <button onClick={() => setNewPrediction(null)} className="btn-secondary flex-1">
-                    Abbrechen
-                  </button>
-                  <button onClick={savePrediction} className="btn-primary flex-1">
-                    Prediction speichern
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-text-muted">
-                  Erstelle eine Prediction basierend auf den aktuellen COT-Daten für {selectedCurrency}.
-                </p>
-                <button
-                  onClick={() => createPrediction(selectedCurrency)}
-                  className="btn-primary w-full flex items-center justify-center gap-2"
-                >
-                  <Sparkles size={16} />
-                  Prediction generieren
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'trade-patterns' && (
-        <div className="space-y-6">
-          {/* Info */}
-          <div className="card bg-accent-primary/5 border border-accent-primary/20">
-            <div className="flex items-start gap-3">
-              <BookOpen size={20} className="text-accent-primary mt-0.5" />
-              <div>
-                <h4 className="font-medium mb-1">Trade Pattern Erkennung</h4>
-                <p className="text-sm text-text-muted">
-                  Das System analysiert deine geschlossenen Trades und erkennt Muster wie:
-                  Direction-Bias pro Pair, Session-Stärken/Schwächen, Tilt-Erkennung nach Verlustserien.
-                  Je mehr Trades du hast, desto genauer werden die Erkenntnisse.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Patterns Grid */}
-          {mlData.learnedPatterns.length === 0 ? (
-            <div className="card text-center py-12">
-              <Brain size={48} className="mx-auto text-text-muted/50 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Keine Muster erkannt</h3>
-              <p className="text-text-muted mb-4">
-                Du benötigst mindestens 10 geschlossene Trades für die Mustererkennung.
-                Aktuell hast du {allTrades.filter(t => t.status === 'closed').length} geschlossene Trades.
-              </p>
-              <button onClick={analyzeTradePatterns} className="btn-primary">
-                <Sparkles size={16} />
-                Jetzt analysieren
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {mlData.learnedPatterns.map(pattern => (
-                <div 
-                  key={pattern.id}
-                  className={clsx(
-                    'card border-l-4',
-                    pattern.recommendation === 'trade' && 'border-l-pnl-positive bg-pnl-positive/5',
-                    pattern.recommendation === 'avoid' && 'border-l-pnl-negative bg-pnl-negative/5',
-                    pattern.recommendation === 'neutral' && 'border-l-accent-primary bg-accent-primary/5'
-                  )}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      {pattern.recommendation === 'trade' && <TrendingUp size={18} className="text-pnl-positive" />}
-                      {pattern.recommendation === 'avoid' && <AlertTriangle size={18} className="text-pnl-negative" />}
-                      {pattern.recommendation === 'neutral' && <Zap size={18} className="text-accent-primary" />}
-                      <span className="font-semibold">{pattern.name}</span>
-                    </div>
-                    <div className={clsx(
-                      'text-xs px-2 py-1 rounded-full font-medium',
-                      pattern.recommendation === 'trade' && 'bg-pnl-positive/20 text-pnl-positive',
-                      pattern.recommendation === 'avoid' && 'bg-pnl-negative/20 text-pnl-negative',
-                      pattern.recommendation === 'neutral' && 'bg-accent-primary/20 text-accent-primary'
-                    )}>
-                      {pattern.confidence}% Konfidenz
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-text-primary mb-4">{pattern.description}</p>
-
-                  <div className="grid grid-cols-3 gap-2 text-center p-2 rounded-lg bg-background-surface/50">
-                    <div>
-                      <div className="text-lg font-bold">{pattern.stats.occurrences}</div>
-                      <div className="text-xs text-text-muted">Trades</div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-pnl-positive">{pattern.stats.wins}</div>
-                      <div className="text-xs text-text-muted">Wins</div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-pnl-negative">{pattern.stats.losses}</div>
-                      <div className="text-xs text-text-muted">Losses</div>
-                    </div>
-                  </div>
-
-                  {pattern.recommendation === 'trade' && (
-                    <div className="mt-3 p-2 rounded bg-pnl-positive/10 text-sm text-pnl-positive">
-                      <CheckCircle2 size={14} className="inline mr-1" />
-                      Empfehlung: Diese Bedingungen bevorzugen
-                    </div>
-                  )}
-                  {pattern.recommendation === 'avoid' && (
-                    <div className="mt-3 p-2 rounded bg-pnl-negative/10 text-sm text-pnl-negative">
-                      <AlertTriangle size={14} className="inline mr-1" />
-                      Empfehlung: Diese Bedingungen meiden
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Pair Performance */}
-          <div className="card">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <LineChart size={18} />
-              Pair Performance Analysis
-            </h3>
-            {(() => {
-              const closedTrades = allTrades.filter(t => t.status === 'closed' && t.pnl !== undefined);
-              const pairStats: Record<string, { wins: number; losses: number; pnl: number }> = {};
-              
-              closedTrades.forEach(trade => {
-                if (!pairStats[trade.pair]) pairStats[trade.pair] = { wins: 0, losses: 0, pnl: 0 };
-                pairStats[trade.pair].pnl += trade.pnl || 0;
-                if ((trade.pnl || 0) > 0) pairStats[trade.pair].wins++;
-                else pairStats[trade.pair].losses++;
-              });
-
-              const sortedPairs = Object.entries(pairStats)
-                .map(([pair, stats]) => ({ pair, ...stats, total: stats.wins + stats.losses }))
-                .sort((a, b) => b.pnl - a.pnl);
-
-              if (sortedPairs.length === 0) {
-                return <p className="text-text-muted">Keine Trades vorhanden.</p>;
-              }
-
-              return (
-                <div className="grid grid-cols-4 gap-3">
-                  {sortedPairs.map((pair, i) => (
-                    <div 
-                      key={pair.pair}
-                      className={clsx(
-                        'p-3 rounded-lg border',
-                        i === 0 && pair.pnl > 0 && 'bg-pnl-positive/10 border-pnl-positive/30',
-                        i === sortedPairs.length - 1 && pair.pnl < 0 && 'bg-pnl-negative/10 border-pnl-negative/30',
-                        i !== 0 && i !== sortedPairs.length - 1 && 'bg-background-surface border-border'
-                      )}
-                    >
-                      <div className="font-medium mb-1">{pair.pair}</div>
-                      <div className={clsx('text-lg font-bold', pair.pnl >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
-                        {pair.pnl >= 0 ? '+' : ''}{pair.pnl.toFixed(2)}
-                      </div>
-                      <div className="text-xs text-text-muted">
-                        {pair.wins}W / {pair.losses}L ({(pair.wins / pair.total * 100).toFixed(0)}%)
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold mb-2">So funktioniert das System</h3>
+                <div className="grid grid-cols-3 gap-6">
+                  {[
+                    { step: '01', title: 'Daten Sammeln', desc: 'COT-Daten werden wochentlich gespeichert und historisch analysiert.' },
+                    { step: '02', title: 'Predictions Erstellen', desc: 'Basierend auf COT-Positioning werden Markterwartungen erstellt.' },
+                    { step: '03', title: 'Lernen & Verbessern', desc: 'Durch Evaluierung der Predictions verbessert sich die Trefferquote.' },
+                  ].map(item => (
+                    <div key={item.step} className="flex gap-2.5">
+                      <span className="text-[10px] font-mono font-bold text-accent-primary/60 pt-0.5">{item.step}</span>
+                      <div>
+                        <div className="text-xs font-semibold text-text-primary mb-0.5">{item.title}</div>
+                        <p className="text-[11px] text-text-muted leading-relaxed">{item.desc}</p>
                       </div>
                     </div>
                   ))}
                 </div>
-              );
-            })()}
-          </div>
-        </div>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
       )}
 
+      {/* ================================================================== */}
+      {/* TAB: COT LEARNING                                                   */}
+      {/* ================================================================== */}
+      {activeTab === 'cot-learning' && (
+        <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-3 gap-5">
+          {/* ── COT History Table ── */}
+          <motion.div variants={staggerItem} className="col-span-2">
+            <div className="rounded-xl bg-white/[0.03] border border-border p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <History size={14} className="text-text-muted" />
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                    COT History
+                  </span>
+                </div>
+                <select
+                  value={selectedCurrency}
+                  onChange={(e) => setSelectedCurrency(e.target.value)}
+                  className="px-2.5 py-1 bg-white/[0.04] border border-border rounded-lg text-xs font-medium
+                             focus:border-accent-primary/50 focus:outline-none transition-all"
+                >
+                  {CURRENCIES.map(c => (
+                    <option key={c.code} value={c.code}>{c.code} - {c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {currencyCOTHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-text-muted">
+                  <Database size={28} className="opacity-30 mb-2" />
+                  <p className="text-xs">Keine COT-Daten fur {selectedCurrency}.</p>
+                  <p className="text-[10px] mt-0.5">Klicke "COT Daten sammeln" um zu starten.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border/60">
+                        {['Datum', 'Comm Long', 'Comm Short', 'Net Position', 'Wkl.'].map(h => (
+                          <th key={h} className={clsx(
+                            'py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted',
+                            h === 'Datum' ? 'text-left' : 'text-right'
+                          )}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currencyCOTHistory.map((snapshot, i) => {
+                        const prev = currencyCOTHistory[i + 1];
+                        const change = prev ? snapshot.commercialsNet - prev.commercialsNet : 0;
+
+                        return (
+                          <tr
+                            key={`${snapshot.date}-${snapshot.currency}`}
+                            className={clsx(
+                              'border-b border-border/20 transition-colors hover:bg-white/[0.02]',
+                              i === 0 && 'bg-white/[0.02]'
+                            )}
+                          >
+                            <td className="py-1.5 text-[11px] font-mono tabular-nums">
+                              {new Date(snapshot.date).toLocaleDateString('de-DE')}
+                            </td>
+                            <td className="py-1.5 text-right text-[11px] font-mono tabular-nums text-pnl-positive/80">
+                              {snapshot.commercialsLong.toLocaleString()}
+                            </td>
+                            <td className="py-1.5 text-right text-[11px] font-mono tabular-nums text-pnl-negative/80">
+                              {snapshot.commercialsShort.toLocaleString()}
+                            </td>
+                            <td className={clsx(
+                              'py-1.5 text-right text-[11px] font-mono tabular-nums font-bold',
+                              snapshot.commercialsNet >= 0 ? 'text-pnl-positive' : 'text-pnl-negative'
+                            )}>
+                              {snapshot.commercialsNet.toLocaleString()}
+                            </td>
+                            <td className={clsx(
+                              'py-1.5 text-right text-[11px] font-mono tabular-nums',
+                              change > 0 ? 'text-pnl-positive' : change < 0 ? 'text-pnl-negative' : 'text-text-muted/40'
+                            )}>
+                              {change > 0 ? '+' : ''}{change.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* ── Create Prediction Panel ── */}
+          <motion.div variants={staggerItem}>
+            <div className="rounded-xl bg-white/[0.03] border border-border p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Target size={14} className="text-accent-primary" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                  Neue Prediction
+                </span>
+              </div>
+
+              {currencyCOTHistory.length < 2 ? (
+                <p className="text-[11px] text-text-muted">Mindestens 2 Datenpunkte benotigt.</p>
+              ) : newPrediction ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-3"
+                >
+                  <div className="p-2.5 rounded-lg bg-white/[0.04]">
+                    <div className="text-[10px] uppercase tracking-[0.1em] text-text-muted mb-0.5">Wahrung</div>
+                    <div className="text-sm font-bold font-mono">{newPrediction.currency}</div>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-white/[0.04]">
+                    <div className="text-[10px] uppercase tracking-[0.1em] text-text-muted mb-0.5">COT Net Position</div>
+                    <div className={clsx(
+                      'text-sm font-bold font-mono tabular-nums',
+                      (newPrediction.cotNetAtPrediction || 0) >= 0 ? 'text-pnl-positive' : 'text-pnl-negative'
+                    )}>
+                      {newPrediction.cotNetAtPrediction?.toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-white/[0.04]">
+                    <div className="text-[10px] uppercase tracking-[0.1em] text-text-muted mb-0.5">Wochentliche Veranderung</div>
+                    <div className={clsx(
+                      'text-sm font-bold font-mono tabular-nums',
+                      (newPrediction.cotChange || 0) >= 0 ? 'text-pnl-positive' : 'text-pnl-negative'
+                    )}>
+                      {(newPrediction.cotChange || 0) > 0 ? '+' : ''}{newPrediction.cotChange?.toLocaleString()}
+                    </div>
+                  </div>
+
+                  {/* Prediction result card */}
+                  <div className={clsx(
+                    'p-3 rounded-xl border',
+                    newPrediction.prediction === 'bullish' && 'bg-pnl-positive/[0.06] border-pnl-positive/30',
+                    newPrediction.prediction === 'bearish' && 'bg-pnl-negative/[0.06] border-pnl-negative/30',
+                    newPrediction.prediction === 'neutral' && 'bg-white/[0.04] border-border'
+                  )}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={clsx(
+                        'text-sm font-bold capitalize',
+                        newPrediction.prediction === 'bullish' && 'text-pnl-positive',
+                        newPrediction.prediction === 'bearish' && 'text-pnl-negative',
+                      )}>
+                        {newPrediction.prediction}
+                      </span>
+                      <span className="text-[10px] font-mono tabular-nums font-bold">{newPrediction.confidence}%</span>
+                    </div>
+                    {/* Confidence bar */}
+                    <div className="w-full h-1 rounded-full bg-white/[0.06] mb-2 overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${newPrediction.confidence}%` }}
+                        transition={{ duration: 0.6 }}
+                        className={clsx(
+                          'h-full rounded-full',
+                          newPrediction.prediction === 'bullish' && 'bg-pnl-positive',
+                          newPrediction.prediction === 'bearish' && 'bg-pnl-negative',
+                          newPrediction.prediction === 'neutral' && 'bg-accent-primary',
+                        )}
+                      />
+                    </div>
+                    <p className="text-[11px] text-text-muted leading-relaxed">{newPrediction.reasoning}</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-[0.1em] text-text-muted mb-1">Timeframe</label>
+                    <select
+                      value={newPrediction.timeframe}
+                      onChange={(e) => setNewPrediction(prev => prev ? { ...prev, timeframe: e.target.value as COTPrediction['timeframe'] } : null)}
+                      className="w-full px-2.5 py-1.5 bg-white/[0.04] border border-border rounded-lg text-xs
+                                 focus:border-accent-primary/50 focus:outline-none transition-all"
+                    >
+                      <option value="1week">1 Woche</option>
+                      <option value="2weeks">2 Wochen</option>
+                      <option value="1month">1 Monat</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => setNewPrediction(null)}
+                      className="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg
+                                 bg-white/[0.04] border border-border hover:bg-white/[0.07] transition-all"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      onClick={savePrediction}
+                      className="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg
+                                 bg-accent-primary/15 text-accent-primary border border-accent-primary/25
+                                 hover:bg-accent-primary/25 transition-all"
+                    >
+                      Speichern
+                    </button>
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-text-muted leading-relaxed">
+                    Erstelle eine Prediction basierend auf den aktuellen COT-Daten fur {selectedCurrency}.
+                  </p>
+                  <button
+                    onClick={() => createPrediction(selectedCurrency)}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium
+                               bg-accent-primary/15 text-accent-primary border border-accent-primary/25
+                               hover:bg-accent-primary/25 transition-all"
+                  >
+                    <Sparkles size={13} />
+                    Prediction generieren
+                  </button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* ================================================================== */}
+      {/* TAB: TRADE PATTERNS                                                 */}
+      {/* ================================================================== */}
+      {activeTab === 'trade-patterns' && (
+        <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-5">
+          {/* ── Info Banner ── */}
+          <motion.div
+            variants={staggerItem}
+            className="rounded-xl bg-accent-primary/[0.04] border border-accent-primary/15 p-4"
+          >
+            <div className="flex items-start gap-3">
+              <BookOpen size={16} className="text-accent-primary mt-0.5 shrink-0" />
+              <div>
+                <h4 className="text-xs font-semibold mb-0.5">Trade Pattern Erkennung</h4>
+                <p className="text-[11px] text-text-muted leading-relaxed">
+                  Das System analysiert deine geschlossenen Trades und erkennt Muster wie:
+                  Direction-Bias pro Pair, Session-Starken/Schwachen, Tilt-Erkennung nach Verlustserien.
+                  Je mehr Trades du hast, desto genauer werden die Erkenntnisse.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* ── Patterns Visual Cards ── */}
+          {mlData.learnedPatterns.length === 0 ? (
+            <motion.div variants={staggerItem} className="rounded-xl bg-white/[0.03] border border-border p-10 text-center">
+              <Brain size={36} className="mx-auto text-text-muted/30 mb-3" />
+              <h3 className="text-sm font-semibold mb-1">Keine Muster erkannt</h3>
+              <p className="text-[11px] text-text-muted mb-4">
+                Du benotitigst mindestens 10 geschlossene Trades fur die Mustererkennung.
+                Aktuell hast du {allTrades.filter(t => t.status === 'closed').length} geschlossene Trades.
+              </p>
+              <button
+                onClick={analyzeTradePatterns}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                           bg-accent-primary/15 text-accent-primary border border-accent-primary/25
+                           hover:bg-accent-primary/25 transition-all"
+              >
+                <Sparkles size={13} />
+                Jetzt analysieren
+              </button>
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {mlData.learnedPatterns.map((pattern, idx) => (
+                <motion.div
+                  key={pattern.id}
+                  variants={staggerItem}
+                  className="rounded-xl bg-white/[0.03] border border-border p-4 hover:border-border-light transition-all"
+                >
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className={clsx(
+                        'p-1.5 rounded-lg',
+                        pattern.recommendation === 'trade' && 'bg-pnl-positive/10',
+                        pattern.recommendation === 'avoid' && 'bg-pnl-negative/10',
+                        pattern.recommendation === 'neutral' && 'bg-accent-primary/10',
+                      )}>
+                        {pattern.recommendation === 'trade' && <TrendingUp size={14} className="text-pnl-positive" />}
+                        {pattern.recommendation === 'avoid' && <AlertTriangle size={14} className="text-pnl-negative" />}
+                        {pattern.recommendation === 'neutral' && <Zap size={14} className="text-accent-primary" />}
+                      </div>
+                      <span className="text-xs font-semibold">{pattern.name}</span>
+                    </div>
+                    <span className={clsx(
+                      'text-[9px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider',
+                      pattern.recommendation === 'trade' && 'bg-pnl-positive/15 text-pnl-positive',
+                      pattern.recommendation === 'avoid' && 'bg-pnl-negative/15 text-pnl-negative',
+                      pattern.recommendation === 'neutral' && 'bg-accent-primary/15 text-accent-primary',
+                    )}>
+                      {pattern.recommendation === 'trade' ? 'Handeln' : pattern.recommendation === 'avoid' ? 'Meiden' : 'Neutral'}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-text-muted leading-relaxed mb-3">{pattern.description}</p>
+
+                  {/* Confidence bar */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Konfidenz</span>
+                      <span className="text-[10px] font-mono tabular-nums font-bold">{pattern.confidence}%</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pattern.confidence}%` }}
+                        transition={{ duration: 0.6, delay: idx * 0.1 }}
+                        className={clsx(
+                          'h-full rounded-full',
+                          pattern.recommendation === 'trade' && 'bg-pnl-positive',
+                          pattern.recommendation === 'avoid' && 'bg-pnl-negative',
+                          pattern.recommendation === 'neutral' && 'bg-accent-primary',
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Stats row */}
+                  <div className="flex items-center gap-4 text-[10px] font-mono tabular-nums pt-2 border-t border-border/40">
+                    <span className="text-text-muted">{pattern.stats.occurrences} Trades</span>
+                    <span className="text-pnl-positive">{pattern.stats.wins}W</span>
+                    <span className="text-pnl-negative">{pattern.stats.losses}L</span>
+                    <span className="text-text-muted ml-auto">
+                      WR {pattern.stats.occurrences > 0 ? ((pattern.stats.wins / pattern.stats.occurrences) * 100).toFixed(0) : 0}%
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Pair Performance ── */}
+          <motion.div variants={staggerItem}>
+            <div className="rounded-xl bg-white/[0.03] border border-border p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <LineChart size={14} className="text-text-muted" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                  Pair Performance Analysis
+                </span>
+              </div>
+              {(() => {
+                const closedTrades = allTrades.filter(t => t.status === 'closed' && t.pnl !== undefined);
+                const pairStats: Record<string, { wins: number; losses: number; pnl: number }> = {};
+
+                closedTrades.forEach(trade => {
+                  if (!pairStats[trade.pair]) pairStats[trade.pair] = { wins: 0, losses: 0, pnl: 0 };
+                  pairStats[trade.pair].pnl += trade.pnl || 0;
+                  if ((trade.pnl || 0) > 0) pairStats[trade.pair].wins++;
+                  else pairStats[trade.pair].losses++;
+                });
+
+                const sortedPairs = Object.entries(pairStats)
+                  .map(([pair, stats]) => ({ pair, ...stats, total: stats.wins + stats.losses }))
+                  .sort((a, b) => b.pnl - a.pnl);
+
+                if (sortedPairs.length === 0) {
+                  return <p className="text-[11px] text-text-muted">Keine Trades vorhanden.</p>;
+                }
+
+                return (
+                  <div className="grid grid-cols-4 gap-2.5">
+                    {sortedPairs.map((pair, i) => (
+                      <motion.div
+                        key={pair.pair}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: i * 0.04 }}
+                        className={clsx(
+                          'p-3 rounded-lg border transition-all hover:border-border-light',
+                          i === 0 && pair.pnl > 0 && 'bg-pnl-positive/[0.05] border-pnl-positive/20',
+                          i === sortedPairs.length - 1 && pair.pnl < 0 && 'bg-pnl-negative/[0.05] border-pnl-negative/20',
+                          !(i === 0 && pair.pnl > 0) && !(i === sortedPairs.length - 1 && pair.pnl < 0) && 'bg-white/[0.02] border-border/50'
+                        )}
+                      >
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.05em] text-text-muted mb-1">{pair.pair}</div>
+                        <div className={clsx(
+                          'text-sm font-bold font-mono tabular-nums',
+                          pair.pnl >= 0 ? 'text-pnl-positive' : 'text-pnl-negative'
+                        )}>
+                          {pair.pnl >= 0 ? '+' : ''}{pair.pnl.toFixed(2)}
+                        </div>
+                        <div className="text-[10px] text-text-muted font-mono tabular-nums mt-0.5">
+                          {pair.wins}W / {pair.losses}L ({(pair.wins / pair.total * 100).toFixed(0)}%)
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* ================================================================== */}
+      {/* TAB: PREDICTIONS                                                    */}
+      {/* ================================================================== */}
       {activeTab === 'predictions' && (
-        <div className="space-y-6">
-          {/* Prediction Stats */}
+        <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-5">
+          {/* ── Accuracy Breakdown ── */}
           {mlData.predictions.filter(p => p.outcome).length >= 5 && (
-            <div className="card bg-gradient-to-r from-accent-primary/10 to-accent-blue/10">
-              <h3 className="font-semibold mb-4">Prediction Accuracy Breakdown</h3>
-              <div className="grid grid-cols-4 gap-4">
+            <motion.div
+              variants={staggerItem}
+              className="rounded-xl bg-gradient-to-r from-accent-primary/[0.06] via-accent-blue/[0.04] to-transparent
+                         border border-accent-primary/15 p-4"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Percent size={14} className="text-accent-primary" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                  Prediction Accuracy Breakdown
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-3">
                 {CURRENCIES.slice(0, 8).map(currency => {
                   const preds = mlData.predictions.filter(p => p.currency === currency.code && p.outcome);
                   const correct = preds.filter(p => p.outcome?.wasCorrect).length;
                   const accuracy = preds.length > 0 ? (correct / preds.length * 100) : 0;
-                  
+
                   return (
-                    <div key={currency.code} className="p-3 rounded-lg bg-background/50">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium">{currency.code}</span>
-                        <span className="text-xs text-text-muted">{preds.length} eval.</span>
+                    <div key={currency.code} className="p-3 rounded-lg bg-white/[0.03] border border-border/40">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold font-mono">{currency.code}</span>
+                        <span className="text-[10px] text-text-muted font-mono tabular-nums">{preds.length} eval.</span>
                       </div>
-                      <div className={clsx(
-                        'text-xl font-bold',
-                        accuracy >= 60 ? 'text-pnl-positive' : accuracy >= 50 ? 'text-accent-gold' : 'text-pnl-negative'
-                      )}>
-                        {preds.length > 0 ? `${accuracy.toFixed(0)}%` : '-'}
-                      </div>
+                      {preds.length > 0 ? (
+                        <>
+                          <div className={clsx(
+                            'text-lg font-bold font-mono tabular-nums',
+                            accuracy >= 60 ? 'text-pnl-positive' : accuracy >= 50 ? 'text-accent-gold' : 'text-pnl-negative'
+                          )}>
+                            {accuracy.toFixed(0)}%
+                          </div>
+                          <div className="w-full h-1 rounded-full bg-white/[0.06] mt-1.5 overflow-hidden">
+                            <div
+                              className={clsx(
+                                'h-full rounded-full transition-all',
+                                accuracy >= 60 ? 'bg-pnl-positive' : accuracy >= 50 ? 'bg-accent-gold' : 'bg-pnl-negative'
+                              )}
+                              style={{ width: `${accuracy}%` }}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-lg font-bold text-text-muted/30">-</div>
+                      )}
                     </div>
                   );
                 })}
               </div>
-            </div>
+            </motion.div>
           )}
 
-          {/* All Predictions */}
-          <div className="card">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <History size={18} />
-              Alle Predictions ({mlData.predictions.length})
-            </h3>
+          {/* ── Predictions Timeline / Feed ── */}
+          <motion.div variants={staggerItem}>
+            <div className="rounded-xl bg-white/[0.03] border border-border p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <History size={14} className="text-text-muted" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                  Alle Predictions
+                </span>
+                <span className="text-[10px] font-mono tabular-nums text-text-muted/60">
+                  ({mlData.predictions.length})
+                </span>
+              </div>
 
-            {mlData.predictions.length === 0 ? (
-              <div className="text-center py-8 text-text-muted">
-                <Target size={32} className="mx-auto mb-2 opacity-50" />
-                <p>Noch keine Predictions erstellt.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="py-2 text-left">Datum</th>
-                      <th className="py-2 text-left">Währung</th>
-                      <th className="py-2 text-left">Prediction</th>
-                      <th className="py-2 text-right">COT Net</th>
-                      <th className="py-2 text-right">Change</th>
-                      <th className="py-2 text-center">Konfidenz</th>
-                      <th className="py-2 text-center">Ergebnis</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mlData.predictions.map(pred => (
-                      <tr key={pred.id} className="border-b border-border/50 hover:bg-white/5">
-                        <td className="py-2">{new Date(pred.createdAt).toLocaleDateString('de-DE')}</td>
-                        <td className="py-2 font-medium">{pred.currency}</td>
-                        <td className="py-2">
+              {mlData.predictions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-text-muted">
+                  <Target size={28} className="opacity-30 mb-2" />
+                  <p className="text-xs">Noch keine Predictions erstellt.</p>
+                </div>
+              ) : (
+                <div className="relative">
+                  {/* Timeline line */}
+                  <div className="absolute left-[17px] top-2 bottom-2 w-px bg-border/40" />
+
+                  <div className="space-y-1">
+                    {mlData.predictions.map((pred, i) => (
+                      <motion.div
+                        key={pred.id}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.03 }}
+                        className="relative flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-white/[0.02] transition-all group"
+                      >
+                        {/* Timeline dot */}
+                        <div className={clsx(
+                          'relative z-10 w-2 h-2 rounded-full shrink-0 ring-2 ring-background-card',
+                          pred.outcome
+                            ? pred.outcome.wasCorrect ? 'bg-pnl-positive' : 'bg-pnl-negative'
+                            : 'bg-text-muted/30'
+                        )} />
+
+                        {/* Date */}
+                        <span className="text-[10px] font-mono tabular-nums text-text-muted w-16 shrink-0">
+                          {new Date(pred.createdAt).toLocaleDateString('de-DE')}
+                        </span>
+
+                        {/* Currency */}
+                        <span className="text-xs font-mono font-bold w-8 shrink-0">{pred.currency}</span>
+
+                        {/* Prediction badge */}
+                        <span className={clsx(
+                          'text-[10px] px-1.5 py-0.5 rounded-md font-medium shrink-0',
+                          pred.prediction === 'bullish' && 'bg-pnl-positive/10 text-pnl-positive',
+                          pred.prediction === 'bearish' && 'bg-pnl-negative/10 text-pnl-negative',
+                          pred.prediction === 'neutral' && 'bg-white/[0.06] text-text-muted'
+                        )}>
+                          {pred.prediction}
+                        </span>
+
+                        {/* COT values */}
+                        <div className="flex items-center gap-3 ml-auto text-[10px] font-mono tabular-nums">
                           <span className={clsx(
-                            'px-2 py-0.5 rounded text-xs',
-                            pred.prediction === 'bullish' && 'bg-pnl-positive/20 text-pnl-positive',
-                            pred.prediction === 'bearish' && 'bg-pnl-negative/20 text-pnl-negative',
-                            pred.prediction === 'neutral' && 'bg-text-muted/20 text-text-muted'
+                            pred.cotNetAtPrediction >= 0 ? 'text-pnl-positive/70' : 'text-pnl-negative/70'
                           )}>
-                            {pred.prediction}
+                            {pred.cotNetAtPrediction.toLocaleString()}
                           </span>
-                        </td>
-                        <td className={clsx('py-2 text-right', pred.cotNetAtPrediction >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
-                          {pred.cotNetAtPrediction.toLocaleString()}
-                        </td>
-                        <td className={clsx('py-2 text-right', pred.cotChange >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
-                          {pred.cotChange >= 0 ? '+' : ''}{pred.cotChange.toLocaleString()}
-                        </td>
-                        <td className="py-2 text-center">{pred.confidence}%</td>
-                        <td className="py-2 text-center">
-                          {pred.outcome ? (
-                            pred.outcome.wasCorrect ? (
-                              <CheckCircle2 size={16} className="inline text-pnl-positive" />
+                          <span className={clsx(
+                            pred.cotChange >= 0 ? 'text-pnl-positive/60' : 'text-pnl-negative/60'
+                          )}>
+                            {pred.cotChange >= 0 ? '+' : ''}{pred.cotChange.toLocaleString()}
+                          </span>
+
+                          {/* Confidence mini-bar */}
+                          <div className="w-10 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-accent-primary/60"
+                              style={{ width: `${pred.confidence}%` }}
+                            />
+                          </div>
+                          <span className="text-text-muted/60 w-7 text-right">{pred.confidence}%</span>
+
+                          {/* Outcome icon */}
+                          <div className="w-5 flex justify-center">
+                            {pred.outcome ? (
+                              pred.outcome.wasCorrect ? (
+                                <CheckCircle2 size={12} className="text-pnl-positive" />
+                              ) : (
+                                <XCircle size={12} className="text-pnl-negative" />
+                              )
                             ) : (
-                              <XCircle size={16} className="inline text-pnl-negative" />
-                            )
-                          ) : (
-                            <Clock size={16} className="inline text-text-muted" />
-                          )}
-                        </td>
-                      </tr>
+                              <Clock size={12} className="text-text-muted/30" />
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
       )}
     </div>
+    </PageTransition>
   );
 }

@@ -9,6 +9,8 @@
 
 import { create } from 'zustand';
 import type { Outlook, OutlookStatus, CurrencyBias } from '@/types';
+import * as outlookService from '@/services/outlookService';
+import { isElectron } from '@/services/webApi';
 
 // ============================================================
 // COT Data Interface (from localStorage cache)
@@ -113,6 +115,15 @@ interface OutlookState {
 
 const STORAGE_KEY = 'tradingJournal_outlooks';
 
+// Check if we should skip Supabase calls (Electron or offline mode)
+const isOfflineMode = (): boolean => {
+  try {
+    return isElectron() || localStorage.getItem('trading-journal-offline-mode') === 'true';
+  } catch {
+    return true;
+  }
+};
+
 // ============================================================
 // Helper Functions
 // ============================================================
@@ -205,22 +216,37 @@ export const useOutlookStore = create<OutlookState>((set, get) => ({
   isFormOpen: false,
   prefillTradeData: null,
   
-  // Load Outlooks from Storage
+  // Load Outlooks from Supabase (fallback localStorage)
   loadOutlooks: () => {
     set({ isLoading: true });
-    try {
+
+    if (isOfflineMode()) {
+      // Skip Supabase in offline/Electron mode
       const outlooks = loadFromStorage();
       set({ outlooks, isLoading: false, error: null });
-    } catch (error) {
-      set({ error: 'Fehler beim Laden der Outlooks', isLoading: false });
+      return;
     }
+
+    outlookService.loadOutlooks()
+      .then(outlooks => {
+        set({ outlooks: outlooks as unknown as Outlook[], isLoading: false, error: null });
+      })
+      .catch(() => {
+        // Fallback to localStorage
+        try {
+          const outlooks = loadFromStorage();
+          set({ outlooks, isLoading: false, error: null });
+        } catch {
+          set({ error: 'Fehler beim Laden der Outlooks', isLoading: false });
+        }
+      });
   },
-  
+
   // Save New Outlook
   saveOutlook: (outlookData) => {
     const isNew = !outlookData.id;
     const now = new Date().toISOString();
-    
+
     const outlook: Outlook = {
       id: outlookData.id || generateId(),
       symbol: outlookData.symbol || '',
@@ -238,7 +264,7 @@ export const useOutlookStore = create<OutlookState>((set, get) => ({
       updatedAt: now,
       executedTradeId: outlookData.executedTradeId,
     };
-    
+
     // Auto-populate COT bias if not provided
     if (!outlook.cotBias && outlook.symbol) {
       const cotBias = get().getCOTBias(outlook.symbol);
@@ -246,23 +272,31 @@ export const useOutlookStore = create<OutlookState>((set, get) => ({
         outlook.cotBias = cotBias;
       }
     }
-    
+
+    // Update state optimistically
     set(state => {
       let newOutlooks: Outlook[];
       if (isNew) {
         newOutlooks = [...state.outlooks, outlook];
       } else {
-        newOutlooks = state.outlooks.map(o => 
+        newOutlooks = state.outlooks.map(o =>
           o.id === outlook.id ? outlook : o
         );
       }
       saveToStorage(newOutlooks);
       return { outlooks: newOutlooks };
     });
-    
+
+    // Persist to Supabase in background (skip in offline mode)
+    if (!isOfflineMode()) {
+      outlookService.saveOutlook(outlook as any).catch(err =>
+        console.error('Supabase outlook save failed:', err)
+      );
+    }
+
     return outlook;
   },
-  
+
   // Update Existing Outlook
   updateOutlook: (id, updates) => {
     set(state => {
@@ -279,8 +313,18 @@ export const useOutlookStore = create<OutlookState>((set, get) => ({
       saveToStorage(newOutlooks);
       return { outlooks: newOutlooks };
     });
+
+    // Persist to Supabase (skip in offline mode)
+    if (!isOfflineMode()) {
+      const updated = get().outlooks.find(o => o.id === id);
+      if (updated) {
+        outlookService.saveOutlook(updated as any).catch(err =>
+          console.error('Supabase outlook update failed:', err)
+        );
+      }
+    }
   },
-  
+
   // Delete Outlook
   deleteOutlook: (id) => {
     set(state => {
@@ -288,6 +332,13 @@ export const useOutlookStore = create<OutlookState>((set, get) => ({
       saveToStorage(newOutlooks);
       return { outlooks: newOutlooks };
     });
+
+    // Delete from Supabase (skip in offline mode)
+    if (!isOfflineMode()) {
+      outlookService.removeOutlook(id).catch(err =>
+        console.error('Supabase outlook delete failed:', err)
+      );
+    }
   },
   
   // Set Status

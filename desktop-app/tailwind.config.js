@@ -28,6 +28,7 @@ export default {
           'primary-dim': '#7C3AED',
           'primary-glow': 'rgba(139, 92, 246, 0.15)',
           secondary: '#A78BFA',
+          cyan: '#06B6D4',
         },
         border: {
           DEFAULT: 'rgba(255, 255, 255, 0.08)',
@@ -61,12 +62,23 @@ export default {
         'xl': '0.75rem',
         '2xl': '1rem',
       },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-card': 'linear-gradient(135deg, rgba(139,92,246,0.05) 0%, rgba(6,182,212,0.03) 100%)',
+        'gradient-accent': 'linear-gradient(135deg, #8B5CF6 0%, #06B6D4 100%)',
+        'gradient-success': 'linear-gradient(135deg, #22C55E 0%, #10B981 100%)',
+        'gradient-danger': 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+        'gradient-surface': 'linear-gradient(180deg, rgba(19,19,22,0.9) 0%, rgba(10,10,12,1) 100%)',
+      },
       boxShadow: {
         'card': '0 1px 3px rgba(0, 0, 0, 0.4)',
         'card-hover': '0 4px 12px rgba(0, 0, 0, 0.5)',
         'glow': '0 0 20px rgba(139, 92, 246, 0.3)',
         'glow-sm': '0 0 10px rgba(139, 92, 246, 0.2)',
+        'glow-lg': '0 0 40px rgba(139, 92, 246, 0.2), 0 0 80px rgba(139, 92, 246, 0.1)',
         'depth': '0 1px 2px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.2)',
+        'depth-lg': '0 2px 4px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3), 0 16px 32px rgba(0,0,0,0.2)',
+        'inner-glow': 'inset 0 1px 0 rgba(255,255,255,0.05)',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
@@ -75,6 +87,8 @@ export default {
         'pulse-slow': 'pulse 3s ease-in-out infinite',
         'float': 'float 4s ease-in-out infinite',
         'glow-pulse': 'glowPulse 2s ease-in-out infinite',
+        'shimmer': 'shimmer 2s linear infinite',
+        'draw': 'draw 1.5s ease-out forwards',
       },
       keyframes: {
         fadeIn: {
@@ -96,6 +110,14 @@ export default {
         glowPulse: {
           '0%, 100%': { opacity: '0.5' },
           '50%': { opacity: '1' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+        draw: {
+          '0%': { strokeDashoffset: '1' },
+          '100%': { strokeDashoffset: '0' },
         },
       },
     },

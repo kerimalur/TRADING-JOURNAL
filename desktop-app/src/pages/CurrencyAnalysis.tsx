@@ -2,16 +2,19 @@
  * ========================================================================
  * Trading Journal - Currency Analysis Page
  * ========================================================================
- * 
- * Kombinierte Analyse für Währungen:
- * - Zinssätze aller Zentralbanken
+ *
+ * "Market Intelligence" Design mit Waage-Visualisierung
+ * BentoGrid Layout, horizontale Score-Bars, Balance-Scale Pairs
+ *
+ * Kombinierte Analyse fuer Waehrungen:
+ * - Zinssaetze aller Zentralbanken
  * - News-Bias (bullish/bearish)
  * - COT-Daten Integration
  * - Finale Pair-Empfehlungen
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { 
+import {
   Globe2,
   TrendingUp,
   TrendingDown,
@@ -29,21 +32,26 @@ import {
   Info
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { motion, AnimatePresence } from 'framer-motion';
 import { getApi } from '@/services/webApi';
+import { PageTransition } from '@/components/ui/PageTransition';
+import { BentoGrid, BentoCell } from '@/components/ui/BentoGrid';
+import { MetricDisplay } from '@/components/ui/MetricDisplay';
+import { Gauge } from '@/components/ui/Gauge';
 
-// Währungen mit Zentralbank-Info
+// Waehrungen mit Zentralbank-Info
 const CURRENCIES = [
-  { id: 'USD', name: 'USD', centralBank: 'Federal Reserve', flag: '🇺🇸' },
-  { id: 'EUR', name: 'EUR', centralBank: 'ECB', flag: '🇪🇺' },
-  { id: 'GBP', name: 'GBP', centralBank: 'Bank of England', flag: '🇬🇧' },
-  { id: 'JPY', name: 'JPY', centralBank: 'Bank of Japan', flag: '🇯🇵' },
-  { id: 'CAD', name: 'CAD', centralBank: 'Bank of Canada', flag: '🇨🇦' },
-  { id: 'AUD', name: 'AUD', centralBank: 'RBA', flag: '🇦🇺' },
-  { id: 'NZD', name: 'NZD', centralBank: 'RBNZ', flag: '🇳🇿' },
-  { id: 'CHF', name: 'CHF', centralBank: 'SNB', flag: '🇨🇭' },
+  { id: 'USD', name: 'USD', centralBank: 'Federal Reserve', flag: '\u{1F1FA}\u{1F1F8}' },
+  { id: 'EUR', name: 'EUR', centralBank: 'ECB', flag: '\u{1F1EA}\u{1F1FA}' },
+  { id: 'GBP', name: 'GBP', centralBank: 'Bank of England', flag: '\u{1F1EC}\u{1F1E7}' },
+  { id: 'JPY', name: 'JPY', centralBank: 'Bank of Japan', flag: '\u{1F1EF}\u{1F1F5}' },
+  { id: 'CAD', name: 'CAD', centralBank: 'Bank of Canada', flag: '\u{1F1E8}\u{1F1E6}' },
+  { id: 'AUD', name: 'AUD', centralBank: 'RBA', flag: '\u{1F1E6}\u{1F1FA}' },
+  { id: 'NZD', name: 'NZD', centralBank: 'RBNZ', flag: '\u{1F1F3}\u{1F1FF}' },
+  { id: 'CHF', name: 'CHF', centralBank: 'SNB', flag: '\u{1F1E8}\u{1F1ED}' },
 ];
 
-// Gängige Pairs
+// Gaengige Pairs
 const MAJOR_PAIRS = [
   'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF',
   'AUD/USD', 'NZD/USD', 'USD/CAD',
@@ -103,8 +111,8 @@ export function CurrencyAnalysis() {
 
   const refreshData = async () => {
     setIsLoading(true);
-    
-    // Default/Fallback Zinssätze (Stand: Februar 2026)
+
+    // Default/Fallback Zinssaetze (Stand: Februar 2026)
     let interestRates: Record<string, { rate: number; change: 'up' | 'down' | 'hold'; next: string; lastMeeting?: string; centralBank?: string }> = {
       'USD': { rate: 4.25, change: 'down', next: '2026-03-19', lastMeeting: '2026-01-29', centralBank: 'Federal Reserve' },
       'EUR': { rate: 2.75, change: 'down', next: '2026-03-06', lastMeeting: '2026-01-30', centralBank: 'ECB' },
@@ -115,16 +123,16 @@ export function CurrencyAnalysis() {
       'NZD': { rate: 4.25, change: 'down', next: '2026-04-09', lastMeeting: '2026-02-19', centralBank: 'RBNZ' },
       'CHF': { rate: 0.75, change: 'hold', next: '2026-03-20', lastMeeting: '2025-12-12', centralBank: 'SNB' },
     };
-    
-    // Versuche Zinssätze über unified API zu laden (falls verfügbar)
+
+    // Versuche Zinssaetze ueber unified API zu laden (falls verfuegbar)
     try {
       const api = getApi();
       if (api.fetchInterestRates) {
-        console.log('💰 Fetching interest rates...');
+        console.log('Fetching interest rates...');
         const result = await api.fetchInterestRates();
         if (result.success && result.data) {
           interestRates = result.data;
-          console.log('✅ Interest rates loaded from API');
+          console.log('Interest rates loaded from API');
         }
       }
     } catch (e) {
@@ -142,10 +150,10 @@ export function CurrencyAnalysis() {
     try {
       const api = getApi();
       if (api.fetchEconomicCalendar) {
-        console.log('📅 Fetching economic calendar for currency analysis...');
+        console.log('Fetching economic calendar for currency analysis...');
         const calResult = await api.fetchEconomicCalendar();
         if (calResult.success && calResult.data) {
-          // Filtere nur High-Impact Events für die nächsten Tage
+          // Filtere nur High-Impact Events fuer die naechsten Tage
           const today = new Date().toISOString().split('T')[0];
           loadedEvents = (calResult.data as any[])
             .filter((e: any) => e.impact === 'high' && e.date >= today)
@@ -157,7 +165,7 @@ export function CurrencyAnalysis() {
               date: e.date,
               impact: e.impact
             }));
-          console.log(`✅ Loaded ${loadedEvents.length} high-impact events`);
+          console.log(`Loaded ${loadedEvents.length} high-impact events`);
         }
       }
     } catch (e) {
@@ -166,110 +174,110 @@ export function CurrencyAnalysis() {
     setUpcomingEvents(loadedEvents);
 
     // News Bias basierend auf Zinspolitik und Wirtschaftslage (deterministisch!)
-    // Diese Funktion gibt auch eine detaillierte Begründung zurück
+    // Diese Funktion gibt auch eine detaillierte Begruendung zurueck
     const getNewsBiasFromRates = (currency: string, rateChange: 'up' | 'down' | 'hold', rate: number): { bias: Bias; strength: SignalStrength; reason: string } => {
-      // JPY ist speziell - Zinserhöhung stärkt Yen (Umkehrung des Carry Trades)
+      // JPY ist speziell - Zinserhoehung staerkt Yen (Umkehrung des Carry Trades)
       if (currency === 'JPY') {
         if (rateChange === 'up') {
-          return { 
-            bias: 'bullish', 
+          return {
+            bias: 'bullish',
             strength: 'strong',
-            reason: 'BoJ normalisiert Geldpolitik nach Jahren der Negativzinsen. Zinserhöhung reduziert Carry-Trade-Attraktivität gegen JPY, was den Yen stärkt. Historische Wende in der japanischen Geldpolitik.'
+            reason: 'BoJ normalisiert Geldpolitik nach Jahren der Negativzinsen. Zinserhoehung reduziert Carry-Trade-Attraktivitaet gegen JPY, was den Yen staerkt. Historische Wende in der japanischen Geldpolitik.'
           };
         }
         if (rateChange === 'down') {
-          return { bias: 'bearish', strength: 'moderate', reason: 'Lockere BoJ-Politik schwächt den Yen.' };
+          return { bias: 'bearish', strength: 'moderate', reason: 'Lockere BoJ-Politik schwaecht den Yen.' };
         }
-        return { bias: 'neutral', strength: 'weak', reason: 'BoJ hält Politik stabil.' };
+        return { bias: 'neutral', strength: 'weak', reason: 'BoJ haelt Politik stabil.' };
       }
-      
-      // USD als Reservewährung - globale Bedeutung
+
+      // USD als Reservewaehrung - globale Bedeutung
       if (currency === 'USD') {
         if (rateChange === 'down') {
-          return { 
-            bias: 'bearish', 
+          return {
+            bias: 'bearish',
             strength: 'moderate',
-            reason: 'Fed senkt Zinsen im Rahmen des Lockerungszyklus. Niedrigere Zinsen reduzieren die Attraktivität von US-Anleihen für internationale Investoren. Dollar verliert an relativer Renditestärke.'
+            reason: 'Fed senkt Zinsen im Rahmen des Lockerungszyklus. Niedrigere Zinsen reduzieren die Attraktivitaet von US-Anleihen fuer internationale Investoren. Dollar verliert an relativer Renditestaerke.'
           };
         }
         if (rateChange === 'up') {
-          return { bias: 'bullish', strength: 'strong', reason: 'Fed erhöht Zinsen - USD wird attraktiver.' };
+          return { bias: 'bullish', strength: 'strong', reason: 'Fed erhoeht Zinsen - USD wird attraktiver.' };
         }
         if (rate >= 4.0) {
-          return { 
-            bias: 'bullish', 
+          return {
+            bias: 'bullish',
             strength: 'weak',
             reason: `Mit ${rate}% bietet der USD weiterhin attraktive Renditen im globalen Vergleich. Safe-Haven-Status bleibt intakt.`
           };
         }
-        return { bias: 'neutral', strength: 'weak', reason: 'Fed hält Zinsen stabil.' };
+        return { bias: 'neutral', strength: 'weak', reason: 'Fed haelt Zinsen stabil.' };
       }
-      
+
       // EUR - EZB Politik
       if (currency === 'EUR') {
         if (rateChange === 'down') {
-          return { 
-            bias: 'bearish', 
+          return {
+            bias: 'bearish',
             strength: 'moderate',
-            reason: 'EZB setzt Lockerungszyklus fort wegen schwachem Wachstum in der Eurozone. Besonders Deutschland kämpft mit industrieller Rezession. Niedrigere Zinsen belasten EUR.'
+            reason: 'EZB setzt Lockerungszyklus fort wegen schwachem Wachstum in der Eurozone. Besonders Deutschland kaempft mit industrieller Rezession. Niedrigere Zinsen belasten EUR.'
           };
         }
         if (rateChange === 'up') {
-          return { bias: 'bullish', strength: 'strong', reason: 'EZB strafft Geldpolitik - EUR wird gestärkt.' };
+          return { bias: 'bullish', strength: 'strong', reason: 'EZB strafft Geldpolitik - EUR wird gestaerkt.' };
         }
-        return { bias: 'neutral', strength: 'weak', reason: 'EZB hält Zinsen stabil.' };
+        return { bias: 'neutral', strength: 'weak', reason: 'EZB haelt Zinsen stabil.' };
       }
-      
+
       // GBP - BoE Politik
       if (currency === 'GBP') {
         if (rateChange === 'down') {
-          return { 
-            bias: 'bearish', 
+          return {
+            bias: 'bearish',
             strength: 'moderate',
-            reason: 'Bank of England senkt Zinsen vorsichtig. UK-Wirtschaft kämpft mit hoher Inflation und schwachem Wachstum. Graduelle Lockerung belastet das Pfund.'
+            reason: 'Bank of England senkt Zinsen vorsichtig. UK-Wirtschaft kaempft mit hoher Inflation und schwachem Wachstum. Graduelle Lockerung belastet das Pfund.'
           };
         }
         if (rateChange === 'up') {
-          return { bias: 'bullish', strength: 'strong', reason: 'BoE erhöht Zinsen - GBP wird gestärkt.' };
+          return { bias: 'bullish', strength: 'strong', reason: 'BoE erhoeht Zinsen - GBP wird gestaerkt.' };
         }
-        return { bias: 'neutral', strength: 'weak', reason: 'BoE hält Zinsen stabil.' };
+        return { bias: 'neutral', strength: 'weak', reason: 'BoE haelt Zinsen stabil.' };
       }
-      
+
       // CHF als Safe Haven - besondere Dynamik
       if (currency === 'CHF') {
-        return { 
-          bias: 'neutral', 
+        return {
+          bias: 'neutral',
           strength: 'weak',
-          reason: 'SNB verfolgt stabile Politik. CHF profitiert von Safe-Haven-Flows in Krisenzeiten, ist aber durch niedrige Zinsen weniger attraktiv für Carry Trades.'
+          reason: 'SNB verfolgt stabile Politik. CHF profitiert von Safe-Haven-Flows in Krisenzeiten, ist aber durch niedrige Zinsen weniger attraktiv fuer Carry Trades.'
         };
       }
-      
-      // Rohstoffwährungen (AUD, CAD, NZD)
+
+      // Rohstoffwaehrungen (AUD, CAD, NZD)
       if (['AUD', 'CAD', 'NZD'].includes(currency)) {
-        const commodityName = currency === 'AUD' ? 'Eisenerz/Gold' : currency === 'CAD' ? 'Öl' : 'Milchprodukte';
+        const commodityName = currency === 'AUD' ? 'Eisenerz/Gold' : currency === 'CAD' ? 'Oel' : 'Milchprodukte';
         if (rateChange === 'down') {
-          return { 
-            bias: 'bearish', 
+          return {
+            bias: 'bearish',
             strength: rate >= 3.5 ? 'weak' : 'moderate',
-            reason: `Zentralbank senkt Zinsen. Als Rohstoffwährung abhängig von ${commodityName}-Preisen und China-Nachfrage. Niedrigere Zinsen reduzieren Carry-Trade-Attraktivität.`
+            reason: `Zentralbank senkt Zinsen. Als Rohstoffwaehrung abhaengig von ${commodityName}-Preisen und China-Nachfrage. Niedrigere Zinsen reduzieren Carry-Trade-Attraktivitaet.`
           };
         }
         if (rateChange === 'up') {
-          return { 
-            bias: 'bullish', 
+          return {
+            bias: 'bullish',
             strength: rate >= 4.0 ? 'strong' : 'moderate',
-            reason: `Zinserhöhung macht ${currency} attraktiver. Rohstoffpreise und China-Wirtschaft als zusätzliche Faktoren beachten.`
+            reason: `Zinserhoehung macht ${currency} attraktiver. Rohstoffpreise und China-Wirtschaft als zusaetzliche Faktoren beachten.`
           };
         }
-        return { bias: 'neutral', strength: 'weak', reason: 'Zentralbank hält Zinsen stabil.' };
+        return { bias: 'neutral', strength: 'weak', reason: 'Zentralbank haelt Zinsen stabil.' };
       }
-      
-      // Fallback für andere
+
+      // Fallback fuer andere
       if (rateChange === 'down') {
-        return { bias: 'bearish', strength: rate >= 3.5 ? 'weak' : 'moderate', reason: 'Zinssenkung belastet die Währung.' };
+        return { bias: 'bearish', strength: rate >= 3.5 ? 'weak' : 'moderate', reason: 'Zinssenkung belastet die Waehrung.' };
       }
       if (rateChange === 'up') {
-        return { bias: 'bullish', strength: rate >= 4.0 ? 'strong' : 'moderate', reason: 'Zinserhöhung stärkt die Währung.' };
+        return { bias: 'bullish', strength: rate >= 4.0 ? 'strong' : 'moderate', reason: 'Zinserhoehung staerkt die Waehrung.' };
       }
       return { bias: 'neutral', strength: 'weak', reason: 'Stabile Zinspolitik.' };
     };
@@ -277,33 +285,33 @@ export function CurrencyAnalysis() {
     const data: CurrencyData[] = CURRENCIES.map(curr => {
       const rates = interestRates[curr.id];
       const cot = cotParsed.find((c: any) => c.currency === curr.id);
-      
-      // News-Bias aus Zinspolitik ableiten (deterministisch, nicht zufällig)
+
+      // News-Bias aus Zinspolitik ableiten (deterministisch, nicht zufaellig)
       const newsBiasData = getNewsBiasFromRates(curr.id, rates.change, rates.rate);
 
       // COT-Bias aus gespeicherten Daten
       let cotBias: Bias = 'neutral';
       let cotStrength: SignalStrength = 'weak';
       let cotReason = 'Keine aktuellen COT-Daten. Bitte COT-Seite besuchen und Daten laden.';
-      
+
       if (cot && cotIsRecent) {
-        if (cot.signal === 'strong_long') { 
-          cotBias = 'bullish'; 
-          cotStrength = 'strong'; 
+        if (cot.signal === 'strong_long') {
+          cotBias = 'bullish';
+          cotStrength = 'strong';
           cotReason = `Commercials sind stark long (${cot.percentileRank}% Perzentil). Smart Money erwartet Aufwertung.`;
         }
-        else if (cot.signal === 'long') { 
-          cotBias = 'bullish'; 
+        else if (cot.signal === 'long') {
+          cotBias = 'bullish';
           cotStrength = 'moderate';
           cotReason = `Commercials sind long (${cot.percentileRank}% Perzentil). Positive Positionierung.`;
         }
-        else if (cot.signal === 'strong_short') { 
-          cotBias = 'bearish'; 
+        else if (cot.signal === 'strong_short') {
+          cotBias = 'bearish';
           cotStrength = 'strong';
           cotReason = `Commercials sind stark short (${cot.percentileRank}% Perzentil). Smart Money erwartet Abwertung.`;
         }
-        else if (cot.signal === 'short') { 
-          cotBias = 'bearish'; 
+        else if (cot.signal === 'short') {
+          cotBias = 'bearish';
           cotStrength = 'moderate';
           cotReason = `Commercials sind short (${cot.percentileRank}% Perzentil). Negative Positionierung.`;
         }
@@ -322,7 +330,7 @@ export function CurrencyAnalysis() {
       const rateScore = rates.change === 'up' ? 20 : rates.change === 'down' ? -20 : 0;
       const newsScore = biasToScore(newsBiasData.bias, newsBiasData.strength);
       const cotScore = biasToScore(cotBias, cotStrength);
-      
+
       const overallScore = Math.max(-100, Math.min(100, rateScore + newsScore + cotScore));
       const overallBias: Bias = overallScore > 20 ? 'bullish' : overallScore < -20 ? 'bearish' : 'neutral';
 
@@ -346,10 +354,10 @@ export function CurrencyAnalysis() {
 
     setCurrencyData(data);
     setLastUpdate(new Date());
-    
+
     localStorage.setItem('currencyAnalysis', JSON.stringify(data));
     localStorage.setItem('currencyAnalysisDate', new Date().toISOString());
-    
+
     setIsLoading(false);
   };
 
@@ -368,24 +376,24 @@ export function CurrencyAnalysis() {
 
       const scoreDiff = baseData.overallScore - quoteData.overallScore;
       const interestDiff = baseData.interestRate - quoteData.interestRate;
-      
+
       // Bei sehr kleinem Score-Unterschied = keine klare Empfehlung
       if (Math.abs(scoreDiff) < 10) {
         return null;
       }
-      
+
       const reasons: string[] = [];
-      
+
       // Interest Rate
       if (Math.abs(interestDiff) >= 1) {
         reasons.push(`Zinsdifferenz: ${interestDiff > 0 ? '+' : ''}${interestDiff.toFixed(2)}%`);
       }
-      
+
       // News
       if (baseData.newsBias !== quoteData.newsBias) {
         reasons.push(`News: ${base} ${baseData.newsBias}, ${quote} ${quoteData.newsBias}`);
       }
-      
+
       // COT
       if (baseData.cotBias !== quoteData.cotBias) {
         reasons.push(`COT: ${base} ${baseData.cotBias}, ${quote} ${quoteData.cotBias}`);
@@ -426,11 +434,11 @@ export function CurrencyAnalysis() {
     return (
       <div className="flex gap-0.5">
         {[1, 2, 3].map(i => (
-          <div 
+          <div
             key={i}
             className={clsx(
-              'w-1.5 h-3 rounded-sm',
-              i <= count ? 'bg-accent-gold' : 'bg-gray-600'
+              'w-1 h-2.5 rounded-[1px]',
+              i <= count ? 'bg-accent-gold' : 'bg-white/[0.06]'
             )}
           />
         ))}
@@ -440,774 +448,1004 @@ export function CurrencyAnalysis() {
 
   const currencyInfo = (id: string) => CURRENCIES.find(c => c.id === id);
 
-  return (
-    <div className="page-container">
-      {/* Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">
-            <Globe2 className="text-accent-primary" />
-            Währungsanalyse
-          </h1>
-          {lastUpdate && (
-            <p className="text-sm text-text-muted mt-1">
-              Letztes Update: {lastUpdate.toLocaleDateString('de-DE')} {lastUpdate.toLocaleTimeString('de-DE')}
-            </p>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <div className="flex bg-background-surface rounded-lg p-1">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={clsx(
-                'px-4 py-2 rounded-md text-sm font-medium transition-all',
-                activeTab === 'overview' ? 'bg-accent-gold text-black' : 'text-text-muted hover:text-white'
-              )}
-            >
-              Übersicht
-            </button>
-            <button
-              onClick={() => setActiveTab('pairs')}
-              className={clsx(
-                'px-4 py-2 rounded-md text-sm font-medium transition-all',
-                activeTab === 'pairs' ? 'bg-accent-gold text-black' : 'text-text-muted hover:text-white'
-              )}
-            >
-              Pair Empfehlungen
-            </button>
+  // --- Horizontal score bar for currency rows ---
+  const ScoreBar = ({ score, compact = false }: { score: number; compact?: boolean }) => {
+    const barH = compact ? 'h-1' : 'h-1.5';
+    const pct = 50 + score / 2; // map -100..100 to 0..100
+    return (
+      <div className={clsx('w-full relative', barH, 'rounded-full overflow-hidden bg-white/[0.04]')}>
+        {/* centre tick */}
+        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/10 z-10" />
+        {/* filled bar from centre */}
+        {score !== 0 && (
+          <motion.div
+            className={clsx(
+              'absolute top-0 bottom-0 rounded-full',
+              score > 0 ? 'bg-pnl-positive/70' : 'bg-pnl-negative/70'
+            )}
+            initial={{ width: 0 }}
+            animate={{
+              width: `${Math.abs(score) / 2}%`,
+              left: score > 0 ? '50%' : undefined,
+              right: score < 0 ? '50%' : undefined,
+            }}
+            transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+            style={score > 0 ? { left: '50%' } : { right: '50%' }}
+          />
+        )}
+        {/* needle */}
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-white rounded-full z-20"
+          style={{ left: `${pct}%`, transform: 'translateX(-50%)' }}
+        />
+      </div>
+    );
+  };
+
+  // --- Balance scale visual for pair recommendations ---
+  const BalanceScale = ({ baseScore, quoteScore, base, quote }: { baseScore: number; quoteScore: number; base: string; quote: string }) => {
+    const diff = baseScore - quoteScore;
+    // tilt: -1 (left heavy = base stronger) to +1 (right heavy = quote stronger)
+    // If base > quote, beam tilts left-down (base heavier = stronger)
+    const tiltDeg = Math.max(-12, Math.min(12, -diff * 0.12));
+
+    return (
+      <div className="flex flex-col items-center gap-1 py-2">
+        {/* Beam */}
+        <motion.div
+          className="relative w-full h-8 flex items-center"
+          initial={{ rotate: 0 }}
+          animate={{ rotate: tiltDeg }}
+          transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+          style={{ transformOrigin: 'center center' }}
+        >
+          <div className="absolute inset-x-4 top-1/2 h-px bg-white/20" />
+          {/* Left pan (base) */}
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 flex flex-col items-center">
+            <div className={clsx(
+              'w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border',
+              baseScore >= quoteScore
+                ? 'bg-pnl-positive/20 border-pnl-positive/40 text-pnl-positive'
+                : 'bg-white/[0.03] border-white/10 text-text-muted'
+            )}>
+              {base}
+            </div>
           </div>
-          
+          {/* Centre pivot */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-accent-gold/60" />
+          {/* Right pan (quote) */}
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col items-center">
+            <div className={clsx(
+              'w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border',
+              quoteScore > baseScore
+                ? 'bg-pnl-positive/20 border-pnl-positive/40 text-pnl-positive'
+                : 'bg-white/[0.03] border-white/10 text-text-muted'
+            )}>
+              {quote}
+            </div>
+          </div>
+        </motion.div>
+        {/* Score labels underneath */}
+        <div className="flex justify-between w-full px-2">
+          <span className={clsx('font-mono tabular-nums text-[10px]', baseScore > 0 ? 'text-pnl-positive' : baseScore < 0 ? 'text-pnl-negative' : 'text-text-muted')}>
+            {baseScore > 0 ? '+' : ''}{baseScore}
+          </span>
+          <span className="text-[9px] text-text-muted uppercase tracking-widest">vs</span>
+          <span className={clsx('font-mono tabular-nums text-[10px]', quoteScore > 0 ? 'text-pnl-positive' : quoteScore < 0 ? 'text-pnl-negative' : 'text-text-muted')}>
+            {quoteScore > 0 ? '+' : ''}{quoteScore}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <PageTransition>
+    <div className="page-container">
+      {/* ================================================================
+          HEADER
+          ================================================================ */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+            <Globe2 size={18} className="text-accent-primary" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-text-primary tracking-tight">Market Intelligence</h1>
+            {lastUpdate && (
+              <p className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-mono tabular-nums">
+                Updated {lastUpdate.toLocaleDateString('de-DE')} {lastUpdate.toLocaleTimeString('de-DE')}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* Pill segment control */}
+          <div className="flex bg-white/[0.03] rounded-full p-0.5 border border-white/[0.06]">
+            {(['overview', 'pairs'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={clsx(
+                  'relative px-4 py-1.5 rounded-full text-[11px] font-medium uppercase tracking-[0.08em] transition-all duration-200',
+                  activeTab === tab
+                    ? 'text-black'
+                    : 'text-text-muted hover:text-text-secondary'
+                )}
+              >
+                {activeTab === tab && (
+                  <motion.div
+                    layoutId="tab-pill"
+                    className="absolute inset-0 rounded-full bg-accent-gold"
+                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  />
+                )}
+                <span className="relative z-10">{tab === 'overview' ? 'Currencies' : 'Pairs'}</span>
+              </button>
+            ))}
+          </div>
+
           <button
             onClick={refreshData}
             disabled={isLoading}
-            className="btn-primary flex items-center gap-2"
+            className={clsx(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium uppercase tracking-[0.06em]',
+              'bg-white/[0.03] border border-white/[0.06] text-text-secondary',
+              'hover:bg-white/[0.06] hover:text-text-primary transition-all',
+              isLoading && 'opacity-60 pointer-events-none'
+            )}
           >
-            <RefreshCw size={18} className={clsx(isLoading && 'animate-spin')} />
-            Aktualisieren
+            <RefreshCw size={13} className={clsx(isLoading && 'animate-spin')} />
+            Refresh
           </button>
         </div>
       </div>
 
-      {activeTab === 'overview' ? (
-        <>
-          {/* Info Banner */}
-          <div className="card mb-6 bg-accent-blue/10 border-accent-blue/30">
-            <div className="flex items-start gap-3">
-              <Info size={20} className="text-accent-blue mt-0.5 flex-shrink-0" />
-              <div>
-                <h4 className="font-medium text-text-primary mb-1">So funktioniert die Analyse</h4>
-                <ul className="text-sm text-text-muted space-y-1">
-                  <li><strong>Zinssätze:</strong> Höhere Zinsen → Währung attraktiver (außer JPY-Sonderfall)</li>
-                  <li><strong>Zinspolitik:</strong> Zinserhöhung = bullish, Zinssenkung = bearish</li>
-                  <li><strong>COT-Daten:</strong> Positionierung der Commercials (Smart Money) aus CFTC-Berichten</li>
-                  <li><strong>Overall Score:</strong> Kombination aus Zinsen, Zinspolitik und COT-Positionierung</li>
-                </ul>
-                <p className="text-xs text-text-muted mt-2 flex items-center gap-2">
-                  <AlertTriangle size={12} />
-                  COT-Daten müssen zuerst auf der COT-Seite geladen werden. Zinssätze: Stand Februar 2026.
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          {/* Currency Cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            {currencyData.map(data => {
-              return (
-                <button 
-                  key={data.currency} 
-                  onClick={() => setSelectedCurrency(data)}
-                  className="card text-left transition-all hover:ring-2 hover:ring-accent-primary/50 hover:scale-[1.02]"
-                >
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-lg">{data.currency}</span>
-                      <Info size={14} className="text-text-muted" />
-                    </div>
-                    <div className={clsx(
-                      'px-2 py-1 rounded text-xs font-bold flex items-center gap-1',
-                      data.overallBias === 'bullish' && 'bg-pnl-positive/20 text-pnl-positive',
-                      data.overallBias === 'bearish' && 'bg-pnl-negative/20 text-pnl-negative',
-                      data.overallBias === 'neutral' && 'bg-gray-500/20 text-gray-400'
-                    )}>
-                      {getBiasIcon(data.overallBias)}
-                      {data.overallBias.toUpperCase()}
-                    </div>
+      <AnimatePresence mode="wait">
+        {activeTab === 'overview' ? (
+          <motion.div
+            key="overview"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <BentoGrid cols={4} className="mb-6">
+              {/* ================================================================
+                  INFO CARD (wide)
+                  ================================================================ */}
+              <BentoCell size="wide" delay={0} className="bg-white/[0.03]">
+                <div className="flex items-start gap-2.5">
+                  <Info size={14} className="text-accent-blue mt-0.5 flex-shrink-0" />
+                  <div>
+                    <span className="text-[10px] uppercase tracking-[0.1em] text-accent-blue font-semibold">Analyse-Methodik</span>
+                    <ul className="text-[11px] text-text-muted mt-1.5 space-y-0.5 leading-relaxed">
+                      <li><span className="text-text-secondary font-medium">Zinsen:</span> Hoehere Zinsen = attraktivere Waehrung</li>
+                      <li><span className="text-text-secondary font-medium">Zinspolitik:</span> Erhoehung = bullish, Senkung = bearish</li>
+                      <li><span className="text-text-secondary font-medium">COT:</span> Commercials (Smart Money) Positionierung</li>
+                      <li><span className="text-text-secondary font-medium">Score:</span> Kombination aller Faktoren (-100 bis +100)</li>
+                    </ul>
+                    <p className="text-[10px] text-text-muted mt-1.5 flex items-center gap-1.5 opacity-60">
+                      <AlertTriangle size={10} />
+                      COT-Daten muessen auf der COT-Seite geladen werden
+                    </p>
                   </div>
+                </div>
+              </BentoCell>
 
-                  {/* Score Bar */}
-                  <div className="mb-4">
-                    <div className="flex justify-between text-xs text-text-muted mb-1">
-                      <span>Bearish</span>
-                      <span className="font-semibold">{data.overallScore > 0 ? '+' : ''}{data.overallScore}</span>
-                      <span>Bullish</span>
-                    </div>
-                    <div className="h-2 bg-background rounded-full overflow-hidden relative">
-                      <div className="absolute inset-0 flex">
-                        <div className="w-1/2 bg-pnl-negative/30" />
-                        <div className="w-1/2 bg-pnl-positive/30" />
-                      </div>
-                      <div 
-                        className="absolute h-full w-1 bg-white rounded"
-                        style={{ left: `${50 + data.overallScore / 2}%`, transform: 'translateX(-50%)' }}
-                      />
-                    </div>
+              {/* ================================================================
+                  SUMMARY METRICS
+                  ================================================================ */}
+              <BentoCell delay={0.05} className="bg-white/[0.03] flex flex-col justify-center">
+                <MetricDisplay
+                  label="Bullish"
+                  value={currencyData.filter(d => d.overallBias === 'bullish').length}
+                  size="lg"
+                  icon={<TrendingUp size={12} />}
+                  trend="up"
+                  trendLabel="Currencies"
+                />
+              </BentoCell>
+
+              <BentoCell delay={0.1} className="bg-white/[0.03] flex flex-col justify-center">
+                <MetricDisplay
+                  label="Bearish"
+                  value={currencyData.filter(d => d.overallBias === 'bearish').length}
+                  size="lg"
+                  icon={<TrendingDown size={12} />}
+                  trend="down"
+                  trendLabel="Currencies"
+                />
+              </BentoCell>
+
+              {/* ================================================================
+                  CURRENCY TABLE (full width, 4-col span)
+                  ================================================================ */}
+              <BentoCell size="wide-tall" delay={0.15} noPadding className="bg-white/[0.03] col-span-4 !row-span-1">
+                <div className="px-4 pt-3 pb-1 flex items-center justify-between border-b border-white/[0.04]">
+                  <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">Currency Scores</span>
+                  <div className="flex items-center gap-3 text-[9px] text-text-muted uppercase tracking-widest">
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-pnl-negative/70" /> Bearish</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white/30" /> Neutral</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-pnl-positive/70" /> Bullish</span>
                   </div>
+                </div>
+                <div className="divide-y divide-white/[0.03]">
+                  {currencyData.map((data, idx) => (
+                    <motion.button
+                      key={data.currency}
+                      onClick={() => setSelectedCurrency(data)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03] transition-colors text-left group"
+                      initial={{ opacity: 0, x: -12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: idx * 0.04 }}
+                    >
+                      {/* Currency ID + Flag */}
+                      <div className="w-16 flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-base">{currencyInfo(data.currency)?.flag}</span>
+                        <span className="font-mono text-xs font-bold text-text-primary">{data.currency}</span>
+                      </div>
 
-                  {/* Details */}
-                  <div className="space-y-3 text-sm">
-                    {/* Interest Rate */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-text-muted">
-                        <Percent size={14} />
-                        <span>Zinssatz</span>
+                      {/* Rate */}
+                      <div className="w-14 flex-shrink-0 text-right">
+                        <span className="font-mono tabular-nums text-xs text-text-secondary">{data.interestRate}%</span>
+                        {data.rateChange === 'up' && <TrendingUp size={10} className="inline ml-1 text-pnl-positive" />}
+                        {data.rateChange === 'down' && <TrendingDown size={10} className="inline ml-1 text-pnl-negative" />}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">{data.interestRate}%</span>
-                        {data.rateChange === 'up' && <TrendingUp size={14} className="text-pnl-positive" />}
-                        {data.rateChange === 'down' && <TrendingDown size={14} className="text-pnl-negative" />}
-                      </div>
-                    </div>
 
-                    {/* News */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-text-muted">
-                        <Newspaper size={14} />
-                        <span>News</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={clsx('font-semibold capitalize', getBiasColor(data.newsBias))}>
-                          {data.newsBias}
+                      {/* Bias pills */}
+                      <div className="flex items-center gap-1.5 w-28 flex-shrink-0">
+                        <span className={clsx(
+                          'text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded',
+                          data.newsBias === 'bullish' && 'bg-pnl-positive/10 text-pnl-positive',
+                          data.newsBias === 'bearish' && 'bg-pnl-negative/10 text-pnl-negative',
+                          data.newsBias === 'neutral' && 'bg-white/[0.04] text-text-muted'
+                        )}>
+                          <Newspaper size={8} className="inline mr-0.5 -mt-px" />{data.newsBias.slice(0, 4)}
                         </span>
-                        {getStrengthBars(data.newsStrength)}
-                      </div>
-                    </div>
-
-                    {/* COT */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-text-muted">
-                        <Database size={14} />
-                        <span>COT</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={clsx('font-semibold capitalize', getBiasColor(data.cotBias))}>
-                          {data.cotBias}
+                        <span className={clsx(
+                          'text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded',
+                          data.cotBias === 'bullish' && 'bg-pnl-positive/10 text-pnl-positive',
+                          data.cotBias === 'bearish' && 'bg-pnl-negative/10 text-pnl-negative',
+                          data.cotBias === 'neutral' && 'bg-white/[0.04] text-text-muted'
+                        )}>
+                          <Database size={8} className="inline mr-0.5 -mt-px" />{data.cotBias.slice(0, 4)}
                         </span>
-                        {getStrengthBars(data.cotStrength)}
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Next Meeting */}
-                  <div className="mt-4 pt-3 border-t border-border text-xs text-text-muted">
-                    Nächstes Meeting: {new Date(data.nextMeeting).toLocaleDateString('de-DE')}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                      {/* Score bar */}
+                      <div className="flex-1 min-w-0">
+                        <ScoreBar score={data.overallScore} />
+                      </div>
 
-          {/* Legend */}
-          <div className="card">
-            <h4 className="font-semibold mb-3">Legende</h4>
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div>
-                <div className="flex items-center gap-2 text-pnl-positive mb-1">
-                  <TrendingUp size={16} />
-                  <span className="font-medium">Bullish</span>
+                      {/* Score number */}
+                      <div className={clsx(
+                        'w-10 text-right font-mono tabular-nums text-xs font-bold',
+                        data.overallScore > 20 ? 'text-pnl-positive' :
+                        data.overallScore < -20 ? 'text-pnl-negative' : 'text-text-muted'
+                      )}>
+                        {data.overallScore > 0 ? '+' : ''}{data.overallScore}
+                      </div>
+
+                      {/* Bias badge */}
+                      <div className={clsx(
+                        'w-16 text-center text-[9px] uppercase tracking-wider font-bold py-0.5 rounded flex-shrink-0',
+                        data.overallBias === 'bullish' && 'bg-pnl-positive/15 text-pnl-positive',
+                        data.overallBias === 'bearish' && 'bg-pnl-negative/15 text-pnl-negative',
+                        data.overallBias === 'neutral' && 'bg-white/[0.04] text-text-muted'
+                      )}>
+                        {data.overallBias}
+                      </div>
+
+                      {/* Arrow hint */}
+                      <div className="w-4 flex-shrink-0 text-text-muted opacity-0 group-hover:opacity-60 transition-opacity">
+                        <Info size={12} />
+                      </div>
+                    </motion.button>
+                  ))}
                 </div>
-                <p className="text-text-muted text-xs">Positive Erwartung, Long-Bias</p>
-              </div>
-              <div>
-                <div className="flex items-center gap-2 text-gray-400 mb-1">
-                  <Minus size={16} />
-                  <span className="font-medium">Neutral</span>
+                {/* Scale footer */}
+                <div className="px-4 py-1.5 flex justify-between text-[9px] text-text-muted font-mono tabular-nums border-t border-white/[0.04]">
+                  <span>-100</span>
+                  <span>0</span>
+                  <span>+100</span>
                 </div>
-                <p className="text-text-muted text-xs">Keine klare Richtung</p>
-              </div>
-              <div>
-                <div className="flex items-center gap-2 text-pnl-negative mb-1">
-                  <TrendingDown size={16} />
-                  <span className="font-medium">Bearish</span>
-                </div>
-                <p className="text-text-muted text-xs">Negative Erwartung, Short-Bias</p>
-              </div>
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Pair Recommendations */}
-          <div className="space-y-4">
+              </BentoCell>
+            </BentoGrid>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="pairs"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* ================================================================
+                PAIR RECOMMENDATIONS
+                ================================================================ */}
             {pairRecommendations.length > 0 ? (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  {pairRecommendations.map((rec) => (
-                    <button 
+              <BentoGrid cols={3} className="mb-6">
+                {pairRecommendations.map((rec, idx) => {
+                  const [base, quote] = rec.pair.split('/');
+                  const baseData = currencyData.find(c => c.currency === base);
+                  const quoteData = currencyData.find(c => c.currency === quote);
+
+                  return (
+                    <BentoCell
                       key={rec.pair}
-                      onClick={() => setSelectedPair(rec)}
+                      delay={idx * 0.05}
                       className={clsx(
-                        'card border-2 text-left transition-all hover:scale-[1.02] cursor-pointer',
-                        rec.direction === 'LONG' 
-                          ? 'border-pnl-positive/50 hover:border-pnl-positive' 
-                          : 'border-pnl-negative/50 hover:border-pnl-negative'
+                        'bg-white/[0.03] cursor-pointer group',
+                        'hover:border-white/20'
                       )}
                     >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center">
-                            <span className="text-2xl">{currencyInfo(rec.pair.split('/')[0])?.flag}</span>
-                            <ArrowRightLeft size={16} className="mx-1 text-text-muted" />
-                            <span className="text-2xl">{currencyInfo(rec.pair.split('/')[1])?.flag}</span>
+                      <button onClick={() => setSelectedPair(rec)} className="w-full text-left">
+                        {/* Pair header */}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm">{currencyInfo(base)?.flag}</span>
+                            <span className="font-mono text-xs font-bold text-text-primary">{rec.pair}</span>
+                            <span className="text-sm">{currencyInfo(quote)?.flag}</span>
                           </div>
-                          <div>
-                            <div className="font-bold text-lg">{rec.pair}</div>
-                            <div className="text-xs text-text-muted">
-                              Zinsdiff: {rec.interestDiff >= 0 ? '+' : ''}{rec.interestDiff.toFixed(2)}%
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="text-right">
-                          <div className={clsx(
-                            'px-3 py-1 rounded-lg text-lg font-bold inline-block',
-                            rec.direction === 'LONG' 
-                              ? 'bg-pnl-positive text-white' 
+                          <span className={clsx(
+                            'text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full',
+                            rec.direction === 'LONG'
+                              ? 'bg-pnl-positive text-white'
                               : 'bg-pnl-negative text-white'
                           )}>
                             {rec.direction}
-                          </div>
+                          </span>
                         </div>
-                      </div>
 
-                      {/* Confidence Bar */}
-                      <div className="mb-4">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-text-muted">Konfidenz</span>
-                          <span className="font-semibold">{rec.confidence}%</span>
-                        </div>
-                        <div className="h-2 bg-background rounded-full overflow-hidden">
-                          <div 
-                            className={clsx(
-                              'h-full rounded-full transition-all',
-                              rec.direction === 'LONG' ? 'bg-pnl-positive' : 'bg-pnl-negative'
-                            )}
-                            style={{ width: `${rec.confidence}%` }}
+                        {/* Balance scale visual */}
+                        {baseData && quoteData && (
+                          <BalanceScale
+                            baseScore={baseData.overallScore}
+                            quoteScore={quoteData.overallScore}
+                            base={base}
+                            quote={quote}
                           />
-                        </div>
-                      </div>
+                        )}
 
-                      {/* Reasons */}
-                      <div className="space-y-2">
-                        {rec.reasons.map((reason, j) => (
-                          <div key={j} className="flex items-center gap-2 text-sm">
-                            <CheckCircle2 size={14} className="text-accent-primary flex-shrink-0" />
-                            <span className="text-text-muted">{reason}</span>
+                        {/* Confidence gauge */}
+                        <div className="flex items-center justify-between mt-1">
+                          <div className="flex-1">
+                            <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Konfidenz</span>
+                            <div className="mt-1 h-1 rounded-full bg-white/[0.04] overflow-hidden">
+                              <motion.div
+                                className={clsx(
+                                  'h-full rounded-full',
+                                  rec.direction === 'LONG' ? 'bg-pnl-positive' : 'bg-pnl-negative'
+                                )}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${rec.confidence}%` }}
+                                transition={{ duration: 0.8, delay: idx * 0.05 + 0.2 }}
+                              />
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                      
-                      {/* Click hint */}
-                      <div className="mt-4 pt-3 border-t border-white/10 text-center">
-                        <span className="text-xs text-accent-primary">Klicke für detaillierte Analyse →</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                          <span className="font-mono tabular-nums text-sm font-bold text-text-primary ml-3">
+                            {rec.confidence}%
+                          </span>
+                        </div>
 
-                <div className="card bg-background-surface">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="text-accent-primary flex-shrink-0" />
-                    <div className="text-sm">
-                      <p className="font-semibold text-text-primary mb-1">Hinweis</p>
-                      <p className="text-text-muted">
-                        Diese Empfehlungen basieren auf fundamentalen Faktoren (Zinsen, COT, News) und ersetzen 
+                        {/* Reasons */}
+                        <div className="mt-2 space-y-1">
+                          {rec.reasons.map((reason, j) => (
+                            <div key={j} className="flex items-center gap-1.5 text-[10px] text-text-muted">
+                              <CheckCircle2 size={9} className="text-accent-primary flex-shrink-0" />
+                              <span>{reason}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Click hint */}
+                        <div className="mt-2 pt-2 border-t border-white/[0.04] text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-[9px] text-accent-primary uppercase tracking-widest">Details</span>
+                        </div>
+                      </button>
+                    </BentoCell>
+                  );
+                })}
+
+                {/* Disclaimer cell */}
+                <BentoCell delay={pairRecommendations.length * 0.05} className="bg-white/[0.03]">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={13} className="text-accent-primary flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-[10px] uppercase tracking-[0.1em] text-text-secondary font-semibold">Hinweis</span>
+                      <p className="text-[11px] text-text-muted mt-1 leading-relaxed">
+                        Diese Empfehlungen basieren auf fundamentalen Faktoren (Zinsen, COT, News) und ersetzen
                         keine technische Analyse. Immer mit eigenem Setup und Risikomanagement traden!
                       </p>
                     </div>
                   </div>
-                </div>
-              </>
+                </BentoCell>
+              </BentoGrid>
             ) : (
-              <div className="card text-center py-12">
-                <Target size={48} className="mx-auto text-text-muted/50 mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Keine starken Empfehlungen</h3>
-                <p className="text-text-muted">
-                  Aktuell gibt es keine Pairs mit ausreichend hoher Konfidenz.
-                  Aktualisiere die Daten oder warte auf klarere Signale.
-                </p>
-              </div>
+              <BentoGrid cols={4}>
+                <BentoCell size="wide-tall" className="bg-white/[0.03] flex flex-col items-center justify-center col-span-4">
+                  <Target size={36} className="text-text-muted/30 mb-3" />
+                  <h3 className="text-sm font-semibold text-text-secondary mb-1">Keine starken Empfehlungen</h3>
+                  <p className="text-[11px] text-text-muted text-center max-w-xs">
+                    Aktuell gibt es keine Pairs mit ausreichend hoher Konfidenz.
+                    Aktualisiere die Daten oder warte auf klarere Signale.
+                  </p>
+                </BentoCell>
+              </BentoGrid>
             )}
-          </div>
-        </>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Upcoming High-Impact Events */}
+      {/* ================================================================
+          UPCOMING HIGH-IMPACT EVENTS
+          ================================================================ */}
       {upcomingEvents.length > 0 && (
-        <div className="mt-6 card">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="text-pnl-negative" size={20} />
-            <h3 className="text-lg font-semibold">Kommende High-Impact Events (Forex Factory)</h3>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.3 }}
+          className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] overflow-hidden"
+        >
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/[0.04]">
+            <AlertTriangle size={13} className="text-pnl-negative" />
+            <span className="text-[10px] uppercase tracking-[0.1em] text-text-secondary font-semibold">High-Impact Events</span>
+            <span className="text-[9px] text-text-muted font-mono ml-auto">{upcomingEvents.length} events</span>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-px bg-white/[0.02]">
             {upcomingEvents.slice(0, 8).map((event, i) => (
-              <div 
+              <div
                 key={i}
-                className="p-3 rounded-lg bg-pnl-negative/10 border border-pnl-negative/30"
+                className="px-3 py-2.5 bg-pnl-negative/[0.04] hover:bg-pnl-negative/[0.08] transition-colors"
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold">{event.currency}</span>
-                  <span className="text-xs text-pnl-negative font-medium">HIGH</span>
+                  <span className="font-mono text-[11px] font-bold text-text-primary">{event.currency}</span>
+                  <span className="text-[8px] text-pnl-negative font-bold uppercase tracking-widest">High</span>
                 </div>
-                <div className="text-sm text-text-primary mb-1 line-clamp-2">{event.event}</div>
-                <div className="text-xs text-text-muted">
-                  {new Date(event.date).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short' })} 
-                  {event.time !== 'All Day' && ` • ${event.time}`}
+                <div className="text-[11px] text-text-secondary mb-1 line-clamp-2 leading-tight">{event.event}</div>
+                <div className="text-[10px] text-text-muted font-mono tabular-nums">
+                  {new Date(event.date).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short' })}
+                  {event.time !== 'All Day' && ` ${event.time}`}
                 </div>
               </div>
             ))}
           </div>
-          <p className="text-xs text-text-muted mt-3 flex items-center gap-2">
-            <AlertTriangle size={12} />
-            Vorsicht beim Traden um High-Impact Events – hohe Volatilität erwartet!
-          </p>
-        </div>
+          <div className="px-4 py-1.5 border-t border-white/[0.04]">
+            <p className="text-[9px] text-text-muted flex items-center gap-1 opacity-60">
+              <AlertTriangle size={8} />
+              Vorsicht beim Traden um High-Impact Events
+            </p>
+          </div>
+        </motion.div>
       )}
 
-      {/* Data Sources */}
-      <div className="mt-6 p-4 bg-background-surface rounded-lg border border-border text-sm text-text-muted">
-        <h4 className="font-semibold text-text-primary mb-2">Datenquellen</h4>
-        <div className="flex flex-wrap gap-4">
-          <a href="https://www.forexfactory.com" target="_blank" rel="noopener noreferrer" 
-             className="flex items-center gap-1 hover:text-accent-primary">
-            News Kalender <ExternalLink size={12} />
-          </a>
-          <a href="https://www.cftc.gov" target="_blank" rel="noopener noreferrer"
-             className="flex items-center gap-1 hover:text-accent-primary">
-            CFTC COT Reports <ExternalLink size={12} />
-          </a>
-          <a href="https://www.tradingeconomics.com" target="_blank" rel="noopener noreferrer"
-             className="flex items-center gap-1 hover:text-accent-primary">
-            Interest Rates <ExternalLink size={12} />
-          </a>
+      {/* ================================================================
+          DATA SOURCES FOOTER
+          ================================================================ */}
+      <div className="mt-4 px-4 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+        <div className="flex items-center gap-6">
+          <span className="text-[9px] uppercase tracking-[0.1em] text-text-muted font-semibold">Sources</span>
+          <div className="flex flex-wrap gap-4">
+            <a href="https://www.forexfactory.com" target="_blank" rel="noopener noreferrer"
+               className="flex items-center gap-1 text-[10px] text-text-muted hover:text-accent-primary transition-colors">
+              News Kalender <ExternalLink size={9} />
+            </a>
+            <a href="https://www.cftc.gov" target="_blank" rel="noopener noreferrer"
+               className="flex items-center gap-1 text-[10px] text-text-muted hover:text-accent-primary transition-colors">
+              CFTC COT Reports <ExternalLink size={9} />
+            </a>
+            <a href="https://www.tradingeconomics.com" target="_blank" rel="noopener noreferrer"
+               className="flex items-center gap-1 text-[10px] text-text-muted hover:text-accent-primary transition-colors">
+              Interest Rates <ExternalLink size={9} />
+            </a>
+          </div>
         </div>
       </div>
 
-      {/* Currency Detail Modal */}
-      {selectedCurrency && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedCurrency(null)}
-        >
-          <div 
-            className="card w-full max-w-2xl max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
+      {/* ================================================================
+          CURRENCY DETAIL MODAL
+          ================================================================ */}
+      <AnimatePresence>
+        {selectedCurrency && (
+          <motion.div
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedCurrency(null)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl font-bold">{selectedCurrency.currency}</span>
-                <div className={clsx(
-                  'px-3 py-1.5 rounded text-sm font-bold flex items-center gap-1',
-                  selectedCurrency.overallBias === 'bullish' && 'bg-pnl-positive/20 text-pnl-positive',
-                  selectedCurrency.overallBias === 'bearish' && 'bg-pnl-negative/20 text-pnl-negative',
-                  selectedCurrency.overallBias === 'neutral' && 'bg-gray-500/20 text-gray-400'
-                )}>
-                  {getBiasIcon(selectedCurrency.overallBias)}
-                  {selectedCurrency.overallBias.toUpperCase()}
+            <motion.div
+              className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#0d0f12] p-5"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{currencyInfo(selectedCurrency.currency)?.flag}</span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-lg font-bold text-text-primary">{selectedCurrency.currency}</span>
+                      <span className={clsx(
+                        'text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full',
+                        selectedCurrency.overallBias === 'bullish' && 'bg-pnl-positive/15 text-pnl-positive',
+                        selectedCurrency.overallBias === 'bearish' && 'bg-pnl-negative/15 text-pnl-negative',
+                        selectedCurrency.overallBias === 'neutral' && 'bg-white/[0.06] text-text-muted'
+                      )}>
+                        {getBiasIcon(selectedCurrency.overallBias)}
+                        <span className="ml-1">{selectedCurrency.overallBias}</span>
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-text-muted">{selectedCurrency.centralBank || currencyInfo(selectedCurrency.currency)?.centralBank}</span>
+                  </div>
                 </div>
+                <button onClick={() => setSelectedCurrency(null)} className="w-7 h-7 rounded-full bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-colors">
+                  <X size={14} className="text-text-muted" />
+                </button>
               </div>
-              <button onClick={() => setSelectedCurrency(null)} className="btn-icon">
-                <X size={18} />
-              </button>
-            </div>
 
-            {/* Bias Reasoning */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Warum {selectedCurrency.overallBias.toUpperCase()}?</h3>
-              
-              {/* Factors */}
-              <div className="space-y-3">
-                {/* Interest Rate Factor */}
-                <div className={clsx(
-                  'p-4 rounded-lg border-l-4',
-                  selectedCurrency.rateChange === 'up' ? 'bg-pnl-positive/10 border-pnl-positive' :
-                  selectedCurrency.rateChange === 'down' ? 'bg-pnl-negative/10 border-pnl-negative' :
-                  'bg-background-surface border-gray-500'
-                )}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Percent size={18} />
-                    <span className="font-semibold">Zinssatz: {selectedCurrency.interestRate}%</span>
-                    {selectedCurrency.rateChange === 'up' && <TrendingUp size={16} className="text-pnl-positive" />}
-                    {selectedCurrency.rateChange === 'down' && <TrendingDown size={16} className="text-pnl-negative" />}
+              {/* Score + Gauge row */}
+              <div className="flex items-center gap-5 mb-5 p-3 rounded-xl bg-white/[0.03] border border-white/[0.04]">
+                <Gauge
+                  value={Math.abs(selectedCurrency.overallScore)}
+                  label="Score"
+                  sublabel={selectedCurrency.overallScore > 0 ? 'Bullish' : selectedCurrency.overallScore < 0 ? 'Bearish' : 'Neutral'}
+                  size="md"
+                  color={selectedCurrency.overallScore > 20 ? 'success' : selectedCurrency.overallScore < -20 ? 'danger' : 'warning'}
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Gesamt-Score</span>
+                    <span className={clsx(
+                      'font-mono tabular-nums text-lg font-bold',
+                      selectedCurrency.overallScore > 20 ? 'text-pnl-positive' :
+                      selectedCurrency.overallScore < -20 ? 'text-pnl-negative' : 'text-text-muted'
+                    )}>
+                      {selectedCurrency.overallScore > 0 ? '+' : ''}{selectedCurrency.overallScore}
+                    </span>
                   </div>
-                  <p className="text-sm text-text-muted">
-                    {selectedCurrency.rateChange === 'up' 
-                      ? `Die Zentralbank hat die Zinsen erhöht. Höhere Zinsen machen ${selectedCurrency.currency} attraktiver für Investoren, da sie höhere Renditen auf Einlagen bieten. Dies stärkt die Währung.`
-                      : selectedCurrency.rateChange === 'down'
-                      ? `Die Zentralbank hat die Zinsen gesenkt. Niedrigere Zinsen machen ${selectedCurrency.currency} weniger attraktiv für Investoren. Kapital fließt in Währungen mit höheren Renditen.`
-                      : `Die Zentralbank hält die Zinsen stabil bei ${selectedCurrency.interestRate}%. Dies signalisiert eine abwartende Haltung der Zentralbank.`
-                    }
-                  </p>
-                  <p className="text-xs text-text-muted mt-2">
-                    Nächstes Meeting: {new Date(selectedCurrency.nextMeeting).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}
-                  </p>
-                </div>
-
-                {/* News Factor */}
-                <div className={clsx(
-                  'p-4 rounded-lg border-l-4',
-                  selectedCurrency.newsBias === 'bullish' ? 'bg-pnl-positive/10 border-pnl-positive' :
-                  selectedCurrency.newsBias === 'bearish' ? 'bg-pnl-negative/10 border-pnl-negative' :
-                  'bg-background-surface border-gray-500'
-                )}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Newspaper size={18} />
-                    <span className="font-semibold">News-Sentiment: {selectedCurrency.newsBias.toUpperCase()}</span>
-                    {getStrengthBars(selectedCurrency.newsStrength)}
+                  <ScoreBar score={selectedCurrency.overallScore} />
+                  <div className="flex justify-between text-[9px] text-text-muted font-mono tabular-nums mt-1">
+                    <span>-100</span>
+                    <span>0</span>
+                    <span>+100</span>
                   </div>
-                  <p className="text-sm text-text-muted">
-                    {selectedCurrency.newsReason || (
-                      selectedCurrency.newsBias === 'bullish' 
-                        ? `Positive Wirtschaftsnachrichten für ${selectedCurrency.currency}.`
-                        : selectedCurrency.newsBias === 'bearish'
-                        ? `Negative Wirtschaftsnachrichten für ${selectedCurrency.currency}.`
-                        : `Gemischte Nachrichtenlage für ${selectedCurrency.currency}.`
-                    )}
-                  </p>
-                </div>
-
-                {/* COT Factor */}
-                <div className={clsx(
-                  'p-4 rounded-lg border-l-4',
-                  selectedCurrency.cotBias === 'bullish' ? 'bg-pnl-positive/10 border-pnl-positive' :
-                  selectedCurrency.cotBias === 'bearish' ? 'bg-pnl-negative/10 border-pnl-negative' :
-                  'bg-background-surface border-gray-500'
-                )}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Database size={18} />
-                    <span className="font-semibold">COT-Positionierung: {selectedCurrency.cotBias.toUpperCase()}</span>
-                    {getStrengthBars(selectedCurrency.cotStrength)}
-                  </div>
-                  <p className="text-sm text-text-muted">
-                    {selectedCurrency.cotReason || (
-                      selectedCurrency.cotBias === 'bullish' 
-                        ? `Commercials (Smart Money) sind netto long positioniert.`
-                        : selectedCurrency.cotBias === 'bearish'
-                        ? `Commercials (Smart Money) sind netto short positioniert.`
-                        : `Neutrale COT-Positionierung. Kein klares Signal.`
-                    )}
-                  </p>
                 </div>
               </div>
 
-              {/* Score Summary */}
-              <div className="mt-6 p-4 rounded-lg bg-background-surface">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-semibold">Gesamt-Score</span>
-                  <span className={clsx(
-                    'text-xl font-bold',
-                    selectedCurrency.overallScore > 20 ? 'text-pnl-positive' :
-                    selectedCurrency.overallScore < -20 ? 'text-pnl-negative' :
-                    'text-gray-400'
+              {/* Factor comparison - side by side */}
+              <div className="mb-5">
+                <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold mb-2 block">Faktoren-Analyse</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {/* Interest Rate Factor */}
+                  <div className={clsx(
+                    'p-3 rounded-xl border',
+                    selectedCurrency.rateChange === 'up' ? 'bg-pnl-positive/[0.05] border-pnl-positive/20' :
+                    selectedCurrency.rateChange === 'down' ? 'bg-pnl-negative/[0.05] border-pnl-negative/20' :
+                    'bg-white/[0.02] border-white/[0.06]'
                   )}>
-                    {selectedCurrency.overallScore > 0 ? '+' : ''}{selectedCurrency.overallScore}
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Percent size={12} className="text-accent-gold" />
+                      <span className="text-[9px] uppercase tracking-[0.1em] font-semibold text-text-muted">Zinssatz</span>
+                    </div>
+                    <div className="font-mono tabular-nums text-xl font-bold text-text-primary">
+                      {selectedCurrency.interestRate}%
+                    </div>
+                    <div className="flex items-center gap-1 mt-1">
+                      {selectedCurrency.rateChange === 'up' && <TrendingUp size={10} className="text-pnl-positive" />}
+                      {selectedCurrency.rateChange === 'down' && <TrendingDown size={10} className="text-pnl-negative" />}
+                      {selectedCurrency.rateChange === 'hold' && <Minus size={10} className="text-text-muted" />}
+                      <span className={clsx('text-[10px]',
+                        selectedCurrency.rateChange === 'up' ? 'text-pnl-positive' :
+                        selectedCurrency.rateChange === 'down' ? 'text-pnl-negative' : 'text-text-muted'
+                      )}>
+                        {selectedCurrency.rateChange === 'up' ? 'Steigend' : selectedCurrency.rateChange === 'down' ? 'Sinkend' : 'Stabil'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* News Factor */}
+                  <div className={clsx(
+                    'p-3 rounded-xl border',
+                    selectedCurrency.newsBias === 'bullish' ? 'bg-pnl-positive/[0.05] border-pnl-positive/20' :
+                    selectedCurrency.newsBias === 'bearish' ? 'bg-pnl-negative/[0.05] border-pnl-negative/20' :
+                    'bg-white/[0.02] border-white/[0.06]'
+                  )}>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Newspaper size={12} className="text-accent-blue" />
+                      <span className="text-[9px] uppercase tracking-[0.1em] font-semibold text-text-muted">News</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={clsx('font-bold text-sm capitalize', getBiasColor(selectedCurrency.newsBias))}>
+                        {selectedCurrency.newsBias}
+                      </span>
+                      {getStrengthBars(selectedCurrency.newsStrength)}
+                    </div>
+                    <p className="text-[10px] text-text-muted mt-1.5 leading-relaxed line-clamp-3">
+                      {selectedCurrency.newsReason || (
+                        selectedCurrency.newsBias === 'bullish'
+                          ? `Positive Wirtschaftsnachrichten fuer ${selectedCurrency.currency}.`
+                          : selectedCurrency.newsBias === 'bearish'
+                          ? `Negative Wirtschaftsnachrichten fuer ${selectedCurrency.currency}.`
+                          : `Gemischte Nachrichtenlage fuer ${selectedCurrency.currency}.`
+                      )}
+                    </p>
+                  </div>
+
+                  {/* COT Factor */}
+                  <div className={clsx(
+                    'p-3 rounded-xl border',
+                    selectedCurrency.cotBias === 'bullish' ? 'bg-pnl-positive/[0.05] border-pnl-positive/20' :
+                    selectedCurrency.cotBias === 'bearish' ? 'bg-pnl-negative/[0.05] border-pnl-negative/20' :
+                    'bg-white/[0.02] border-white/[0.06]'
+                  )}>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Database size={12} className="text-accent-primary" />
+                      <span className="text-[9px] uppercase tracking-[0.1em] font-semibold text-text-muted">COT</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={clsx('font-bold text-sm capitalize', getBiasColor(selectedCurrency.cotBias))}>
+                        {selectedCurrency.cotBias}
+                      </span>
+                      {getStrengthBars(selectedCurrency.cotStrength)}
+                    </div>
+                    <p className="text-[10px] text-text-muted mt-1.5 leading-relaxed line-clamp-3">
+                      {selectedCurrency.cotReason || (
+                        selectedCurrency.cotBias === 'bullish'
+                          ? `Commercials (Smart Money) sind netto long positioniert.`
+                          : selectedCurrency.cotBias === 'bearish'
+                          ? `Commercials (Smart Money) sind netto short positioniert.`
+                          : `Neutrale COT-Positionierung. Kein klares Signal.`
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detailed reasoning */}
+              <div className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Info size={12} className="text-accent-primary" />
+                  <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">
+                    Warum {selectedCurrency.overallBias.toUpperCase()}?
                   </span>
                 </div>
-                <div className="h-3 bg-background rounded-full overflow-hidden relative">
-                  <div className="absolute inset-0 flex">
-                    <div className="w-1/2 bg-pnl-negative/30" />
-                    <div className="w-1/2 bg-pnl-positive/30" />
-                  </div>
-                  <div 
-                    className="absolute h-full w-2 bg-white rounded shadow-lg"
-                    style={{ left: `${50 + selectedCurrency.overallScore / 2}%`, transform: 'translateX(-50%)' }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-text-muted mt-1">
-                  <span>-100 (Bearish)</span>
-                  <span>0 (Neutral)</span>
-                  <span>+100 (Bullish)</span>
-                </div>
+                <p className="text-[11px] text-text-muted leading-relaxed">
+                  {selectedCurrency.rateChange === 'up'
+                    ? `Die Zentralbank hat die Zinsen erhoeht. Hoehere Zinsen machen ${selectedCurrency.currency} attraktiver fuer Investoren, da sie hoehere Renditen auf Einlagen bieten. Dies staerkt die Waehrung.`
+                    : selectedCurrency.rateChange === 'down'
+                    ? `Die Zentralbank hat die Zinsen gesenkt. Niedrigere Zinsen machen ${selectedCurrency.currency} weniger attraktiv fuer Investoren. Kapital fliesst in Waehrungen mit hoeheren Renditen.`
+                    : `Die Zentralbank haelt die Zinsen stabil bei ${selectedCurrency.interestRate}%. Dies signalisiert eine abwartende Haltung der Zentralbank.`
+                  }
+                </p>
+                <p className="text-[10px] text-text-muted mt-1.5 font-mono tabular-nums opacity-60">
+                  Naechstes Meeting: {new Date(selectedCurrency.nextMeeting).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </p>
               </div>
 
               {/* Trading Implication */}
               <div className={clsx(
-                'p-4 rounded-lg border',
-                selectedCurrency.overallBias === 'bullish' ? 'border-pnl-positive bg-pnl-positive/5' :
-                selectedCurrency.overallBias === 'bearish' ? 'border-pnl-negative bg-pnl-negative/5' :
-                'border-gray-500 bg-gray-500/5'
+                'p-3 rounded-xl border',
+                selectedCurrency.overallBias === 'bullish' ? 'border-pnl-positive/30 bg-pnl-positive/[0.05]' :
+                selectedCurrency.overallBias === 'bearish' ? 'border-pnl-negative/30 bg-pnl-negative/[0.05]' :
+                'border-white/[0.08] bg-white/[0.02]'
               )}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Target size={18} />
-                  <span className="font-semibold">Trading-Implikation</span>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Target size={12} />
+                  <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-secondary">Trading-Implikation</span>
                 </div>
-                <p className="text-sm">
-                  {selectedCurrency.overallBias === 'bullish' 
-                    ? `Suche Long-Einstiege in Pairs wo ${selectedCurrency.currency} die Basiswährung ist (z.B. ${selectedCurrency.currency}/JPY) oder Short-Einstiege wo ${selectedCurrency.currency} die Gegenwährung ist.`
+                <p className="text-[11px] text-text-muted leading-relaxed">
+                  {selectedCurrency.overallBias === 'bullish'
+                    ? `Suche Long-Einstiege in Pairs wo ${selectedCurrency.currency} die Basiswaehrung ist (z.B. ${selectedCurrency.currency}/JPY) oder Short-Einstiege wo ${selectedCurrency.currency} die Gegenwaehrung ist.`
                     : selectedCurrency.overallBias === 'bearish'
-                    ? `Suche Short-Einstiege in Pairs wo ${selectedCurrency.currency} die Basiswährung ist oder Long-Einstiege wo ${selectedCurrency.currency} die Gegenwährung ist.`
-                    : `Keine klare Richtung. Fokussiere dich auf andere Währungen mit stärkerem Bias oder warte auf klarere Signale.`
+                    ? `Suche Short-Einstiege in Pairs wo ${selectedCurrency.currency} die Basiswaehrung ist oder Long-Einstiege wo ${selectedCurrency.currency} die Gegenwaehrung ist.`
+                    : `Keine klare Richtung. Fokussiere dich auf andere Waehrungen mit staerkerem Bias oder warte auf klarere Signale.`
                   }
                 </p>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Pair Recommendation Detail Modal */}
-      {selectedPair && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedPair(null)}
-        >
-          <div 
-            className="card w-full max-w-3xl max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
+      {/* ================================================================
+          PAIR RECOMMENDATION DETAIL MODAL
+          ================================================================ */}
+      <AnimatePresence>
+        {selectedPair && (
+          <motion.div
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedPair(null)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-4xl">{currencyInfo(selectedPair.pair.split('/')[0])?.flag}</span>
-                  <ArrowRightLeft size={24} className="text-text-muted" />
-                  <span className="text-4xl">{currencyInfo(selectedPair.pair.split('/')[1])?.flag}</span>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">{selectedPair.pair}</h2>
-                  <div className={clsx(
-                    'inline-block px-3 py-1 rounded-lg text-sm font-bold mt-1',
-                    selectedPair.direction === 'LONG' 
-                      ? 'bg-pnl-positive text-white' 
-                      : 'bg-pnl-negative text-white'
-                  )}>
-                    {selectedPair.direction} EMPFEHLUNG
+            <motion.div
+              className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#0d0f12] p-5"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {/* Header - Face-off style */}
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{currencyInfo(selectedPair.pair.split('/')[0])?.flag}</span>
+                    <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
+                      <ArrowRightLeft size={14} className="text-text-muted" />
+                    </div>
+                    <span className="text-3xl">{currencyInfo(selectedPair.pair.split('/')[1])?.flag}</span>
+                  </div>
+                  <div>
+                    <h2 className="font-mono text-xl font-bold text-text-primary">{selectedPair.pair}</h2>
+                    <span className={clsx(
+                      'inline-block text-[9px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full mt-0.5',
+                      selectedPair.direction === 'LONG'
+                        ? 'bg-pnl-positive text-white'
+                        : 'bg-pnl-negative text-white'
+                    )}>
+                      {selectedPair.direction} Empfehlung
+                    </span>
                   </div>
                 </div>
+                <button
+                  onClick={() => setSelectedPair(null)}
+                  className="w-7 h-7 rounded-full bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-colors"
+                >
+                  <X size={14} className="text-text-muted" />
+                </button>
               </div>
-              <button
-                onClick={() => setSelectedPair(null)}
-                className="text-text-muted hover:text-text-primary p-2"
-              >
-                <X size={24} />
-              </button>
-            </div>
 
-            {/* Confidence */}
-            <div className="mb-6 p-4 rounded-lg bg-background-surface">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-lg font-semibold">Konfidenz-Level</span>
-                <span className="text-2xl font-bold">{selectedPair.confidence}%</span>
+              {/* Confidence */}
+              <div className="mb-5 p-3 rounded-xl bg-white/[0.03] border border-white/[0.04]">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">Konfidenz-Level</span>
+                  <span className="font-mono tabular-nums text-xl font-bold text-text-primary">{selectedPair.confidence}%</span>
+                </div>
+                <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
+                  <motion.div
+                    className={clsx(
+                      'h-full rounded-full',
+                      selectedPair.direction === 'LONG' ? 'bg-pnl-positive' : 'bg-pnl-negative'
+                    )}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${selectedPair.confidence}%` }}
+                    transition={{ duration: 0.8 }}
+                  />
+                </div>
+                <p className="text-[10px] text-text-muted mt-1.5">
+                  {selectedPair.confidence >= 70 ? 'Hohe Konfidenz - Starke fundamentale Uebereinstimmung' :
+                   selectedPair.confidence >= 50 ? 'Mittlere Konfidenz - Gute fundamentale Basis' :
+                   'Niedrige Konfidenz - Schwaechere fundamentale Signale'}
+                </p>
               </div>
-              <div className="h-4 bg-background rounded-full overflow-hidden">
-                <div 
-                  className={clsx(
-                    'h-full rounded-full transition-all',
-                    selectedPair.direction === 'LONG' ? 'bg-pnl-positive' : 'bg-pnl-negative'
-                  )}
-                  style={{ width: `${selectedPair.confidence}%` }}
-                />
+
+              {/* Face-off comparison */}
+              <div className="mb-5">
+                <div className="flex items-center gap-1.5 mb-3">
+                  <Info size={12} className="text-accent-primary" />
+                  <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">
+                    Warum macht dieser Trade Sinn?
+                  </span>
+                </div>
+
+                {(() => {
+                  const [base, quote] = selectedPair.pair.split('/');
+                  const baseData = currencyData.find(c => c.currency === base);
+                  const quoteData = currencyData.find(c => c.currency === quote);
+
+                  if (!baseData || !quoteData) return null;
+
+                  return (
+                    <div className="space-y-3">
+                      {/* Score face-off */}
+                      <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <div className="flex items-center gap-1.5 mb-3">
+                          <Target size={12} className="text-pnl-positive" />
+                          <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">Score-Vergleich</span>
+                        </div>
+                        <div className="flex items-stretch gap-3">
+                          {/* Base side */}
+                          <div className="flex-1 text-center p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                            <span className="text-lg">{currencyInfo(base)?.flag}</span>
+                            <div className="font-mono text-xs font-bold text-text-muted mt-1">{base}</div>
+                            <div className={clsx('font-mono tabular-nums text-2xl font-bold mt-1',
+                              baseData.overallScore > 0 ? 'text-pnl-positive' :
+                              baseData.overallScore < 0 ? 'text-pnl-negative' : 'text-text-muted'
+                            )}>
+                              {baseData.overallScore > 0 ? '+' : ''}{baseData.overallScore}
+                            </div>
+                          </div>
+                          {/* VS divider */}
+                          <div className="flex flex-col items-center justify-center">
+                            <div className="w-px h-full bg-white/[0.06]" />
+                            <span className="text-[9px] text-text-muted uppercase tracking-widest my-2 font-bold">vs</span>
+                            <div className="w-px h-full bg-white/[0.06]" />
+                          </div>
+                          {/* Quote side */}
+                          <div className="flex-1 text-center p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                            <span className="text-lg">{currencyInfo(quote)?.flag}</span>
+                            <div className="font-mono text-xs font-bold text-text-muted mt-1">{quote}</div>
+                            <div className={clsx('font-mono tabular-nums text-2xl font-bold mt-1',
+                              quoteData.overallScore > 0 ? 'text-pnl-positive' :
+                              quoteData.overallScore < 0 ? 'text-pnl-negative' : 'text-text-muted'
+                            )}>
+                              {quoteData.overallScore > 0 ? '+' : ''}{quoteData.overallScore}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-text-muted text-center mt-2 font-mono tabular-nums">
+                          <strong>Differenz: {baseData.overallScore - quoteData.overallScore > 0 ? '+' : ''}{baseData.overallScore - quoteData.overallScore}</strong>
+                          {' -- '}
+                          {selectedPair.direction === 'LONG'
+                            ? `${base} ist fundamental staerker als ${quote}`
+                            : `${quote} ist fundamental staerker als ${base}`}
+                        </p>
+                      </div>
+
+                      {/* Interest Rate face-off */}
+                      <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <div className="flex items-center gap-1.5 mb-3">
+                          <Percent size={12} className="text-accent-gold" />
+                          <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">Zinsdifferenz-Analyse</span>
+                        </div>
+                        <div className="flex items-stretch gap-3">
+                          <div className="flex-1 text-center p-3 rounded-xl bg-white/[0.02]">
+                            <div className="font-mono tabular-nums text-xl font-bold text-text-primary">{baseData.interestRate}%</div>
+                            <div className="text-[10px] text-text-muted">{base} Zinssatz</div>
+                            <div className={clsx('text-[10px] mt-0.5',
+                              baseData.rateChange === 'up' ? 'text-pnl-positive' :
+                              baseData.rateChange === 'down' ? 'text-pnl-negative' : 'text-text-muted'
+                            )}>
+                              {baseData.rateChange === 'up' ? 'Steigend' :
+                               baseData.rateChange === 'down' ? 'Sinkend' : 'Stabil'}
+                            </div>
+                          </div>
+                          <div className="flex items-center">
+                            <div className="w-px h-full bg-white/[0.06]" />
+                          </div>
+                          <div className="flex-1 text-center p-3 rounded-xl bg-white/[0.02]">
+                            <div className="font-mono tabular-nums text-xl font-bold text-text-primary">{quoteData.interestRate}%</div>
+                            <div className="text-[10px] text-text-muted">{quote} Zinssatz</div>
+                            <div className={clsx('text-[10px] mt-0.5',
+                              quoteData.rateChange === 'up' ? 'text-pnl-positive' :
+                              quoteData.rateChange === 'down' ? 'text-pnl-negative' : 'text-text-muted'
+                            )}>
+                              {quoteData.rateChange === 'up' ? 'Steigend' :
+                               quoteData.rateChange === 'down' ? 'Sinkend' : 'Stabil'}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-text-muted text-center mt-2">
+                          <strong>Differenz: {selectedPair.interestDiff >= 0 ? '+' : ''}{selectedPair.interestDiff.toFixed(2)}%</strong>
+                          {selectedPair.interestDiff > 0.5
+                            ? ` - ${base} bietet hoehere Rendite. Carry-Trade favorisiert ${selectedPair.direction === 'LONG' ? 'Long' : 'Short'}.`
+                            : selectedPair.interestDiff < -0.5
+                            ? ` - ${quote} bietet hoehere Rendite. Carry-Trade-Dynamik beachten.`
+                            : ' - Geringe Zinsdifferenz. Andere Faktoren dominieren.'}
+                        </p>
+                      </div>
+
+                      {/* Fundamental face-off */}
+                      <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <div className="flex items-center gap-1.5 mb-3">
+                          <Newspaper size={12} className="text-accent-blue" />
+                          <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">Fundamentale Einschaetzung</span>
+                        </div>
+                        <div className="flex items-stretch gap-3">
+                          <div className={clsx(
+                            'flex-1 p-3 rounded-xl border',
+                            baseData.newsBias === 'bullish' ? 'border-pnl-positive/20 bg-pnl-positive/[0.04]' :
+                            baseData.newsBias === 'bearish' ? 'border-pnl-negative/20 bg-pnl-negative/[0.04]' :
+                            'border-white/[0.06] bg-white/[0.02]'
+                          )}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="font-mono text-[10px] font-bold text-text-secondary">{base}</span>
+                              {getBiasIcon(baseData.newsBias)}
+                              <span className={clsx('text-[9px] uppercase tracking-wider font-bold', getBiasColor(baseData.newsBias))}>
+                                {baseData.newsBias}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-text-muted line-clamp-3 leading-relaxed">{baseData.newsReason}</p>
+                          </div>
+                          <div className={clsx(
+                            'flex-1 p-3 rounded-xl border',
+                            quoteData.newsBias === 'bullish' ? 'border-pnl-positive/20 bg-pnl-positive/[0.04]' :
+                            quoteData.newsBias === 'bearish' ? 'border-pnl-negative/20 bg-pnl-negative/[0.04]' :
+                            'border-white/[0.06] bg-white/[0.02]'
+                          )}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="font-mono text-[10px] font-bold text-text-secondary">{quote}</span>
+                              {getBiasIcon(quoteData.newsBias)}
+                              <span className={clsx('text-[9px] uppercase tracking-wider font-bold', getBiasColor(quoteData.newsBias))}>
+                                {quoteData.newsBias}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-text-muted line-clamp-3 leading-relaxed">{quoteData.newsReason}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* COT face-off */}
+                      <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <div className="flex items-center gap-1.5 mb-3">
+                          <Database size={12} className="text-accent-primary" />
+                          <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">COT-Positionierung (Smart Money)</span>
+                        </div>
+                        <div className="flex items-stretch gap-3">
+                          <div className={clsx(
+                            'flex-1 p-3 rounded-xl border',
+                            baseData.cotBias === 'bullish' ? 'border-pnl-positive/20 bg-pnl-positive/[0.04]' :
+                            baseData.cotBias === 'bearish' ? 'border-pnl-negative/20 bg-pnl-negative/[0.04]' :
+                            'border-white/[0.06] bg-white/[0.02]'
+                          )}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="font-mono text-[10px] font-bold text-text-secondary">{base}</span>
+                              {getBiasIcon(baseData.cotBias)}
+                              <span className={clsx('text-[9px] uppercase tracking-wider font-bold', getBiasColor(baseData.cotBias))}>
+                                {baseData.cotBias}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-text-muted leading-relaxed">{baseData.cotReason}</p>
+                          </div>
+                          <div className={clsx(
+                            'flex-1 p-3 rounded-xl border',
+                            quoteData.cotBias === 'bullish' ? 'border-pnl-positive/20 bg-pnl-positive/[0.04]' :
+                            quoteData.cotBias === 'bearish' ? 'border-pnl-negative/20 bg-pnl-negative/[0.04]' :
+                            'border-white/[0.06] bg-white/[0.02]'
+                          )}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="font-mono text-[10px] font-bold text-text-secondary">{quote}</span>
+                              {getBiasIcon(quoteData.cotBias)}
+                              <span className={clsx('text-[9px] uppercase tracking-wider font-bold', getBiasColor(quoteData.cotBias))}>
+                                {quoteData.cotBias}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-text-muted leading-relaxed">{quoteData.cotReason}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
-              <p className="text-xs text-text-muted mt-2">
-                {selectedPair.confidence >= 70 ? 'Hohe Konfidenz - Starke fundamentale Übereinstimmung' :
-                 selectedPair.confidence >= 50 ? 'Mittlere Konfidenz - Gute fundamentale Basis' :
-                 'Niedrige Konfidenz - Schwächere fundamentale Signale'}
-              </p>
-            </div>
 
-            {/* Detailed Analysis */}
-            <div className="space-y-4 mb-6">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Info size={18} className="text-accent-primary" />
-                Warum macht dieser Trade Sinn?
-              </h3>
-              
-              {(() => {
-                const [base, quote] = selectedPair.pair.split('/');
-                const baseData = currencyData.find(c => c.currency === base);
-                const quoteData = currencyData.find(c => c.currency === quote);
-                
-                if (!baseData || !quoteData) return null;
-                
-                return (
-                  <div className="space-y-4">
-                    {/* Interest Rate Analysis */}
-                    <div className="p-4 rounded-lg border border-border bg-background-surface">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Percent size={18} className="text-accent-gold" />
-                        <span className="font-semibold">Zinsdifferenz-Analyse</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 mb-3">
-                        <div className="text-center p-3 rounded bg-background">
-                          <div className="text-2xl font-bold">{baseData.interestRate}%</div>
-                          <div className="text-sm text-text-muted">{base} Zinssatz</div>
-                          <div className={clsx('text-xs mt-1', 
-                            baseData.rateChange === 'up' ? 'text-pnl-positive' :
-                            baseData.rateChange === 'down' ? 'text-pnl-negative' : 'text-text-muted'
-                          )}>
-                            {baseData.rateChange === 'up' ? '↑ Steigend' : 
-                             baseData.rateChange === 'down' ? '↓ Sinkend' : '→ Stabil'}
-                          </div>
-                        </div>
-                        <div className="text-center p-3 rounded bg-background">
-                          <div className="text-2xl font-bold">{quoteData.interestRate}%</div>
-                          <div className="text-sm text-text-muted">{quote} Zinssatz</div>
-                          <div className={clsx('text-xs mt-1', 
-                            quoteData.rateChange === 'up' ? 'text-pnl-positive' :
-                            quoteData.rateChange === 'down' ? 'text-pnl-negative' : 'text-text-muted'
-                          )}>
-                            {quoteData.rateChange === 'up' ? '↑ Steigend' : 
-                             quoteData.rateChange === 'down' ? '↓ Sinkend' : '→ Stabil'}
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-sm text-text-secondary">
-                        <strong>Differenz: {selectedPair.interestDiff >= 0 ? '+' : ''}{selectedPair.interestDiff.toFixed(2)}%</strong>
-                        {selectedPair.interestDiff > 0.5 
-                          ? ` - ${base} bietet höhere Rendite. Carry-Trade favorisiert ${selectedPair.direction === 'LONG' ? 'Long' : 'Short'}.`
-                          : selectedPair.interestDiff < -0.5
-                          ? ` - ${quote} bietet höhere Rendite. Carry-Trade-Dynamik beachten.`
-                          : ' - Geringe Zinsdifferenz. Andere Faktoren dominieren.'}
-                      </p>
-                    </div>
-
-                    {/* News/Fundamental Bias */}
-                    <div className="p-4 rounded-lg border border-border bg-background-surface">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Newspaper size={18} className="text-accent-blue" />
-                        <span className="font-semibold">Fundamentale Einschätzung</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 mb-3">
-                        <div className={clsx(
-                          'p-3 rounded border',
-                          baseData.newsBias === 'bullish' ? 'border-pnl-positive bg-pnl-positive/10' :
-                          baseData.newsBias === 'bearish' ? 'border-pnl-negative bg-pnl-negative/10' :
-                          'border-gray-500 bg-gray-500/10'
-                        )}>
-                          <div className="font-bold flex items-center gap-2">
-                            {base} {getBiasIcon(baseData.newsBias)}
-                            <span className={getBiasColor(baseData.newsBias)}>{baseData.newsBias.toUpperCase()}</span>
-                          </div>
-                          <p className="text-xs text-text-muted mt-2 line-clamp-3">{baseData.newsReason}</p>
-                        </div>
-                        <div className={clsx(
-                          'p-3 rounded border',
-                          quoteData.newsBias === 'bullish' ? 'border-pnl-positive bg-pnl-positive/10' :
-                          quoteData.newsBias === 'bearish' ? 'border-pnl-negative bg-pnl-negative/10' :
-                          'border-gray-500 bg-gray-500/10'
-                        )}>
-                          <div className="font-bold flex items-center gap-2">
-                            {quote} {getBiasIcon(quoteData.newsBias)}
-                            <span className={getBiasColor(quoteData.newsBias)}>{quoteData.newsBias.toUpperCase()}</span>
-                          </div>
-                          <p className="text-xs text-text-muted mt-2 line-clamp-3">{quoteData.newsReason}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* COT Analysis */}
-                    <div className="p-4 rounded-lg border border-border bg-background-surface">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Database size={18} className="text-accent-primary" />
-                        <span className="font-semibold">COT-Positionierung (Smart Money)</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 mb-3">
-                        <div className={clsx(
-                          'p-3 rounded border',
-                          baseData.cotBias === 'bullish' ? 'border-pnl-positive bg-pnl-positive/10' :
-                          baseData.cotBias === 'bearish' ? 'border-pnl-negative bg-pnl-negative/10' :
-                          'border-gray-500 bg-gray-500/10'
-                        )}>
-                          <div className="font-bold flex items-center gap-2">
-                            {base} {getBiasIcon(baseData.cotBias)}
-                            <span className={getBiasColor(baseData.cotBias)}>{baseData.cotBias.toUpperCase()}</span>
-                          </div>
-                          <p className="text-xs text-text-muted mt-2">{baseData.cotReason}</p>
-                        </div>
-                        <div className={clsx(
-                          'p-3 rounded border',
-                          quoteData.cotBias === 'bullish' ? 'border-pnl-positive bg-pnl-positive/10' :
-                          quoteData.cotBias === 'bearish' ? 'border-pnl-negative bg-pnl-negative/10' :
-                          'border-gray-500 bg-gray-500/10'
-                        )}>
-                          <div className="font-bold flex items-center gap-2">
-                            {quote} {getBiasIcon(quoteData.cotBias)}
-                            <span className={getBiasColor(quoteData.cotBias)}>{quoteData.cotBias.toUpperCase()}</span>
-                          </div>
-                          <p className="text-xs text-text-muted mt-2">{quoteData.cotReason}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Score Comparison */}
-                    <div className="p-4 rounded-lg border border-border bg-background-surface">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Target size={18} className="text-pnl-positive" />
-                        <span className="font-semibold">Score-Vergleich</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 mb-3">
-                        <div className="text-center p-3 rounded bg-background">
-                          <div className={clsx('text-3xl font-bold', 
-                            baseData.overallScore > 0 ? 'text-pnl-positive' : 
-                            baseData.overallScore < 0 ? 'text-pnl-negative' : 'text-text-muted'
-                          )}>
-                            {baseData.overallScore > 0 ? '+' : ''}{baseData.overallScore}
-                          </div>
-                          <div className="text-sm text-text-muted">{base} Score</div>
-                        </div>
-                        <div className="text-center p-3 rounded bg-background">
-                          <div className={clsx('text-3xl font-bold', 
-                            quoteData.overallScore > 0 ? 'text-pnl-positive' : 
-                            quoteData.overallScore < 0 ? 'text-pnl-negative' : 'text-text-muted'
-                          )}>
-                            {quoteData.overallScore > 0 ? '+' : ''}{quoteData.overallScore}
-                          </div>
-                          <div className="text-sm text-text-muted">{quote} Score</div>
-                        </div>
-                      </div>
-                      <p className="text-sm text-text-secondary text-center">
-                        <strong>Differenz: {baseData.overallScore - quoteData.overallScore > 0 ? '+' : ''}{baseData.overallScore - quoteData.overallScore}</strong>
-                        {' → '}
-                        {selectedPair.direction === 'LONG' 
-                          ? `${base} ist fundamentaler stärker als ${quote}`
-                          : `${quote} ist fundamental stärker als ${base}`}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Trading Recommendation Box */}
-            <div className={clsx(
-              'p-4 rounded-lg border-2',
-              selectedPair.direction === 'LONG' 
-                ? 'border-pnl-positive bg-pnl-positive/10' 
-                : 'border-pnl-negative bg-pnl-negative/10'
-            )}>
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle2 size={20} className={selectedPair.direction === 'LONG' ? 'text-pnl-positive' : 'text-pnl-negative'} />
-                <span className="font-bold text-lg">Fazit</span>
-              </div>
-              <p className="text-sm">
-                Die fundamentale Analyse spricht für einen <strong>{selectedPair.direction}</strong> Trade in {selectedPair.pair}. 
-                {selectedPair.confidence >= 60 
-                  ? ' Die Konfluenz mehrerer Faktoren (Zinsen, COT, News-Bias) gibt diesem Setup eine solide Grundlage.'
-                  : ' Obwohl einige Faktoren übereinstimmen, warte idealerweise auf technische Bestätigung.'}
-              </p>
-              <div className="mt-3 p-3 rounded bg-background/50">
-                <div className="text-xs text-text-muted">
-                  <strong>Wichtig:</strong> Dies ist eine fundamentale Einschätzung. Kombiniere sie immer mit technischer Analyse 
-                  (Support/Resistance, Price Action, Trend) und solidem Risikomanagement!
+              {/* Trading Recommendation Box */}
+              <div className={clsx(
+                'p-3 rounded-xl border',
+                selectedPair.direction === 'LONG'
+                  ? 'border-pnl-positive/30 bg-pnl-positive/[0.06]'
+                  : 'border-pnl-negative/30 bg-pnl-negative/[0.06]'
+              )}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <CheckCircle2 size={14} className={selectedPair.direction === 'LONG' ? 'text-pnl-positive' : 'text-pnl-negative'} />
+                  <span className="font-bold text-sm text-text-primary">Fazit</span>
+                </div>
+                <p className="text-[11px] text-text-muted leading-relaxed">
+                  Die fundamentale Analyse spricht fuer einen <strong className="text-text-primary">{selectedPair.direction}</strong> Trade in {selectedPair.pair}.
+                  {selectedPair.confidence >= 60
+                    ? ' Die Konfluenz mehrerer Faktoren (Zinsen, COT, News-Bias) gibt diesem Setup eine solide Grundlage.'
+                    : ' Obwohl einige Faktoren uebereinstimmen, warte idealerweise auf technische Bestaetigung.'}
+                </p>
+                <div className="mt-2 p-2 rounded-lg bg-black/20">
+                  <p className="text-[10px] text-text-muted">
+                    <strong>Wichtig:</strong> Dies ist eine fundamentale Einschaetzung. Kombiniere sie immer mit technischer Analyse
+                    (Support/Resistance, Price Action, Trend) und solidem Risikomanagement!
+                  </p>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+    </PageTransition>
   );
 }

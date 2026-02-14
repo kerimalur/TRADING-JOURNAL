@@ -197,9 +197,8 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                 'px-2 py-0.5 text-xs rounded',
                 result.type === 'trade' && 'bg-pnl-positive/20 text-pnl-positive',
                 result.type === 'outlook' && 'bg-accent-primary/20 text-accent-primary',
-                result.type === 'watchlist' && 'bg-accent-gold/20 text-accent-gold'
               )}>
-                {result.type === 'trade' ? 'Trade' : result.type === 'outlook' ? 'Outlook' : 'Watchlist'}
+                {result.type === 'trade' ? 'Trade' : 'Outlook'}
               </span>
             </button>
           ))}

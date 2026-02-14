@@ -65,8 +65,8 @@ export function migrateTradeData(oldTrade: OldTradeFormat, accountType: 'funded'
     result: normalizeResult(oldTrade.result),
     rMultiple: Number(oldTrade.rMultiple) || 0,
     riskPercent: Number(oldTrade.riskPercent) || 1,
-    riskUSD: Number(oldTrade.riskUSD) || 0,
-    profit: Number(oldTrade.profit) || 0,
+    riskAmount: Number(oldTrade.riskUSD) || 0,
+    profitAmount: Number(oldTrade.profit) || 0,
     accountBalanceBefore: Number(oldTrade.accountBalanceBefore) || 0,
     accountBalanceAfter: Number(oldTrade.accountBalanceAfter) || 0,
     runningBalance: Number(oldTrade.runningBalance) || Number(oldTrade.accountBalanceAfter) || 0,
@@ -84,7 +84,8 @@ export function migrateTradeData(oldTrade: OldTradeFormat, accountType: 'funded'
     takeProfit: oldTrade.takeProfit,
     comment: oldTrade.comment || oldTrade.notes || '',
     session: oldTrade.session || 'NY',
-    
+    sessionType: 'live' as const,
+
     createdAt: oldTrade.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -111,7 +112,7 @@ export function migrateAccountConfig(oldConfig: OldAccountConfig, accountType: '
     profitTarget: oldConfig.profitTarget ? Number(oldConfig.profitTarget) : undefined,
     maxDrawdown: oldConfig.maxDrawdown ? Number(oldConfig.maxDrawdown) : undefined,
     defaultRiskPerTrade: Number(oldConfig.defaultRiskPerTrade) || (accountType === 'funded' ? 0.5 : 1),
-    autoCalculateRisk: Boolean(oldConfig.autoCalculateRisk ?? true)
+    currency: 'USD'
   };
 }
 
@@ -174,15 +175,15 @@ export async function attemptLocalStorageMigration(): Promise<{
       initialStartBalance: 100000,
       currentBalance: 100000,
       defaultRiskPerTrade: 0.5,
-      autoCalculateRisk: true
+      currency: 'USD'
     };
-    
+
     let ekConfig: AccountConfig = {
       type: 'ek',
       initialStartBalance: 10000,
       currentBalance: 10000,
       defaultRiskPerTrade: 1,
-      autoCalculateRisk: true
+      currency: 'USD'
     };
     
     const configKeys = ['fundedConfig', 'ekConfig', 'accountConfig', 'tradingJournal_config'];

@@ -496,7 +496,7 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
           </div>
 
           {/* Price Levels (optional) */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div>
               <label className="input-label">Entry Preis</label>
               <input
@@ -528,6 +528,18 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
                 value={formData.takeProfit || ''}
                 onChange={(e) => handleChange('takeProfit', parseFloat(e.target.value) || undefined)}
                 placeholder="Optional"
+              />
+            </div>
+            <div>
+              <label className="input-label">Lot Size</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="input"
+                value={formData.lotSize || ''}
+                onChange={(e) => handleChange('lotSize', parseFloat(e.target.value) || undefined)}
+                placeholder="z.B. 0.10"
               />
             </div>
           </div>

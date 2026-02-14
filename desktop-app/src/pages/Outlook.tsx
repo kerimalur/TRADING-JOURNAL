@@ -2,7 +2,7 @@
  * ========================================================================
  * Trading Journal - Outlook Page (Trading-Thesen)
  * ========================================================================
- * 
+ *
  * Verwaltet Trading-Thesen mit:
  * - Symbol, Richtung, Thesis, Confidence, Status
  * - Automatische COT-Bias Anzeige
@@ -26,7 +26,6 @@ import {
   ArrowRight,
   Filter,
   Star,
-  Tag,
   Eye,
   Pause,
   Play,
@@ -44,6 +43,9 @@ import { useOutlookStore, getUpcomingHighImpactNews, getCurrenciesFromSymbol, ty
 import { useUIStore } from '@/stores/uiStore';
 import type { Outlook, OutlookStatus, ConfidenceLevel, OutlookTag } from '@/types';
 import { OUTLOOK_STATUS_CONFIG, OUTLOOK_TAGS, getAllPairs, addCustomPair } from '@/types';
+import { PageTransition } from '@/components/ui/PageTransition';
+import { MetricDisplay } from '@/components/ui/MetricDisplay';
+import { motion } from 'framer-motion';
 
 // ============================================================
 // Sample News Events (would come from News.tsx logic in production)
@@ -119,6 +121,31 @@ const SAMPLE_NEWS_EVENTS: UpcomingNewsEvent[] = [
 ];
 
 // ============================================================
+// Tag color mapping for dot indicators
+// ============================================================
+
+const TAG_DOT_COLORS: Record<string, string> = {
+  'Breakout': 'bg-blue-400',
+  'Trend': 'bg-emerald-400',
+  'Reversal': 'bg-amber-400',
+  'Range': 'bg-purple-400',
+  'News': 'bg-red-400',
+  'Fundamental': 'bg-cyan-400',
+  'Technical': 'bg-indigo-400',
+  'Sentiment': 'bg-pink-400',
+  'COT': 'bg-orange-400',
+  'Seasonal': 'bg-teal-400',
+  'Intermarket': 'bg-rose-400',
+  'Scalp': 'bg-lime-400',
+  'Swing': 'bg-violet-400',
+  'Position': 'bg-sky-400',
+};
+
+function getTagDotColor(tag: string): string {
+  return TAG_DOT_COLORS[tag] || 'bg-text-muted';
+}
+
+// ============================================================
 // Outlook Form Modal Component
 // ============================================================
 
@@ -131,7 +158,7 @@ interface OutlookFormProps {
 function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
   const isEditing = !!outlook;
   const { getCOTBias } = useOutlookStore();
-  
+
   const [formData, setFormData] = useState<Partial<Outlook>>(() => ({
     symbol: 'EURUSD',
     direction: 'long',
@@ -145,19 +172,19 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
     expiresAt: undefined,
     ...outlook,
   }));
-  
+
   const [showAdvanced, setShowAdvanced] = useState(false);
-  
+
   // Auto-update COT bias when symbol changes
   const cotBias = useMemo(() => {
     if (!formData.symbol) return null;
     return getCOTBias(formData.symbol);
   }, [formData.symbol, getCOTBias]);
-  
+
   const handleChange = (field: keyof Outlook, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
-  
+
   const handleTagToggle = (tag: OutlookTag) => {
     setFormData(prev => ({
       ...prev,
@@ -166,7 +193,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
         : [...(prev.tags || []), tag]
     }));
   };
-  
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
@@ -177,35 +204,43 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-background-surface border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2 }}
+        className="bg-[#0d0f14] border border-white/[0.06] rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-xl font-semibold text-text-primary flex items-center gap-2">
-            <Target className="text-accent-primary" size={24} />
-            {isEditing ? 'Outlook bearbeiten' : 'Neue Trading-These'}
-          </h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+          <div className="flex items-center gap-2.5">
+            <Target className="text-accent-primary" size={18} />
+            <h2 className="text-sm font-semibold text-text-primary tracking-wide">
+              {isEditing ? 'Outlook bearbeiten' : 'Neue Trading-These'}
+            </h2>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 text-text-muted hover:text-text-primary hover:bg-background-surface-hover rounded-lg transition-colors"
+            className="p-1.5 text-text-muted hover:text-text-primary rounded transition-colors"
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
-        
+
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
           {/* Symbol & Direction */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
                 Symbol
               </label>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <select
                   value={formData.symbol}
                   onChange={(e) => handleChange('symbol', e.target.value)}
-                  className="input-field flex-1"
+                  className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded px-3 py-2 text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary/50 transition-colors"
                 >
                   {getAllPairs().map(pair => (
                     <option key={pair} value={pair}>{pair}</option>
@@ -219,140 +254,130 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                       handleChange('symbol', newPair.replace('/', '').toUpperCase());
                     }
                   }}
-                  className="px-3 py-2 bg-background border border-border rounded-lg text-text-muted hover:text-accent-primary hover:border-accent-primary transition-colors"
-                  title="Eigenes Pair hinzufügen"
+                  className="px-2.5 py-2 bg-white/[0.03] border border-white/[0.06] rounded text-text-muted hover:text-accent-primary hover:border-accent-primary/30 transition-colors"
+                  title="Eigenes Pair hinzufuegen"
                 >
-                  <Plus size={18} />
+                  <Plus size={16} />
                 </button>
               </div>
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
                 Richtung
               </label>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <button
                   type="button"
                   onClick={() => handleChange('direction', 'long')}
                   className={clsx(
-                    'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border transition-all',
+                    'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-all',
                     formData.direction === 'long'
-                      ? 'bg-pnl-positive/20 border-pnl-positive text-pnl-positive'
-                      : 'bg-background border-border text-text-muted hover:border-border-hover'
+                      ? 'bg-pnl-positive/15 border border-pnl-positive/40 text-pnl-positive'
+                      : 'bg-white/[0.03] border border-white/[0.06] text-text-muted hover:border-white/[0.1]'
                   )}
                 >
-                  <TrendingUp size={18} />
+                  <TrendingUp size={14} />
                   Long
                 </button>
                 <button
                   type="button"
                   onClick={() => handleChange('direction', 'short')}
                   className={clsx(
-                    'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border transition-all',
+                    'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-all',
                     formData.direction === 'short'
-                      ? 'bg-pnl-negative/20 border-pnl-negative text-pnl-negative'
-                      : 'bg-background border-border text-text-muted hover:border-border-hover'
+                      ? 'bg-pnl-negative/15 border border-pnl-negative/40 text-pnl-negative'
+                      : 'bg-white/[0.03] border border-white/[0.06] text-text-muted hover:border-white/[0.1]'
                   )}
                 >
-                  <TrendingDown size={18} />
+                  <TrendingDown size={14} />
                   Short
                 </button>
               </div>
             </div>
           </div>
-          
+
           {/* COT Bias Preview */}
           {cotBias && (
-            <div className="p-4 bg-background rounded-lg border border-border">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium text-text-secondary">COT Bias (automatisch)</span>
+            <div className="p-3 bg-white/[0.03] rounded border border-white/[0.06]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted">COT Bias (auto)</span>
                 <span className={clsx(
-                  'text-sm font-semibold',
+                  'text-xs font-mono tabular-nums font-semibold',
                   cotBias.divergenceScore > 20 ? 'text-pnl-positive' :
                   cotBias.divergenceScore < -20 ? 'text-pnl-negative' : 'text-text-muted'
                 )}>
-                  Divergenz: {cotBias.divergenceScore > 0 ? '+' : ''}{cotBias.divergenceScore}%
+                  {cotBias.divergenceScore > 0 ? '+' : ''}{cotBias.divergenceScore}%
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">{getFlagEmoji(cotBias.base.currency)}</span>
-                  <div>
-                    <div className="text-sm font-medium text-text-primary">{cotBias.base.currency}</div>
-                    <div className={clsx(
-                      'text-xs font-medium',
-                      getSignalColor(cotBias.base.signal)
-                    )}>
-                      {cotBias.base.signal.replace('_', ' ').toUpperCase()} ({cotBias.base.percentile}%)
-                    </div>
-                  </div>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{getFlagEmoji(cotBias.base.currency)}</span>
+                  <span className="text-xs font-medium text-text-primary">{cotBias.base.currency}</span>
+                  <span className={clsx('text-[10px] font-mono', getSignalColor(cotBias.base.signal))}>
+                    {cotBias.base.signal.replace('_', ' ').toUpperCase()} ({cotBias.base.percentile}%)
+                  </span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">{getFlagEmoji(cotBias.quote.currency)}</span>
-                  <div>
-                    <div className="text-sm font-medium text-text-primary">{cotBias.quote.currency}</div>
-                    <div className={clsx(
-                      'text-xs font-medium',
-                      getSignalColor(cotBias.quote.signal)
-                    )}>
-                      {cotBias.quote.signal.replace('_', ' ').toUpperCase()} ({cotBias.quote.percentile}%)
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{getFlagEmoji(cotBias.quote.currency)}</span>
+                  <span className="text-xs font-medium text-text-primary">{cotBias.quote.currency}</span>
+                  <span className={clsx('text-[10px] font-mono', getSignalColor(cotBias.quote.signal))}>
+                    {cotBias.quote.signal.replace('_', ' ').toUpperCase()} ({cotBias.quote.percentile}%)
+                  </span>
                 </div>
               </div>
             </div>
           )}
-          
+
           {/* Thesis */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
               Trading-These
             </label>
             <textarea
               value={formData.thesis}
               onChange={(e) => handleChange('thesis', e.target.value)}
-              placeholder="Beschreibe deine Trading-These... z.B. fundamentale Gründe, technische Setups, Marktbedingungen..."
-              rows={4}
-              className="input-field w-full resize-none"
+              placeholder="Beschreibe deine Trading-These..."
+              rows={3}
+              className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-3 py-2 text-sm text-text-primary resize-none focus:outline-none focus:border-accent-primary/50 transition-colors placeholder:text-text-muted/40"
               required
             />
           </div>
-          
+
           {/* Confidence */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Confidence Level
+            <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
+              Confidence
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               {[1, 2, 3, 4, 5].map((level) => (
                 <button
                   key={level}
                   type="button"
                   onClick={() => handleChange('confidence', level as ConfidenceLevel)}
                   className={clsx(
-                    'flex-1 flex items-center justify-center gap-1 px-3 py-2.5 rounded-lg border transition-all',
+                    'flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded text-xs font-medium transition-all',
                     formData.confidence === level
-                      ? 'bg-accent-gold/20 border-accent-gold text-accent-gold'
-                      : 'bg-background border-border text-text-muted hover:border-border-hover'
+                      ? 'bg-accent-gold/15 border border-accent-gold/40 text-accent-gold'
+                      : 'bg-white/[0.03] border border-white/[0.06] text-text-muted hover:border-white/[0.1]'
                   )}
                 >
-                  <Star 
-                    size={16} 
-                    className={formData.confidence! >= level ? 'fill-current' : ''} 
+                  <Star
+                    size={12}
+                    className={formData.confidence! >= level ? 'fill-current' : ''}
                   />
                   {level}
                 </button>
               ))}
             </div>
           </div>
-          
+
           {/* Status */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
               Status
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {(['observation', 'waiting', 'active'] as OutlookStatus[]).map((status) => {
                 const config = OUTLOOK_STATUS_CONFIG[status];
                 return (
@@ -361,10 +386,10 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     type="button"
                     onClick={() => handleChange('status', status)}
                     className={clsx(
-                      'flex items-center gap-2 px-4 py-2 rounded-lg border transition-all',
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all',
                       formData.status === status
-                        ? `${config.bgColor} ${config.color} border-current`
-                        : 'bg-background border-border text-text-muted hover:border-border-hover'
+                        ? `${config.bgColor} ${config.color} border border-current/30`
+                        : 'bg-white/[0.03] border border-white/[0.06] text-text-muted hover:border-white/[0.1]'
                     )}
                   >
                     {getStatusIcon(status)}
@@ -374,52 +399,52 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
               })}
             </div>
           </div>
-          
+
           {/* Tags */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
               Tags
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {OUTLOOK_TAGS.map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => handleTagToggle(tag as OutlookTag)}
                   className={clsx(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-all',
+                    'flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium transition-all',
                     formData.tags?.includes(tag)
-                      ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
-                      : 'bg-background border-border text-text-muted hover:border-border-hover'
+                      ? 'bg-accent-primary/15 border border-accent-primary/40 text-accent-primary'
+                      : 'bg-white/[0.03] border border-white/[0.06] text-text-muted hover:border-white/[0.1]'
                   )}
                 >
-                  <Tag size={12} />
+                  <span className={clsx('w-1.5 h-1.5 rounded-full', getTagDotColor(tag))} />
                   {tag}
                 </button>
               ))}
             </div>
           </div>
-          
+
           {/* Advanced Options Toggle */}
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-2 text-sm text-text-muted hover:text-text-primary transition-colors"
+            className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted hover:text-text-primary transition-colors"
           >
-            <ChevronDown 
-              size={16} 
-              className={clsx('transition-transform', showAdvanced && 'rotate-180')} 
+            <ChevronDown
+              size={12}
+              className={clsx('transition-transform', showAdvanced && 'rotate-180')}
             />
             Erweiterte Optionen
           </button>
-          
+
           {/* Advanced Options */}
           {showAdvanced && (
-            <div className="space-y-4 p-4 bg-background rounded-lg border border-border">
-              <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-3 p-3 bg-white/[0.03] rounded border border-white/[0.06]">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-text-muted mb-1.5">
-                    Entry (optional)
+                  <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1">
+                    Entry
                   </label>
                   <input
                     type="number"
@@ -427,12 +452,12 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     value={formData.targetEntry || ''}
                     onChange={(e) => handleChange('targetEntry', e.target.value ? parseFloat(e.target.value) : undefined)}
                     placeholder="1.0850"
-                    className="input-field w-full text-sm"
+                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-primary/50 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-text-muted mb-1.5">
-                    Stop Loss (optional)
+                  <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1">
+                    Stop Loss
                   </label>
                   <input
                     type="number"
@@ -440,12 +465,12 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     value={formData.targetSL || ''}
                     onChange={(e) => handleChange('targetSL', e.target.value ? parseFloat(e.target.value) : undefined)}
                     placeholder="1.0800"
-                    className="input-field w-full text-sm"
+                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-primary/50 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-text-muted mb-1.5">
-                    Take Profit (optional)
+                  <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1">
+                    Take Profit
                   </label>
                   <input
                     type="number"
@@ -453,44 +478,44 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     value={formData.targetTP || ''}
                     onChange={(e) => handleChange('targetTP', e.target.value ? parseFloat(e.target.value) : undefined)}
                     placeholder="1.0950"
-                    className="input-field w-full text-sm"
+                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-primary/50 transition-colors"
                   />
                 </div>
               </div>
-              
+
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1.5">
-                  Gültig bis (optional)
+                <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1">
+                  Gueltig bis
                 </label>
                 <input
                   type="date"
                   value={formData.expiresAt || ''}
                   onChange={(e) => handleChange('expiresAt', e.target.value || undefined)}
-                  className="input-field w-full text-sm"
+                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary/50 transition-colors"
                 />
               </div>
             </div>
           )}
-          
+
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+          <div className="flex justify-end gap-2 pt-4 border-t border-white/[0.06]">
             <button
               type="button"
               onClick={onClose}
-              className="btn-secondary"
+              className="px-4 py-2 text-xs font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
             >
               Abbrechen
             </button>
             <button
               type="submit"
-              className="btn-primary flex items-center gap-2"
+              className="btn-primary flex items-center gap-1.5 text-xs px-4 py-2"
             >
-              <Save size={18} />
+              <Save size={14} />
               {isEditing ? 'Speichern' : 'Erstellen'}
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -510,88 +535,89 @@ interface OutlookCardProps {
 function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer }: OutlookCardProps) {
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const statusConfig = OUTLOOK_STATUS_CONFIG[outlook.status];
-  
+
   // Get upcoming news for this pair's currencies
   const currencies = getCurrenciesFromSymbol(outlook.symbol);
   const upcomingNews = getUpcomingHighImpactNews(currencies, SAMPLE_NEWS_EVENTS, 3);
-  
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     if (date.toDateString() === today.toDateString()) return 'Heute';
     if (date.toDateString() === tomorrow.toDateString()) return 'Morgen';
     return date.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
   };
 
+  const directionColor = outlook.direction === 'long' ? 'border-l-pnl-positive' : 'border-l-pnl-negative';
+
   return (
-    <div className="card hover:border-border-hover transition-all">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className={clsx(
-            'flex items-center justify-center w-12 h-12 rounded-xl',
-            outlook.direction === 'long' ? 'bg-pnl-positive/20' : 'bg-pnl-negative/20'
+    <div className={clsx(
+      'bg-white/[0.03] border border-white/[0.06] rounded-lg overflow-hidden transition-all hover:border-white/[0.1] hover:bg-white/[0.04]',
+      'border-l-2',
+      directionColor
+    )}>
+      {/* Header row */}
+      <div className="flex items-center justify-between px-3.5 pt-3 pb-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <h3 className="text-sm font-bold font-mono tracking-wide text-text-primary">
+            {outlook.symbol}
+          </h3>
+          <span className={clsx(
+            'text-[10px] uppercase tracking-[0.1em] font-bold',
+            outlook.direction === 'long' ? 'text-pnl-positive' : 'text-pnl-negative'
           )}>
-            {outlook.direction === 'long' 
-              ? <TrendingUp className="text-pnl-positive" size={24} /> 
-              : <TrendingDown className="text-pnl-negative" size={24} />
-            }
+            {outlook.direction}
+          </span>
+          {/* Confidence dots */}
+          <div className="flex items-center gap-0.5 ml-1">
+            {[1, 2, 3, 4, 5].map(level => (
+              <span
+                key={level}
+                className={clsx(
+                  'w-1.5 h-1.5 rounded-full transition-colors',
+                  level <= outlook.confidence
+                    ? 'bg-accent-gold'
+                    : 'bg-white/[0.08]'
+                )}
+              />
+            ))}
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold text-text-primary">
-                {outlook.symbol}
-              </h3>
-              <span className={clsx(
-                'text-sm font-medium',
-                outlook.direction === 'long' ? 'text-pnl-positive' : 'text-pnl-negative'
-              )}>
-                {outlook.direction.toUpperCase()}
-              </span>
+          {/* Tags as colored dots */}
+          {outlook.tags && outlook.tags.length > 0 && (
+            <div className="flex items-center gap-0.5 ml-1" title={outlook.tags.join(', ')}>
+              {outlook.tags.map(tag => (
+                <span
+                  key={tag}
+                  className={clsx('w-1.5 h-1.5 rounded-full', getTagDotColor(tag))}
+                  title={tag}
+                />
+              ))}
             </div>
-            <div className="flex items-center gap-2 mt-0.5">
-              {/* Confidence Stars */}
-              <div className="flex items-center gap-0.5">
-                {[1, 2, 3, 4, 5].map(level => (
-                  <Star
-                    key={level}
-                    size={12}
-                    className={clsx(
-                      level <= outlook.confidence 
-                        ? 'text-accent-gold fill-accent-gold' 
-                        : 'text-border'
-                    )}
-                  />
-                ))}
-              </div>
-              <span className="text-xs text-text-muted">
-                {new Date(outlook.createdAt).toLocaleDateString('de-DE')}
-              </span>
-            </div>
-          </div>
+          )}
         </div>
-        
-        {/* Status Badge */}
-        <div className="relative">
+
+        {/* Status pill */}
+        <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowStatusMenu(!showStatusMenu)}
             className={clsx(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
+              'flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.05em] transition-all',
               statusConfig.bgColor,
-              statusConfig.color
+              statusConfig.color,
+              'opacity-80 hover:opacity-100'
             )}
           >
             {getStatusIcon(outlook.status)}
             {statusConfig.label}
-            <ChevronDown size={14} />
+            <ChevronDown size={10} />
           </button>
-          
+
           {/* Status Dropdown */}
           {showStatusMenu && (
-            <div className="absolute right-0 top-full mt-1 bg-background-surface border border-border rounded-lg shadow-xl z-10 py-1 min-w-[160px]">
+            <div className="absolute right-0 top-full mt-1 bg-[#0d0f14] border border-white/[0.08] rounded-lg shadow-xl z-10 py-0.5 min-w-[140px]">
               {Object.entries(OUTLOOK_STATUS_CONFIG).map(([status, config]) => (
                 <button
                   key={status}
@@ -600,8 +626,8 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer }: 
                     setShowStatusMenu(false);
                   }}
                   className={clsx(
-                    'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-background-surface-hover transition-colors',
-                    outlook.status === status && 'bg-background-surface-hover'
+                    'w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-left hover:bg-white/[0.05] transition-colors',
+                    outlook.status === status && 'bg-white/[0.05]'
                   )}
                 >
                   {getStatusIcon(status as OutlookStatus)}
@@ -612,153 +638,133 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer }: 
           )}
         </div>
       </div>
-      
-      {/* Thesis */}
-      <p className="text-text-secondary text-sm leading-relaxed mb-4 line-clamp-3">
+
+      {/* Thesis - compact */}
+      <p className="text-text-secondary text-xs leading-relaxed px-3.5 pb-2 line-clamp-2">
         {outlook.thesis}
       </p>
-      
-      {/* Tags */}
-      {outlook.tags && outlook.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {outlook.tags.map(tag => (
+
+      {/* COT Bias - horizontal compact */}
+      {outlook.cotBias && (
+        <div className="mx-3.5 mb-2 px-2.5 py-1.5 bg-white/[0.02] rounded border border-white/[0.04] flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted">COT</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px]">{getFlagEmoji(outlook.cotBias.base.currency)}</span>
+              <span className="text-[10px] font-mono text-text-primary">{outlook.cotBias.base.currency}</span>
+              <span className={clsx('text-[10px] font-mono', getSignalColor(outlook.cotBias.base.signal))}>
+                {outlook.cotBias.base.signal.replace('_', ' ').toUpperCase()}
+              </span>
+              <span className="text-[10px] font-mono tabular-nums text-text-muted">{outlook.cotBias.base.percentile}%</span>
+            </div>
+            <div className="w-px h-3 bg-white/[0.06]" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px]">{getFlagEmoji(outlook.cotBias.quote.currency)}</span>
+              <span className="text-[10px] font-mono text-text-primary">{outlook.cotBias.quote.currency}</span>
+              <span className={clsx('text-[10px] font-mono', getSignalColor(outlook.cotBias.quote.signal))}>
+                {outlook.cotBias.quote.signal.replace('_', ' ').toUpperCase()}
+              </span>
+              <span className="text-[10px] font-mono tabular-nums text-text-muted">{outlook.cotBias.quote.percentile}%</span>
+            </div>
+            <div className="w-px h-3 bg-white/[0.06]" />
+            <span className={clsx(
+              'text-[10px] font-mono tabular-nums font-bold',
+              outlook.cotBias.divergenceScore > 20
+                ? 'text-pnl-positive'
+                : outlook.cotBias.divergenceScore < -20
+                  ? 'text-pnl-negative'
+                  : 'text-text-muted'
+            )}>
+              {outlook.cotBias.divergenceScore > 0 ? '+' : ''}{outlook.cotBias.divergenceScore}%
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Upcoming News - inline badges */}
+      {upcomingNews.length > 0 && (
+        <div className="mx-3.5 mb-2 flex items-center gap-1.5 flex-wrap">
+          <Newspaper size={10} className="text-pnl-negative/70 flex-shrink-0" />
+          {upcomingNews.map(event => (
             <span
-              key={tag}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-background text-xs text-text-muted"
+              key={event.id}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-pnl-negative/8 border border-pnl-negative/15 text-[10px] text-pnl-negative/80"
             >
-              <Tag size={10} />
-              {tag}
+              <span className="font-medium">{event.currency}</span>
+              <span className="opacity-60">{formatDate(event.date)} {event.time}</span>
             </span>
           ))}
         </div>
       )}
-      
-      {/* COT Bias */}
-      {outlook.cotBias && (
-        <div className="p-3 bg-background rounded-lg mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-text-muted">COT Bias</span>
-            <span className={clsx(
-              'text-xs font-semibold px-2 py-0.5 rounded',
-              outlook.cotBias.divergenceScore > 20 
-                ? 'bg-pnl-positive/20 text-pnl-positive' 
-                : outlook.cotBias.divergenceScore < -20 
-                  ? 'bg-pnl-negative/20 text-pnl-negative' 
-                  : 'bg-background-surface text-text-muted'
-            )}>
-              {outlook.cotBias.divergenceScore > 0 ? '+' : ''}{outlook.cotBias.divergenceScore}% Divergenz
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{getFlagEmoji(outlook.cotBias.base.currency)}</span>
-              <div className="flex-1">
-                <div className="text-xs font-medium text-text-primary">{outlook.cotBias.base.currency}</div>
-                <div className={clsx('text-[10px]', getSignalColor(outlook.cotBias.base.signal))}>
-                  {outlook.cotBias.base.signal.replace('_', ' ').toUpperCase()}
-                </div>
-              </div>
-              <div className="text-xs text-text-muted">{outlook.cotBias.base.percentile}%</div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{getFlagEmoji(outlook.cotBias.quote.currency)}</span>
-              <div className="flex-1">
-                <div className="text-xs font-medium text-text-primary">{outlook.cotBias.quote.currency}</div>
-                <div className={clsx('text-[10px]', getSignalColor(outlook.cotBias.quote.signal))}>
-                  {outlook.cotBias.quote.signal.replace('_', ' ').toUpperCase()}
-                </div>
-              </div>
-              <div className="text-xs text-text-muted">{outlook.cotBias.quote.percentile}%</div>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Upcoming News */}
-      {upcomingNews.length > 0 && (
-        <div className="p-3 bg-pnl-negative/5 border border-pnl-negative/20 rounded-lg mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Newspaper size={14} className="text-pnl-negative" />
-            <span className="text-xs font-medium text-pnl-negative">High Impact News</span>
-          </div>
-          <div className="space-y-1.5">
-            {upcomingNews.map(event => (
-              <div key={event.id} className="flex items-center gap-2 text-xs">
-                <span className="font-medium text-text-muted w-14">{formatDate(event.date)}</span>
-                <span className="text-text-muted">{event.time}</span>
-                <span className="font-medium text-text-primary">{event.currency}</span>
-                <span className="text-text-secondary flex-1 truncate">{event.event}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {/* Price Targets */}
+
+      {/* Price targets - inline */}
       {(outlook.targetEntry || outlook.targetSL || outlook.targetTP) && (
-        <div className="flex items-center gap-4 mb-4 text-xs">
+        <div className="mx-3.5 mb-2 flex items-center gap-3 text-[10px] font-mono tabular-nums">
           {outlook.targetEntry && (
-            <div>
-              <span className="text-text-muted">Entry:</span>
-              <span className="ml-1 text-text-primary font-medium">{outlook.targetEntry}</span>
-            </div>
+            <span>
+              <span className="text-text-muted uppercase tracking-[0.05em]">E </span>
+              <span className="text-text-primary font-semibold">{outlook.targetEntry}</span>
+            </span>
           )}
           {outlook.targetSL && (
-            <div>
-              <span className="text-text-muted">SL:</span>
-              <span className="ml-1 text-pnl-negative font-medium">{outlook.targetSL}</span>
-            </div>
+            <span>
+              <span className="text-text-muted uppercase tracking-[0.05em]">SL </span>
+              <span className="text-pnl-negative font-semibold">{outlook.targetSL}</span>
+            </span>
           )}
           {outlook.targetTP && (
-            <div>
-              <span className="text-text-muted">TP:</span>
-              <span className="ml-1 text-pnl-positive font-medium">{outlook.targetTP}</span>
-            </div>
+            <span>
+              <span className="text-text-muted uppercase tracking-[0.05em]">TP </span>
+              <span className="text-pnl-positive font-semibold">{outlook.targetTP}</span>
+            </span>
           )}
         </div>
       )}
-      
+
       {/* Expiry Warning */}
       {outlook.expiresAt && new Date(outlook.expiresAt) < new Date(Date.now() + 86400000 * 2) && (
-        <div className="flex items-center gap-2 mb-4 text-xs text-accent-gold">
-          <AlertCircle size={14} />
-          Läuft ab: {new Date(outlook.expiresAt).toLocaleDateString('de-DE')}
+        <div className="mx-3.5 mb-2 flex items-center gap-1 text-[10px] text-accent-gold">
+          <AlertCircle size={10} />
+          <span>Ablauf: {new Date(outlook.expiresAt).toLocaleDateString('de-DE')}</span>
         </div>
       )}
-      
-      {/* Actions */}
-      <div className="flex items-center justify-between pt-3 border-t border-border">
-        <div className="flex items-center gap-2">
+
+      {/* Actions row - subtle */}
+      <div className="flex items-center justify-between px-3.5 py-2 border-t border-white/[0.04]">
+        <div className="flex items-center gap-0.5">
+          <span className="text-[10px] text-text-muted font-mono tabular-nums mr-1.5">
+            {new Date(outlook.createdAt).toLocaleDateString('de-DE')}
+          </span>
           <button
             onClick={onEdit}
-            className="p-2 text-text-muted hover:text-accent-primary hover:bg-accent-primary/10 rounded-lg transition-colors"
+            className="p-1 text-text-muted/50 hover:text-accent-primary rounded transition-colors"
             title="Bearbeiten"
           >
-            <Edit2 size={16} />
+            <Edit2 size={12} />
           </button>
           <button
             onClick={onDelete}
-            className="p-2 text-text-muted hover:text-pnl-negative hover:bg-pnl-negative/10 rounded-lg transition-colors"
-            title="Löschen"
+            className="p-1 text-text-muted/50 hover:text-pnl-negative rounded transition-colors"
+            title="Loeschen"
           >
-            <Trash2 size={16} />
+            <Trash2 size={12} />
           </button>
         </div>
-        
+
         {outlook.status !== 'executed' && outlook.status !== 'cancelled' && (
           <button
             onClick={onTransfer}
-            className="btn-primary text-sm flex items-center gap-2"
+            className="flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] font-semibold text-accent-primary hover:bg-accent-primary/10 rounded transition-colors"
           >
-            <ArrowRight size={16} />
-            In Journal übernehmen
+            Journal
+            <ArrowRight size={10} />
           </button>
         )}
-        
+
         {outlook.status === 'executed' && outlook.executedTradeId && (
-          <span className="text-xs text-accent-primary flex items-center gap-1">
-            <CheckCircle2 size={14} />
-            Trade #{outlook.executedTradeId.slice(-6)}
+          <span className="text-[10px] text-accent-primary/70 flex items-center gap-1 font-mono">
+            <CheckCircle2 size={10} />
+            #{outlook.executedTradeId.slice(-6)}
           </span>
         )}
       </div>
@@ -779,12 +785,12 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
   const [inputText, setInputText] = useState('');
   const [previewSymbols, setPreviewSymbols] = useState<string[]>([]);
   const [importedCount, setImportedCount] = useState<number | null>(null);
-  
+
   // Parse import text for symbols
   const parseImportText = (text: string): string[] => {
     const lines = text.split(/[\n,;\t]+/).map(line => line.trim()).filter(Boolean);
     const symbols: string[] = [];
-    
+
     for (const line of lines) {
       const parts = line.split(/\s+/);
       for (const part of parts) {
@@ -798,10 +804,10 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
         }
       }
     }
-    
+
     return [...new Set(symbols)];
   };
-  
+
   // Preview parsed symbols
   useEffect(() => {
     if (inputText.trim()) {
@@ -811,7 +817,7 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
       setPreviewSymbols([]);
     }
   }, [inputText]);
-  
+
   const handleImport = () => {
     onImport(previewSymbols);
     setImportedCount(previewSymbols.length);
@@ -819,7 +825,7 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
       onClose();
     }, 1500);
   };
-  
+
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText();
@@ -830,85 +836,93 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-background-surface border border-border rounded-xl shadow-2xl w-full max-w-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2 }}
+        className="bg-[#0d0f14] border border-white/[0.06] rounded-lg shadow-2xl w-full max-w-xl"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-xl font-semibold text-text-primary flex items-center gap-2">
-            <Upload className="text-accent-primary" size={24} />
-            TradingView Symbole importieren
-          </h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+          <div className="flex items-center gap-2.5">
+            <Upload className="text-accent-primary" size={18} />
+            <h2 className="text-sm font-semibold text-text-primary tracking-wide">
+              TradingView Import
+            </h2>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 text-text-muted hover:text-text-primary hover:bg-background-surface-hover rounded-lg transition-colors"
+            className="p-1.5 text-text-muted hover:text-text-primary rounded transition-colors"
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
-        
+
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="p-5 space-y-4">
           {importedCount !== null ? (
             <div className="text-center py-8">
-              <div className="w-16 h-16 rounded-full bg-pnl-positive/20 flex items-center justify-center mx-auto mb-4">
-                <Check className="text-pnl-positive" size={32} />
+              <div className="w-12 h-12 rounded-full bg-pnl-positive/15 flex items-center justify-center mx-auto mb-3">
+                <Check className="text-pnl-positive" size={24} />
               </div>
-              <p className="text-lg font-medium text-text-primary">
+              <p className="text-sm font-semibold text-text-primary">
                 {importedCount} Outlooks werden erstellt!
               </p>
             </div>
           ) : (
             <>
               {/* Info */}
-              <div className="p-4 bg-accent-primary/10 border border-accent-primary/20 rounded-lg">
-                <p className="text-sm text-text-secondary">
-                  <strong className="text-accent-primary">Tipp:</strong> Kopiere deine TradingView Watchlist 
-                  oder füge Symbole wie <code className="bg-background px-1 rounded">OANDA:EURUSD</code>, 
-                  <code className="bg-background px-1 rounded">EURUSD</code> ein. Für jedes Symbol wird ein Outlook erstellt.
+              <div className="p-3 bg-accent-primary/5 border border-accent-primary/10 rounded">
+                <p className="text-[11px] text-text-secondary leading-relaxed">
+                  <strong className="text-accent-primary">Tipp:</strong> Kopiere deine TradingView Watchlist
+                  oder fuege Symbole wie <code className="bg-white/[0.05] px-1 rounded font-mono text-[10px]">OANDA:EURUSD</code>,
+                  <code className="bg-white/[0.05] px-1 rounded font-mono text-[10px]">EURUSD</code> ein.
                 </p>
               </div>
-              
+
               {/* Input Area */}
               <div className="relative">
                 <textarea
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Symbole hier einfügen...&#10;&#10;OANDA:EURUSD&#10;GBPUSD&#10;BTCUSD&#10;..."
-                  rows={8}
-                  className="input-field w-full resize-none font-mono text-sm"
+                  placeholder="Symbole hier einfuegen...&#10;&#10;OANDA:EURUSD&#10;GBPUSD&#10;BTCUSD&#10;..."
+                  rows={7}
+                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-3 py-2 text-xs text-text-primary font-mono resize-none focus:outline-none focus:border-accent-primary/50 transition-colors placeholder:text-text-muted/30"
                 />
                 <button
                   onClick={handlePaste}
-                  className="absolute top-2 right-2 p-2 text-text-muted hover:text-accent-primary hover:bg-accent-primary/10 rounded-lg transition-colors"
-                  title="Aus Zwischenablage einfügen"
+                  className="absolute top-2 right-2 p-1.5 text-text-muted/40 hover:text-accent-primary rounded transition-colors"
+                  title="Aus Zwischenablage einfuegen"
                 >
-                  <Copy size={16} />
+                  <Copy size={14} />
                 </button>
               </div>
-              
+
               {/* Preview */}
               {previewSymbols.length > 0 && (
-                <div className="p-4 bg-background rounded-lg border border-border">
+                <div className="p-3 bg-white/[0.03] rounded border border-white/[0.06]">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-text-secondary">
+                    <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted">
                       Erkannte Symbole
                     </span>
-                    <span className="text-sm text-accent-primary font-medium">
-                      {previewSymbols.length} gefunden
+                    <span className="text-[10px] text-accent-primary font-mono font-semibold">
+                      {previewSymbols.length}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1">
                     {previewSymbols.slice(0, 20).map((symbol, idx) => (
                       <span
                         key={idx}
-                        className="px-2 py-1 bg-background-surface text-text-primary text-xs rounded font-mono"
+                        className="px-1.5 py-0.5 bg-white/[0.05] text-text-primary text-[10px] rounded font-mono"
                       >
                         {symbol}
                       </span>
                     ))}
                     {previewSymbols.length > 20 && (
-                      <span className="px-2 py-1 text-text-muted text-xs">
-                        +{previewSymbols.length - 20} weitere
+                      <span className="px-1.5 py-0.5 text-text-muted text-[10px]">
+                        +{previewSymbols.length - 20}
                       </span>
                     )}
                   </div>
@@ -917,24 +931,27 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
             </>
           )}
         </div>
-        
+
         {/* Footer */}
         {importedCount === null && (
-          <div className="flex justify-end gap-3 p-6 border-t border-border">
-            <button onClick={onClose} className="btn-secondary">
+          <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/[0.06]">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+            >
               Abbrechen
             </button>
             <button
               onClick={handleImport}
               disabled={previewSymbols.length === 0}
-              className="btn-primary flex items-center gap-2"
+              className="btn-primary flex items-center gap-1.5 text-xs px-4 py-2 disabled:opacity-30"
             >
-              <Upload size={18} />
-              {previewSymbols.length} Outlooks erstellen
+              <Upload size={14} />
+              {previewSymbols.length} importieren
             </button>
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -966,17 +983,35 @@ function getSignalColor(signal: string): string {
 
 function getFlagEmoji(currency: string): string {
   const flags: Record<string, string> = {
-    EUR: '🇪🇺',
-    USD: '🇺🇸',
-    GBP: '🇬🇧',
-    JPY: '🇯🇵',
-    AUD: '🇦🇺',
-    NZD: '🇳🇿',
-    CAD: '🇨🇦',
-    CHF: '🇨🇭',
+    EUR: '\u{1F1EA}\u{1F1FA}',
+    USD: '\u{1F1FA}\u{1F1F8}',
+    GBP: '\u{1F1EC}\u{1F1E7}',
+    JPY: '\u{1F1EF}\u{1F1F5}',
+    AUD: '\u{1F1E6}\u{1F1FA}',
+    NZD: '\u{1F1F3}\u{1F1FF}',
+    CAD: '\u{1F1E8}\u{1F1E6}',
+    CHF: '\u{1F1E8}\u{1F1ED}',
   };
-  return flags[currency] || '🏳️';
+  return flags[currency] || '\u{1F3F3}\u{FE0F}';
 }
+
+// ============================================================
+// Stagger animation variants
+// ============================================================
+
+const cardContainerVariants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.04,
+    },
+  },
+};
+
+const cardItemVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut' as const } },
+};
 
 // ============================================================
 // Main Outlook Page Component
@@ -1005,14 +1040,14 @@ export function Outlook() {
     downloadExport,
     importOutlooks,
   } = useOutlookStore();
-  
+
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
-  
+
   useEffect(() => {
     loadOutlooks();
   }, []);
-  
+
   // Handle TradingView import - create outlook for each symbol
   const handleTradingViewImport = (symbols: string[]) => {
     let created = 0;
@@ -1034,44 +1069,44 @@ export function Outlook() {
     showToast(`${created} neue Outlooks erstellt`, 'success');
     loadOutlooks();
   };
-  
+
   // Navigate to journal when prefill data is set
   useEffect(() => {
     if (prefillTradeData) {
-      showToast('Outlook wird in Journal übernommen...', 'success');
+      showToast('Outlook wird in Journal uebernommen...', 'success');
       // Store prefill data in sessionStorage for TradeForm to pick up
       sessionStorage.setItem('tradePrefill', JSON.stringify(prefillTradeData));
       clearPrefillData();
       navigate('/ek'); // or /funded based on preference
     }
   }, [prefillTradeData, navigate, clearPrefillData, showToast]);
-  
+
   const filteredOutlooks = getFilteredOutlooks();
-  
+
   const handleSave = (data: Partial<Outlook>) => {
     saveOutlook(data);
     showToast(
-      selectedOutlook ? 'Outlook aktualisiert' : 'Neuer Outlook erstellt', 
+      selectedOutlook ? 'Outlook aktualisiert' : 'Neuer Outlook erstellt',
       'success'
     );
   };
-  
+
   const handleDelete = (id: string) => {
     deleteOutlook(id);
     setDeleteConfirm(null);
-    showToast('Outlook gelöscht', 'success');
+    showToast('Outlook geloescht', 'success');
   };
-  
+
   const handleTransfer = (id: string) => {
     transferToJournal(id);
   };
-  
+
   // Handle JSON Export
   const handleExport = () => {
     downloadExport();
     showToast('Outlooks exportiert', 'success');
   };
-  
+
   // Handle JSON Import
   const handleFileImport = () => {
     const input = document.createElement('input');
@@ -1080,7 +1115,7 @@ export function Outlook() {
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      
+
       try {
         const text = await file.text();
         const result = importOutlooks(text);
@@ -1096,7 +1131,7 @@ export function Outlook() {
     };
     input.click();
   };
-  
+
   // Stats
   const stats = useMemo(() => ({
     total: outlooks.length,
@@ -1107,83 +1142,79 @@ export function Outlook() {
   }), [outlooks]);
 
   return (
+    <PageTransition>
     <div className="page-container">
       {/* Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">
-            <Target className="text-accent-primary" />
-            Trading Outlook
-          </h1>
-          <p className="text-sm text-text-muted mt-1">
-            Verwalte deine Trading-Thesen und Markteinschätzungen
-          </p>
-        </div>
-        
+      <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
+          <Target className="text-accent-primary" size={20} />
+          <div>
+            <h1 className="text-lg font-bold text-text-primary tracking-tight">
+              Market Intelligence
+            </h1>
+            <p className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">
+              Trading Outlook & Thesen
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowImportModal(true)}
-            className="btn-secondary flex items-center gap-2"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
             title="TradingView Watchlist importieren"
           >
-            <Copy size={18} />
+            <Copy size={13} />
             TV Import
           </button>
           <button
             onClick={handleExport}
-            className="btn-secondary flex items-center gap-2"
+            className="p-1.5 text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
             title="Als JSON exportieren"
           >
-            <Download size={18} />
+            <Download size={14} />
           </button>
           <button
             onClick={handleFileImport}
-            className="btn-secondary flex items-center gap-2"
+            className="p-1.5 text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
             title="JSON importieren"
           >
-            <Upload size={18} />
+            <Upload size={14} />
           </button>
           <button
             onClick={() => openForm()}
-            className="btn-primary flex items-center gap-2"
+            className="btn-primary flex items-center gap-1.5 text-xs px-3 py-1.5"
           >
-            <Plus size={18} />
+            <Plus size={14} />
             Neue These
           </button>
         </div>
       </div>
-      
-      {/* Stats Bar */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
-        {[
-          { label: 'Gesamt', value: stats.total, color: 'text-text-primary' },
-          { label: 'Aktiv', value: stats.active, color: 'text-pnl-positive' },
-          { label: 'Wartend', value: stats.waiting, color: 'text-accent-gold' },
-          { label: 'Beobachtung', value: stats.observation, color: 'text-accent-blue' },
-          { label: 'Ausgeführt', value: stats.executed, color: 'text-accent-primary' },
-        ].map(stat => (
-          <div key={stat.label} className="card text-center">
-            <div className={clsx('text-2xl font-bold', stat.color)}>{stat.value}</div>
-            <div className="text-xs text-text-muted">{stat.label}</div>
-          </div>
-        ))}
+
+      {/* Compact Stats Strip */}
+      <div className="flex items-end gap-8 px-4 py-3 mb-5 bg-white/[0.03] border border-white/[0.06] rounded-lg">
+        <MetricDisplay label="Gesamt" value={stats.total} size="sm" />
+        <MetricDisplay label="Aktiv" value={stats.active} size="sm" />
+        <MetricDisplay label="Wartend" value={stats.waiting} size="sm" />
+        <MetricDisplay label="Beobachtung" value={stats.observation} size="sm" />
+        <MetricDisplay label="Ausgefuehrt" value={stats.executed} size="sm" />
       </div>
-      
-      {/* Filters */}
-      <div className="flex items-center gap-4 mb-6 flex-wrap">
+
+      {/* Filter Bar - pill style */}
+      <div className="flex items-center gap-3 mb-5 flex-wrap">
         {/* Status Filter */}
-        <div className="flex items-center gap-2">
-          <Filter size={16} className="text-text-muted" />
-          <div className="flex gap-1 bg-background-surface rounded-lg p-1">
+        <div className="flex items-center gap-1.5">
+          <Filter size={12} className="text-text-muted/50" />
+          <div className="flex gap-0.5">
             {['all', 'observation', 'waiting', 'active'].map(status => (
               <button
                 key={status}
                 onClick={() => setFilters({ status: status as OutlookStatus | 'all' })}
                 className={clsx(
-                  'px-3 py-1.5 rounded-md text-sm transition-all',
+                  'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all',
                   filters.status === status
                     ? 'bg-accent-primary text-white'
-                    : 'text-text-muted hover:text-text-primary hover:bg-background-surface-hover'
+                    : 'text-text-muted hover:text-text-primary hover:bg-white/[0.05]'
                 )}
               >
                 {status === 'all' ? 'Alle' : OUTLOOK_STATUS_CONFIG[status as OutlookStatus].label}
@@ -1191,22 +1222,22 @@ export function Outlook() {
             ))}
           </div>
         </div>
-        
+
         {/* Direction Filter */}
-        <div className="flex gap-1 bg-background-surface rounded-lg p-1">
+        <div className="flex gap-0.5">
           {[
             { value: 'all', label: 'Alle', icon: null },
-            { value: 'long', label: 'Long', icon: <TrendingUp size={14} /> },
-            { value: 'short', label: 'Short', icon: <TrendingDown size={14} /> },
+            { value: 'long', label: 'Long', icon: <TrendingUp size={11} /> },
+            { value: 'short', label: 'Short', icon: <TrendingDown size={11} /> },
           ].map(option => (
             <button
               key={option.value}
               onClick={() => setFilters({ direction: option.value as 'long' | 'short' | 'all' })}
               className={clsx(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all',
+                'flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all',
                 filters.direction === option.value
                   ? 'bg-accent-primary text-white'
-                  : 'text-text-muted hover:text-text-primary hover:bg-background-surface-hover'
+                  : 'text-text-muted hover:text-text-primary hover:bg-white/[0.05]'
               )}
             >
               {option.icon}
@@ -1214,7 +1245,7 @@ export function Outlook() {
             </button>
           ))}
         </div>
-        
+
         {/* Sort */}
         <select
           value={`${filters.sortBy}-${filters.sortOrder}`}
@@ -1222,75 +1253,78 @@ export function Outlook() {
             const [sortBy, sortOrder] = e.target.value.split('-') as ['date' | 'confidence' | 'symbol', 'asc' | 'desc'];
             setFilters({ sortBy, sortOrder });
           }}
-          className="input-field text-sm"
+          className="bg-white/[0.03] border border-white/[0.06] rounded-full px-2.5 py-1 text-[11px] text-text-muted focus:outline-none focus:border-accent-primary/50 transition-colors"
         >
           <option value="date-desc">Neueste zuerst</option>
-          <option value="date-asc">Älteste zuerst</option>
-          <option value="confidence-desc">Höchste Confidence</option>
+          <option value="date-asc">Aelteste zuerst</option>
+          <option value="confidence-desc">Hoechste Confidence</option>
           <option value="confidence-asc">Niedrigste Confidence</option>
           <option value="symbol-asc">Symbol A-Z</option>
           <option value="symbol-desc">Symbol Z-A</option>
         </select>
-        
+
         {/* Show Archived */}
-        <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer">
+        <label className="flex items-center gap-1.5 text-[11px] text-text-muted cursor-pointer ml-auto">
           <input
             type="checkbox"
             checked={filters.showArchived}
             onChange={(e) => setFilters({ showArchived: e.target.checked })}
-            className="rounded border-border"
+            className="rounded border-white/[0.1] bg-white/[0.03] w-3 h-3"
           />
-          Archiv anzeigen
+          Archiv
         </label>
       </div>
-      
+
       {/* Outlooks Grid */}
       {isLoading ? (
-        <div className="card text-center py-16">
-          <Loader2 size={48} className="text-accent-primary mx-auto mb-4 animate-spin" />
-          <h3 className="text-lg font-medium text-text-primary mb-2">
+        <div className="flex flex-col items-center justify-center py-16">
+          <Loader2 size={32} className="text-accent-primary/50 mb-3 animate-spin" />
+          <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted">
             Laden...
-          </h3>
-          <p className="text-text-muted">
-            Outlooks werden geladen
-          </p>
+          </span>
         </div>
       ) : filteredOutlooks.length === 0 ? (
-        <div className="card text-center py-12">
-          <Target size={48} className="text-text-muted mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-text-primary mb-2">
-            Keine Outlooks gefunden
+        <div className="flex flex-col items-center justify-center py-16">
+          <Target size={32} className="text-text-muted/30 mb-3" />
+          <h3 className="text-sm font-semibold text-text-primary mb-1">
+            Keine Outlooks
           </h3>
-          <p className="text-text-muted mb-4">
-            {outlooks.length === 0 
-              ? 'Erstelle deine erste Trading-These, um loszulegen.'
-              : 'Keine Outlooks entsprechen den aktuellen Filtern.'}
+          <p className="text-[11px] text-text-muted mb-4">
+            {outlooks.length === 0
+              ? 'Erstelle deine erste Trading-These.'
+              : 'Keine Outlooks entsprechen den Filtern.'}
           </p>
           {outlooks.length === 0 && (
             <button
               onClick={() => openForm()}
-              className="btn-primary inline-flex items-center gap-2"
+              className="btn-primary inline-flex items-center gap-1.5 text-xs px-3 py-1.5"
             >
-              <Plus size={18} />
-              Erste These erstellen
+              <Plus size={14} />
+              Erste These
             </button>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <motion.div
+          className="grid grid-cols-1 lg:grid-cols-2 gap-3"
+          variants={cardContainerVariants}
+          initial="hidden"
+          animate="visible"
+        >
           {filteredOutlooks.map(outlook => (
-            <OutlookCard
-              key={outlook.id}
-              outlook={outlook}
-              onEdit={() => openForm(outlook)}
-              onDelete={() => setDeleteConfirm(outlook.id)}
-              onStatusChange={(status) => setStatus(outlook.id, status)}
-              onTransfer={() => handleTransfer(outlook.id)}
-            />
+            <motion.div key={outlook.id} variants={cardItemVariants}>
+              <OutlookCard
+                outlook={outlook}
+                onEdit={() => openForm(outlook)}
+                onDelete={() => setDeleteConfirm(outlook.id)}
+                onStatusChange={(status) => setStatus(outlook.id, status)}
+                onTransfer={() => handleTransfer(outlook.id)}
+              />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
-      
+
       {/* Form Modal */}
       {isFormOpen && (
         <OutlookForm
@@ -1299,38 +1333,43 @@ export function Outlook() {
           onClose={closeForm}
         />
       )}
-      
+
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-background-surface border border-border rounded-xl shadow-2xl p-6 max-w-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.15 }}
+            className="bg-[#0d0f14] border border-white/[0.06] rounded-lg shadow-2xl p-5 max-w-sm"
+          >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-pnl-negative/20 flex items-center justify-center">
-                <Trash2 className="text-pnl-negative" size={20} />
+              <div className="w-8 h-8 rounded-full bg-pnl-negative/15 flex items-center justify-center">
+                <Trash2 className="text-pnl-negative" size={16} />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-text-primary">Outlook löschen?</h3>
-                <p className="text-sm text-text-muted">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+                <h3 className="text-sm font-semibold text-text-primary">Outlook loeschen?</h3>
+                <p className="text-[11px] text-text-muted">Kann nicht rueckgaengig gemacht werden.</p>
               </div>
             </div>
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="btn-secondary"
+                className="px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
               >
                 Abbrechen
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirm)}
-                className="bg-pnl-negative hover:bg-pnl-negative/90 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                className="px-3 py-1.5 text-xs font-medium bg-pnl-negative hover:bg-pnl-negative/90 text-white rounded transition-colors"
               >
-                Löschen
+                Loeschen
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
-      
+
       {/* TradingView Import Modal */}
       {showImportModal && (
         <ImportModal
@@ -1339,5 +1378,6 @@ export function Outlook() {
         />
       )}
     </div>
+    </PageTransition>
   );
 }

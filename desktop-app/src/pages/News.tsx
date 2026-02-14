@@ -2,7 +2,7 @@
  * ========================================================================
  * Trading Journal - News Page
  * ========================================================================
- * 
+ *
  * Wirtschaftsnachrichten und Events von offiziellen Quellen:
  * - ForexFactory Economic Calendar
  * - Investing.com News
@@ -10,10 +10,9 @@
  */
 
 import { useState, useEffect } from 'react';
-import { 
-  Newspaper, 
-  Calendar, 
-  Clock, 
+import {
+  Newspaper,
+  Calendar,
   AlertTriangle,
   RefreshCw,
   ExternalLink,
@@ -21,7 +20,9 @@ import {
   Globe
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { motion } from 'framer-motion';
 import { getApi } from '@/services/webApi';
+import { PageTransition } from '@/components/ui/PageTransition';
 
 // Wirtschafts-Event Typen
 interface EconomicEvent {
@@ -88,6 +89,19 @@ const SAMPLE_NEWS: NewsArticle[] = [
   },
 ];
 
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.04 },
+  },
+};
+
+const staggerItem = {
+  hidden: { opacity: 0, x: -12 },
+  show: { opacity: 1, x: 0, transition: { duration: 0.3, ease: 'easeOut' as const } },
+};
+
 export function News() {
   const [events, setEvents] = useState<EconomicEvent[]>([]);
   const [news] = useState<NewsArticle[]>(SAMPLE_NEWS);
@@ -105,18 +119,18 @@ export function News() {
 
   const loadCalendar = async () => {
     setIsLoading(true);
-    
+
     try {
       const api = getApi();
       // Nutze unified API für Wirtschaftskalender
       if (api.fetchEconomicCalendar) {
         console.log('📅 Fetching economic calendar...');
         const result = await api.fetchEconomicCalendar();
-        
+
         if (result.success && result.data) {
           // Konvertiere Daten ins richtige Format
           let calendarEvents: EconomicEvent[] = [];
-          
+
           if (result.source === 'scheduled') {
             // Scheduled Events kommen bereits im richtigen Format
             calendarEvents = result.data.map((item: any, index: number) => ({
@@ -169,7 +183,7 @@ export function News() {
               previous: item.previous,
             }));
           }
-          
+
           setEvents(calendarEvents);
           setDataSource(result.source || 'api');
           setLastUpdate(new Date());
@@ -218,8 +232,8 @@ export function News() {
   }, {} as Record<string, EconomicEvent[]>);
 
   const toggleCurrency = (currency: string) => {
-    setSelectedCurrencies(prev => 
-      prev.includes(currency) 
+    setSelectedCurrencies(prev =>
+      prev.includes(currency)
         ? prev.filter(c => c !== currency)
         : [...prev, currency]
     );
@@ -230,7 +244,7 @@ export function News() {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     if (dateStr === today.toISOString().split('T')[0]) {
       return 'Heute';
     }
@@ -245,7 +259,7 @@ export function News() {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 60) return `vor ${diffMins} Min.`;
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `vor ${diffHours} Std.`;
@@ -253,280 +267,336 @@ export function News() {
     return `vor ${diffDays} Tagen`;
   };
 
+  const impactDot = (impact: 'low' | 'medium' | 'high') => (
+    <span className={clsx(
+      'inline-block w-1.5 h-1.5 rounded-full flex-shrink-0',
+      impact === 'high' && 'bg-pnl-negative',
+      impact === 'medium' && 'bg-accent-gold',
+      impact === 'low' && 'bg-accent-blue',
+    )} />
+  );
+
   return (
+    <PageTransition>
     <div className="page-container">
-      {/* Header */}
-      <div className="page-header">
+
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="page-title">
-            <Newspaper className="text-accent-primary" />
+          <p className="text-[10px] uppercase tracking-[0.1em] text-text-muted mb-1">Market Intelligence</p>
+          <h1 className="text-2xl font-semibold text-text-primary tracking-tight">
             News & Wirtschaftskalender
           </h1>
-          <p className="text-sm text-text-muted mt-1 flex items-center gap-2">
-            <Clock size={14} />
-            Daten-Stand: {lastUpdate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} {lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
+          <div className="flex items-center gap-3 mt-2 text-[11px] text-text-muted">
+            <span className="font-mono tabular-nums">
+              {lastUpdate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}{' '}
+              {lastUpdate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+            </span>
             {dataSource === 'scheduled' && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-pnl-positive/20 text-pnl-positive">
-                GEPLANTE EVENTS
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] uppercase tracking-[0.06em] font-medium bg-pnl-positive/10 text-pnl-positive">
+                Scheduled
               </span>
             )}
             {dataSource === 'fxstreet' && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-accent-blue/20 text-accent-blue">
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] uppercase tracking-[0.06em] font-medium bg-accent-blue/10 text-accent-blue">
                 FXStreet
               </span>
             )}
             {dataSource === 'investing' && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-accent-gold/20 text-accent-gold">
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] uppercase tracking-[0.06em] font-medium bg-accent-gold/10 text-accent-gold">
                 Investing.com
               </span>
             )}
-            <span className="text-text-muted">• {events.length} Events</span>
-          </p>
+            <span className="font-mono tabular-nums">{events.length} events</span>
+          </div>
         </div>
-        <button 
+
+        <button
           onClick={loadCalendar}
           disabled={isLoading}
-          className="btn-secondary"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-all disabled:opacity-40"
         >
-          <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+          <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
           {isLoading ? 'Laden...' : 'Aktualisieren'}
         </button>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-2 mb-6">
+      {/* ── Segment Control (pill tabs) ── */}
+      <div className="inline-flex items-center rounded-full bg-white/[0.03] p-0.5 mb-5">
         <button
           onClick={() => setActiveTab('calendar')}
           className={clsx(
-            'px-4 py-2 rounded-lg font-medium transition-all',
+            'relative flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium transition-all',
             activeTab === 'calendar'
-              ? 'bg-accent-gold text-background'
-              : 'bg-background-surface-hover text-text-muted hover:text-text-primary'
+              ? 'bg-accent-gold text-background shadow-sm'
+              : 'text-text-muted hover:text-text-primary'
           )}
         >
-          <Calendar size={18} className="inline mr-2" />
+          <Calendar size={13} />
           Wirtschaftskalender
         </button>
         <button
           onClick={() => setActiveTab('news')}
           className={clsx(
-            'px-4 py-2 rounded-lg font-medium transition-all',
+            'relative flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium transition-all',
             activeTab === 'news'
-              ? 'bg-accent-gold text-background'
-              : 'bg-background-surface-hover text-text-muted hover:text-text-primary'
+              ? 'bg-accent-gold text-background shadow-sm'
+              : 'text-text-muted hover:text-text-primary'
           )}
         >
-          <Globe size={18} className="inline mr-2" />
+          <Globe size={13} />
           Marktnews
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="card mb-6">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Filter size={16} className="text-text-muted" />
-            <span className="text-sm text-text-muted">Währungen:</span>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {CURRENCIES.map(currency => (
-              <button
-                key={currency}
-                onClick={() => toggleCurrency(currency)}
-                className={clsx(
-                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
-                  selectedCurrencies.includes(currency)
-                    ? 'bg-accent-gold text-background'
-                    : 'bg-background-surface-hover text-text-muted hover:text-text-primary'
-                )}
-              >
-                {currency}
-              </button>
-            ))}
-          </div>
-          
-          {activeTab === 'calendar' && (
-            <>
-              <div className="w-px h-6 bg-border" />
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-text-muted">Impact:</span>
-                <select
-                  value={impactFilter}
-                  onChange={(e) => setImpactFilter(e.target.value as 'all' | 'high' | 'medium')}
-                  className="select text-sm py-1"
-                >
-                  <option value="all">Alle</option>
-                  <option value="high">Nur High Impact</option>
-                  <option value="medium">Medium & High</option>
-                </select>
-              </div>
-            </>
-          )}
-          
-          {selectedCurrencies.length > 0 && (
+      {/* ── Compact Filter Bar ── */}
+      <div className="flex items-center gap-3 flex-wrap mb-6 py-2.5 px-3 rounded-lg bg-white/[0.03] border border-white/[0.04]">
+        <Filter size={12} className="text-text-muted flex-shrink-0" />
+        <div className="flex gap-1 flex-wrap">
+          {CURRENCIES.map(currency => (
             <button
-              onClick={() => setSelectedCurrencies([])}
-              className="text-sm text-accent-primary hover:underline"
+              key={currency}
+              onClick={() => toggleCurrency(currency)}
+              className={clsx(
+                'px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.06em] font-medium transition-all',
+                selectedCurrencies.includes(currency)
+                  ? 'bg-accent-gold text-background'
+                  : 'bg-white/[0.04] text-text-muted hover:text-text-primary hover:bg-white/[0.08]'
+              )}
             >
-              Filter zurücksetzen
+              {currency}
             </button>
-          )}
+          ))}
         </div>
+
+        {activeTab === 'calendar' && (
+          <>
+            <div className="w-px h-4 bg-white/[0.06]" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-[0.08em] text-text-muted">Impact</span>
+              <select
+                value={impactFilter}
+                onChange={(e) => setImpactFilter(e.target.value as 'all' | 'high' | 'medium')}
+                className="bg-white/[0.04] border border-white/[0.06] rounded-md text-[11px] text-text-primary px-1.5 py-0.5 focus:outline-none"
+              >
+                <option value="all">Alle</option>
+                <option value="high">Nur High Impact</option>
+                <option value="medium">Medium & High</option>
+              </select>
+            </div>
+          </>
+        )}
+
+        {selectedCurrencies.length > 0 && (
+          <button
+            onClick={() => setSelectedCurrencies([])}
+            className="text-[10px] uppercase tracking-[0.08em] text-accent-primary hover:underline ml-auto"
+          >
+            Reset
+          </button>
+        )}
       </div>
 
-      {/* Economic Calendar Tab */}
+      {/* ══════════════════════════════════════════════════
+          CALENDAR TAB  -  Vertical Timeline
+         ══════════════════════════════════════════════════ */}
       {activeTab === 'calendar' && (
-        <div className="space-y-6">
+        <div>
           {Object.keys(eventsByDate).length === 0 ? (
-            <div className="card text-center py-16">
-              <Calendar size={64} className="mx-auto text-text-muted/50 mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Keine Events gefunden</h3>
-              <p className="text-text-muted">Passe deine Filter an, um Events zu sehen.</p>
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <Calendar size={40} className="text-text-muted/30 mb-3" />
+              <p className="text-sm font-medium text-text-muted">Keine Events gefunden</p>
+              <p className="text-[11px] text-text-muted/60 mt-1">Passe deine Filter an, um Events zu sehen.</p>
             </div>
           ) : (
-            Object.entries(eventsByDate)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([date, dayEvents]) => (
-                <div key={date} className="card">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Calendar size={20} className="text-accent-primary" />
-                    {formatDate(date)}
-                    <span className="text-sm font-normal text-text-muted ml-2">({date})</span>
-                  </h3>
-                  
-                  <div className="space-y-2">
-                    {dayEvents
-                      .sort((a, b) => a.time.localeCompare(b.time))
-                      .map(event => (
-                        <div
-                          key={event.id}
-                          className={clsx(
-                            'p-4 rounded-lg border-l-4 bg-background-surface-hover',
-                            IMPACT_COLORS[event.impact].border
-                          )}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="flex items-center gap-2">
-                                <Clock size={14} className="text-text-muted" />
-                                <span className="font-mono text-sm">{event.time}</span>
+            <div className="space-y-0">
+              {Object.entries(eventsByDate)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([date, dayEvents]) => (
+                  <div key={date}>
+                    {/* ── Sticky Day Divider ── */}
+                    <div className="sticky top-0 z-10 flex items-center gap-3 py-2 mb-1 bg-background/80 backdrop-blur-sm">
+                      <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-accent-primary">
+                        {formatDate(date)}
+                      </span>
+                      <span className="text-[10px] font-mono tabular-nums text-text-muted">{date}</span>
+                      <div className="flex-1 h-px bg-white/[0.04]" />
+                      <span className="text-[10px] tabular-nums text-text-muted">{dayEvents.length}</span>
+                    </div>
+
+                    {/* ── Timeline Events ── */}
+                    <motion.div
+                      variants={staggerContainer}
+                      initial="hidden"
+                      animate="show"
+                      className="relative ml-4 border-l border-white/[0.06] pl-6 pb-6"
+                    >
+                      {dayEvents
+                        .sort((a, b) => a.time.localeCompare(b.time))
+                        .map((event) => (
+                          <motion.div
+                            key={event.id}
+                            variants={staggerItem}
+                            className="relative group mb-3 last:mb-0"
+                          >
+                            {/* Timeline dot */}
+                            <span className={clsx(
+                              'absolute -left-[30.5px] top-2.5 w-2 h-2 rounded-full ring-2 ring-background',
+                              event.impact === 'high' && 'bg-pnl-negative',
+                              event.impact === 'medium' && 'bg-accent-gold',
+                              event.impact === 'low' && 'bg-accent-blue',
+                            )} />
+
+                            <div className="flex items-start gap-4 p-3 rounded-lg bg-white/[0.03] hover:bg-white/[0.05] transition-colors">
+                              {/* Left column: time + currency */}
+                              <div className="flex flex-col items-center gap-1 w-16 flex-shrink-0 pt-0.5">
+                                <span className="font-mono tabular-nums text-xs text-text-muted">{event.time}</span>
+                                <span className="text-[10px] uppercase tracking-[0.08em] font-semibold px-1.5 py-0.5 rounded bg-white/[0.06] text-text-primary">
+                                  {event.currency}
+                                </span>
                               </div>
-                              
-                              <span className="px-2 py-1 rounded bg-background-surface text-sm font-semibold">
-                                {event.currency}
-                              </span>
-                              
-                              <span className={clsx(
-                                'px-2 py-0.5 rounded text-xs font-medium',
-                                IMPACT_COLORS[event.impact].bg,
-                                IMPACT_COLORS[event.impact].text
-                              )}>
-                                {event.impact === 'high' ? 'HIGH' : event.impact === 'medium' ? 'MED' : 'LOW'}
-                              </span>
+
+                              {/* Right column: event details */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  {impactDot(event.impact)}
+                                  <span className="text-sm font-medium text-text-primary truncate">{event.event}</span>
+                                  {event.impact === 'high' && (
+                                    <AlertTriangle size={12} className="text-pnl-negative animate-pulse flex-shrink-0" />
+                                  )}
+                                  <span className={clsx(
+                                    'ml-auto text-[9px] uppercase tracking-[0.1em] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0',
+                                    IMPACT_COLORS[event.impact].bg,
+                                    IMPACT_COLORS[event.impact].text,
+                                  )}>
+                                    {event.impact === 'high' ? 'HIGH' : event.impact === 'medium' ? 'MED' : 'LOW'}
+                                  </span>
+                                </div>
+
+                                {(event.forecast || event.previous || event.actual) && (
+                                  <div className="flex gap-5 mt-1.5 text-[11px]">
+                                    {event.actual && (
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Act</span>
+                                        <span className="font-mono tabular-nums font-semibold text-pnl-positive">{event.actual}</span>
+                                      </div>
+                                    )}
+                                    {event.forecast && (
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Fcst</span>
+                                        <span className="font-mono tabular-nums font-semibold text-text-primary">{event.forecast}</span>
+                                      </div>
+                                    )}
+                                    {event.previous && (
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Prev</span>
+                                        <span className="font-mono tabular-nums text-text-muted">{event.previous}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            
-                            {event.impact === 'high' && (
-                              <AlertTriangle size={18} className="text-pnl-negative animate-pulse" />
-                            )}
-                          </div>
-                          
-                          <h4 className="font-semibold mt-2">{event.event}</h4>
-                          
-                          {(event.forecast || event.previous || event.actual) && (
-                            <div className="flex gap-6 mt-2 text-sm">
-                              {event.actual && (
-                                <div>
-                                  <span className="text-text-muted">Actual: </span>
-                                  <span className="font-semibold text-pnl-positive">{event.actual}</span>
-                                </div>
-                              )}
-                              {event.forecast && (
-                                <div>
-                                  <span className="text-text-muted">Forecast: </span>
-                                  <span className="font-semibold">{event.forecast}</span>
-                                </div>
-                              )}
-                              {event.previous && (
-                                <div>
-                                  <span className="text-text-muted">Previous: </span>
-                                  <span className="text-text-muted">{event.previous}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                          </motion.div>
+                        ))}
+                    </motion.div>
                   </div>
-                </div>
-              ))
+                ))}
+            </div>
           )}
         </div>
       )}
 
-      {/* News Tab */}
+      {/* ══════════════════════════════════════════════════
+          NEWS TAB  -  Feed / Ticker Style
+         ══════════════════════════════════════════════════ */}
       {activeTab === 'news' && (
-        <div className="space-y-4">
+        <div>
           {filteredNews.length === 0 ? (
-            <div className="card text-center py-16">
-              <Newspaper size={64} className="mx-auto text-text-muted/50 mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Keine News gefunden</h3>
-              <p className="text-text-muted">Passe deine Filter an, um News zu sehen.</p>
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <Newspaper size={40} className="text-text-muted/30 mb-3" />
+              <p className="text-sm font-medium text-text-muted">Keine News gefunden</p>
+              <p className="text-[11px] text-text-muted/60 mt-1">Passe deine Filter an, um News zu sehen.</p>
             </div>
           ) : (
-            filteredNews.map(article => (
-              <div key={article.id} className="card hover:bg-glass-white transition-colors">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm text-text-muted">{article.source}</span>
-                      <span className="text-text-muted">•</span>
-                      <span className="text-sm text-text-muted">{getTimeAgo(article.publishedAt)}</span>
-                      <div className="flex gap-1 ml-2">
-                        {article.relatedCurrencies.map(c => (
-                          <span key={c} className="px-1.5 py-0.5 text-xs bg-accent-gold/20 text-accent-primary rounded">
-                            {c}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <h3 className="text-lg font-semibold mb-2">{article.title}</h3>
-                    <p className="text-text-muted">{article.summary}</p>
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+              className="divide-y divide-white/[0.04]"
+            >
+              {filteredNews.map(article => (
+                <motion.div
+                  key={article.id}
+                  variants={staggerItem}
+                  className="group flex items-center gap-4 py-3 px-3 -mx-1 rounded-lg hover:bg-white/[0.03] transition-colors"
+                >
+                  {/* Source icon placeholder */}
+                  <div className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center flex-shrink-0">
+                    <span className="text-[9px] font-bold uppercase text-text-muted">
+                      {article.source.charAt(0)}
+                    </span>
                   </div>
-                  
+
+                  {/* Time ago */}
+                  <span className="font-mono tabular-nums text-[10px] text-text-muted w-20 flex-shrink-0">
+                    {getTimeAgo(article.publishedAt)}
+                  </span>
+
+                  {/* Title + summary */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{article.title}</p>
+                    <p className="text-[11px] text-text-muted/70 truncate mt-0.5">{article.summary}</p>
+                  </div>
+
+                  {/* Currency badges */}
+                  <div className="flex gap-1 flex-shrink-0">
+                    {article.relatedCurrencies.map(c => (
+                      <span key={c} className="px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em] font-semibold bg-accent-gold/10 text-accent-primary rounded-full">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Source name + link */}
+                  <span className="text-[10px] text-text-muted/50 w-16 text-right flex-shrink-0 hidden sm:block">
+                    {article.source}
+                  </span>
                   <a
                     href={article.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2 hover:bg-background-surface rounded-lg transition-colors"
+                    className="p-1 rounded hover:bg-white/[0.06] transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
                   >
-                    <ExternalLink size={18} className="text-text-muted" />
+                    <ExternalLink size={12} className="text-text-muted" />
                   </a>
-                </div>
-              </div>
-            ))
+                </motion.div>
+              ))}
+            </motion.div>
           )}
         </div>
       )}
 
-      {/* Info Box */}
-      <div className="mt-6 p-4 bg-background-surface rounded-lg border border-border text-sm text-text-muted">
-        <h4 className="font-semibold text-text-primary mb-2">Datenquellen</h4>
-        <p>
+      {/* ── Data Sources (subtle footer) ── */}
+      <div className="mt-10 pt-4 border-t border-white/[0.04]">
+        <p className="text-[10px] uppercase tracking-[0.1em] text-text-muted/40 mb-2">Datenquellen</p>
+        <p className="text-[11px] text-text-muted/40 leading-relaxed">
           Die Wirtschaftsdaten stammen aus öffentlichen Quellen. Für Echtzeit-Daten empfehlen wir:
         </p>
-        <div className="flex gap-4 mt-2">
-          <a href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">
+        <div className="flex gap-4 mt-1.5">
+          <a href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener noreferrer" className="text-[11px] text-text-muted/40 hover:text-accent-primary transition-colors">
             ForexFactory Calendar
           </a>
-          <a href="https://www.investing.com/economic-calendar/" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">
+          <a href="https://www.investing.com/economic-calendar/" target="_blank" rel="noopener noreferrer" className="text-[11px] text-text-muted/40 hover:text-accent-primary transition-colors">
             Investing.com
           </a>
-          <a href="https://www.myfxbook.com/forex-economic-calendar" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">
+          <a href="https://www.myfxbook.com/forex-economic-calendar" target="_blank" rel="noopener noreferrer" className="text-[11px] text-text-muted/40 hover:text-accent-primary transition-colors">
             MyFxBook
           </a>
         </div>
       </div>
+
     </div>
+    </PageTransition>
   );
 }

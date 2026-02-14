@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { HashRouter, BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
@@ -19,6 +19,7 @@ import { Toaster } from '@/components/ui/Toaster';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { GlobalSearch } from '@/components/ui/GlobalSearch';
 import { QueryProvider } from '@/providers';
+import { AnimatePresence } from 'framer-motion';
 
 // Pages
 import { Dashboard } from '@/pages/Dashboard';
@@ -35,10 +36,8 @@ import { MachineLearning } from '@/pages/MachineLearning';
 import { News } from '@/pages/News';
 import { Outlook } from '@/pages/Outlook';
 import { StrategyBuilder } from '@/pages/StrategyBuilder';
-import { RiskManagement } from '@/pages/RiskManagement';
 
-// Debug
-import { AuthDebug } from '@/components/AuthDebug';
+// Debug removed - AuthDebug no longer needed
 
 // Utils
 import { isElectron } from '@/services/webApi';
@@ -138,6 +137,7 @@ function LoginScreen({ onSkipLogin }: LoginScreenProps) {
 // MAIN APP CONTENT
 // ----------------------------------------------------------------------
 function AppContent() {
+  const location = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -206,7 +206,7 @@ function AppContent() {
 
   return (
     <div className="flex flex-col h-screen bg-background text-text-primary overflow-hidden">
-      <AuthDebug />
+      {/* AuthDebug removed */}
       {/* Draggable Title Bar - nur für Electron */}
       {inElectron && (
         <div 
@@ -220,24 +220,25 @@ function AppContent() {
         
         <main className="flex-1 overflow-y-auto bg-background">
           <ErrorBoundary>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/funded" element={<FundedJournal />} />
-              <Route path="/ek" element={<EKJournal />} />
-              <Route path="/equity" element={<EquityCurve />} />
-              <Route path="/currency" element={<CurrencyAnalysis />} />
-              <Route path="/backtest" element={<Backtest />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/simulation" element={<Simulation />} />
-              <Route path="/cot" element={<COTData />} />
-              <Route path="/news" element={<News />} />
-              <Route path="/outlook" element={<Outlook />} />
-              <Route path="/strategy" element={<StrategyBuilder />} />
-              <Route path="/ml" element={<MachineLearning />} />
-              <Route path="/risk" element={<RiskManagement />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
+            <AnimatePresence mode="wait">
+              <Routes location={location} key={location.pathname}>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/funded" element={<FundedJournal />} />
+                <Route path="/ek" element={<EKJournal />} />
+                <Route path="/equity" element={<EquityCurve />} />
+                <Route path="/currency" element={<CurrencyAnalysis />} />
+                <Route path="/backtest" element={<Backtest />} />
+                <Route path="/calendar" element={<Calendar />} />
+                <Route path="/simulation" element={<Simulation />} />
+                <Route path="/cot" element={<COTData />} />
+                <Route path="/news" element={<News />} />
+                <Route path="/outlook" element={<Outlook />} />
+                <Route path="/strategy" element={<StrategyBuilder />} />
+                <Route path="/ml" element={<MachineLearning />} />
+                <Route path="/settings" element={<Settings />} />
+              </Routes>
+            </AnimatePresence>
           </ErrorBoundary>
         </main>
       </div>
