@@ -116,25 +116,31 @@ export function FundedJournal() {
       const user = session.user;
       
       // MAPPING: APP -> DB
-     const dbPayload = {
-  // --- PFLICHTFELDER (laut deinem DB-Screenshot) ---
-  quantity: Number(tradeData.quantity), // Fix für den aktuellen Fehler
-  entry_price: Number(tradeData.entryPrice),
-  symbol: tradeData.pair,               // DB nennt es 'symbol', deine App 'pair'
-  side: tradeData.direction,            // DB nennt es 'side', deine App 'direction'
-  
-  // Wichtig: Falls der User nicht automatisch erkannt wird, muss hier die ID hin.
-  // Wenn 'user' in deiner Komponente nicht verfügbar ist, lösch die nächste Zeile vorerst.
-  // user_id: user.id, 
+  // DB PAYLOAD DEFINITION
+  const dbPayload = {
+    // 1. PFLICHTFELDER (Mit Sicherheits-Fallback "|| 0")
+    // Wenn tradeData.quantity leer ist, senden wir einfach 0, damit die DB nicht abstürzt.
+    quantity: Number(tradeData.quantity) || 0, 
+    entry_price: Number(tradeData.entryPrice) || 0,
+    
+    // Achtung: DB nennt es 'symbol', App nennt es 'pair'
+    symbol: tradeData.pair || 'EURUSD', 
+    
+    // Achtung: DB nennt es 'side', App nennt es 'direction'
+    side: tradeData.direction || 'long',
 
-  // --- OPTIONALE FELDER ---
-  exit_price: tradeData.exitPrice ? Number(tradeData.exitPrice) : null,
-  date: tradeData.date,
-  notes: tradeData.notes || '',
-  status: 'closed',
-  type: 'funded'
-};
-      };
+    // 2. OPTIONALE FELDER (Hier ist null erlaubt)
+    exit_price: tradeData.exitPrice ? Number(tradeData.exitPrice) : null,
+    date: tradeData.date,
+    notes: tradeData.notes || '',
+    
+    // 3. FESTE WERTE
+    status: 'closed',
+    type: 'funded'
+  };
+
+  // DEBUGGING: Zeig mir in der Konsole, was wir gleich senden!
+  console.log("🚀 Sende an DB:", dbPayload);
 
       let error;
       if (tradeData.id) {
