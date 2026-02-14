@@ -63,18 +63,18 @@ function LoginScreen({ onSkipLogin }: LoginScreenProps) {
     setLoading(true);
     setMessage('');
     
-    try {
+   try {
       // Redirect URL = aktuelle URL (für localhost oder Vercel)
-      const redirectUrl = window.location.origin;
+  const redirectUrl = window.location.origin;
       console.log('🔐 Magic Link redirect URL:', redirectUrl);
-      
+
       const { error } = await supabase.auth.signInWithOtp({ 
         email,
-        options: {
-          emailRedirectTo: redirectUrl,
+    options: {
+      emailRedirectTo: redirectUrl,
         }
-      });
-      
+  });
+  
       if (error) {
         console.error('❌ Supabase Auth Error:', error);
         setMessage(`Fehler: ${error.message}`);
