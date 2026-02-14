@@ -104,7 +104,28 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
   // ============================================================
   const handleSaveTrade = async (tradeData: Omit<Trade, 'id'> & { id?: string }) => {
     try {
+      const isNewTrade = !tradeData.id;
+      const oldTrade = isNewTrade ? null : trades.find(t => t.id === tradeData.id);
+      
       await tradeService.saveTrade({ ...tradeData, type: accountType });
+      
+      // Update account balance based on profit/loss (except for breakeven)
+      if (config && tradeData.result !== 'breakeven') {
+        const profitAmount = tradeData.profitAmount || 0;
+        let balanceChange = profitAmount;
+        
+        // If editing, reverse the old trade's effect first
+        if (oldTrade && oldTrade.result !== 'breakeven') {
+          const oldProfit = oldTrade.profitAmount || 0;
+          balanceChange = profitAmount - oldProfit;
+        }
+        
+        if (balanceChange !== 0 || isNewTrade) {
+          const newBalance = config.currentBalance + (isNewTrade ? profitAmount : balanceChange);
+          await saveConfig({ ...config, currentBalance: Math.round(newBalance * 100) / 100 });
+        }
+      }
+      
       showToast(tradeData.id ? 'Trade aktualisiert' : 'Trade gespeichert', 'success');
       setShowTradeForm(false);
       setEditingTrade(undefined);
@@ -120,8 +141,17 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
     if (confirm(`Trade vom ${trade.date} wirklich löschen?`)) {
       try {
         await tradeService.deleteTrade(trade.id);
+        
+        // Reverse the balance change (except for breakeven)
+        if (config && trade.result !== 'breakeven') {
+          const profitAmount = trade.profitAmount || 0;
+          const newBalance = config.currentBalance - profitAmount;
+          await saveConfig({ ...config, currentBalance: Math.round(newBalance * 100) / 100 });
+        }
+        
         showToast('Trade erfolgreich gelöscht', 'success');
         setTrades(prev => prev.filter(t => t.id !== trade.id));
+        await loadConfigs();
       } catch (error) {
         console.error('Löschfehler:', error);
         showToast('Fehler beim Löschen', 'error');

@@ -289,41 +289,77 @@ export const webExternalApi = {
     };
 
     try {
-      const results: Record<string, any> = {};
+      const results: any[] = [];
+      const historyMap: Record<string, any[]> = {};
       
       for (const [currency, code] of Object.entries(CFTC_CODES)) {
         const response = await fetch(
-          `https://publicreporting.cftc.gov/resource/6dca-aqww.json?cftc_contract_market_code=${code}&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=2`
+          `https://publicreporting.cftc.gov/resource/6dca-aqww.json?cftc_contract_market_code=${code}&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=52`
         );
         
         if (response.ok) {
           const data = await response.json();
           if (data && data.length > 0) {
-            const current = data[0];
+            const latest = data[0];
             const previous = data[1];
             
-            const currentNet = parseInt(current.comm_positions_long_all || 0) - parseInt(current.comm_positions_short_all || 0);
-            const previousNet = previous ? parseInt(previous.comm_positions_long_all || 0) - parseInt(previous.comm_positions_short_all || 0) : 0;
+            // Commercial positions
+            const commercialsLong = parseInt(latest.comm_positions_long_all || 0);
+            const commercialsShort = parseInt(latest.comm_positions_short_all || 0);
+            const commercialsNet = commercialsLong - commercialsShort;
             
-            results[currency] = {
-              contract: current.contract_market_name,
-              date: current.report_date_as_yyyy_mm_dd?.substring(0, 10),
-              commercialLong: parseInt(current.comm_positions_long_all || 0),
-              commercialShort: parseInt(current.comm_positions_short_all || 0),
-              commercialNet: currentNet,
-              change: currentNet - previousNet,
-            };
+            // Previous week for change calculation
+            const prevCommercialsNet = previous
+              ? parseInt(previous.comm_positions_long_all || 0) - parseInt(previous.comm_positions_short_all || 0)
+              : 0;
+            const weeklyChange = commercialsNet - prevCommercialsNet;
+            
+            // Build history for charts
+            const historicalData = data.map((row: any) => ({
+              date: row.report_date_as_yyyy_mm_dd,
+              commercialsLong: parseInt(row.comm_positions_long_all) || 0,
+              commercialsShort: parseInt(row.comm_positions_short_all) || 0,
+            })).reverse();
+            
+            historyMap[currency] = historicalData;
+            
+            // Calculate percentile rank
+            const commNetHistory = data.map((row: any) => 
+              parseInt(row.comm_positions_long_all || 0) - parseInt(row.comm_positions_short_all || 0)
+            );
+            const sortedNets = [...commNetHistory].sort((a, b) => a - b);
+            const rank = sortedNets.findIndex(n => n >= commercialsNet);
+            const percentileRank = Math.round((rank / Math.max(sortedNets.length, 1)) * 100);
+            
+            // Determine signal based on percentile
+            let signal = 'neutral';
+            if (percentileRank >= 80) signal = 'strong_long';
+            else if (percentileRank >= 60) signal = 'long';
+            else if (percentileRank <= 20) signal = 'strong_short';
+            else if (percentileRank <= 40) signal = 'short';
+            
+            results.push({
+              currency,
+              date: latest.report_date_as_yyyy_mm_dd?.substring(0, 10),
+              commercialsLong,
+              commercialsShort,
+              commercialsNet,
+              weeklyChange,
+              percentileRank,
+              signal,
+              openInterest: parseInt(latest.open_interest_all) || 0
+            });
           }
         }
       }
       
       // Cache the results
-      saveToStorage(STORAGE_KEYS.COT, { data: results, timestamp: Date.now() });
-      return { success: true, data: results };
+      saveToStorage(STORAGE_KEYS.COT, { data: results, history: historyMap, timestamp: Date.now() });
+      return { success: true, data: results, history: historyMap };
     } catch (error) {
       // Return cached data if available
       const cached = getFromStorage<any>(STORAGE_KEYS.COT, null);
-      if (cached) return { success: true, data: cached.data, cached: true };
+      if (cached) return { success: true, data: cached.data, history: cached.history, cached: true };
       return { success: false, error: String(error) };
     }
   },
@@ -340,20 +376,57 @@ export const webExternalApi = {
       const events = xml.querySelectorAll('event');
       
       const calendarEvents: any[] = [];
-      events.forEach(event => {
+      events.forEach((event, index) => {
+        const title = event.querySelector('title')?.textContent || '';
+        const country = event.querySelector('country')?.textContent || '';
+        const dateStr = event.querySelector('date')?.textContent || '';
+        const timeStr = event.querySelector('time')?.textContent || '';
+        let impact = (event.querySelector('impact')?.textContent || '').toLowerCase();
+        const forecast = event.querySelector('forecast')?.textContent || '';
+        const previous = event.querySelector('previous')?.textContent || '';
+        
+        // Convert date from MM-DD-YYYY to ISO format
+        let isoDate = '';
+        if (dateStr) {
+          const [month, day, year] = dateStr.split('-');
+          if (month && day && year) {
+            isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        }
+        
+        // Convert time to 24h format
+        let time24 = timeStr;
+        if (timeStr && timeStr.includes('am')) {
+          time24 = timeStr.replace('am', '').trim();
+          const parts = time24.split(':');
+          time24 = `${parts[0].padStart(2, '0')}:${parts[1] || '00'}`;
+        } else if (timeStr && timeStr.includes('pm')) {
+          time24 = timeStr.replace('pm', '').trim();
+          const parts = time24.split(':');
+          const hour = parseInt(parts[0]) === 12 ? 12 : parseInt(parts[0]) + 12;
+          time24 = `${hour}:${parts[1] || '00'}`;
+        }
+        
+        // Normalize impact
+        if (impact !== 'high' && impact !== 'medium' && impact !== 'low') {
+          impact = 'low';
+        }
+        
         calendarEvents.push({
-          title: event.querySelector('title')?.textContent || '',
-          country: event.querySelector('country')?.textContent || '',
-          date: event.querySelector('date')?.textContent || '',
-          time: event.querySelector('time')?.textContent || '',
-          impact: event.querySelector('impact')?.textContent || '',
-          forecast: event.querySelector('forecast')?.textContent || '',
-          previous: event.querySelector('previous')?.textContent || '',
+          id: `ff-${index}`,
+          event: title,
+          currency: country,
+          date: isoDate,
+          time: time24,
+          impact: impact as 'high' | 'medium' | 'low',
+          forecast: forecast || undefined,
+          previous: previous || undefined,
+          source: 'forexfactory'
         });
       });
       
       saveToStorage(STORAGE_KEYS.CALENDAR, { data: calendarEvents, timestamp: Date.now() });
-      return { success: true, data: calendarEvents };
+      return { success: true, data: calendarEvents, source: 'forexfactory' };
     } catch (error) {
       const cached = getFromStorage<any>(STORAGE_KEYS.CALENDAR, null);
       if (cached) return { success: true, data: cached.data, cached: true };

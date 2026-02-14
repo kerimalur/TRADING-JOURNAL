@@ -19,7 +19,6 @@ import { useTradeStore } from '@/stores/tradeStore';
 import { useNavigate } from 'react-router-dom';
 import type { Trade } from '@/types';
 import { PageTransition } from '@/components/ui/PageTransition';
-import { Heatmap, type HeatmapDay } from '@/components/ui/Heatmap';
 import { MetricDisplay } from '@/components/ui/MetricDisplay';
 import { TradeRow } from '@/components/ui/TradeRow';
 
@@ -31,7 +30,7 @@ export function Calendar() {
   const { trades, loadTrades } = useTradeStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'heatmap' | 'month' | 'year'>('month');
+  const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
   const [accountFilter, setAccountFilter] = useState<'all' | 'ek' | 'funded'>('all');
 
   useEffect(() => { loadTrades(); }, []);
@@ -41,18 +40,6 @@ export function Calendar() {
       (accountFilter === 'all' || t.type === accountFilter) && t.sessionType === 'live'
     );
   }, [trades, accountFilter]);
-
-  // Heatmap data
-  const heatmapData = useMemo((): HeatmapDay[] => {
-    const dayMap = new Map<string, { totalR: number; count: number }>();
-    filteredTrades.forEach(t => {
-      const existing = dayMap.get(t.date) || { totalR: 0, count: 0 };
-      dayMap.set(t.date, { totalR: existing.totalR + t.rMultiple, count: existing.count + 1 });
-    });
-    return Array.from(dayMap.entries()).map(([date, d]) => ({
-      date, value: d.totalR, trades: d.count,
-    }));
-  }, [filteredTrades]);
 
   // Selected day details
   const selectedDayData = useMemo(() => {
@@ -157,10 +144,10 @@ export function Calendar() {
               <option value="funded">Funded</option>
             </select>
             <div className="toggle-group text-xs">
-              {(['heatmap', 'month', 'year'] as const).map(mode => (
+              {(['month', 'year'] as const).map(mode => (
                 <button key={mode} onClick={() => setViewMode(mode)}
                   className={clsx('toggle-btn px-3 py-1 text-xs', viewMode === mode && 'active')}>
-                  {mode === 'heatmap' ? 'Heatmap' : mode === 'month' ? 'Monat' : 'Jahr'}
+                  {mode === 'month' ? 'Monat' : 'Jahr'}
                 </button>
               ))}
             </div>
@@ -180,18 +167,6 @@ export function Calendar() {
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-          {/* HEATMAP VIEW */}
-          {viewMode === 'heatmap' && (
-            <div className="rounded-xl border border-border bg-background-card p-5">
-              <Heatmap
-                data={heatmapData}
-                weeks={26}
-                colorMode="pnl"
-                onDayClick={(day) => setSelectedDate(day.date)}
-              />
-            </div>
-          )}
-
           {/* MONTH VIEW */}
           {viewMode === 'month' && (
             <div className="rounded-xl border border-border bg-background-card p-4">

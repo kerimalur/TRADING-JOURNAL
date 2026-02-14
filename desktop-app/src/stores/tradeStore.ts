@@ -5,13 +5,13 @@
  * 
  * Zentraler State für alle Trade-bezogenen Daten.
  * Mit Memoization für optimierte Performance.
- * Unterstützt Electron und Web (Vercel).
+ * Verwendet tradeService (Supabase) als Single Source of Truth.
  */
 
 import { create } from 'zustand';
 import type { Trade, TradeFilters, AccountType, DashboardMetrics } from '@/types';
 import { calculateDashboardMetrics, createMemoizedCalculator } from '@/utils/calculations';
-import { getApi } from '@/services/webApi';
+import * as tradeService from '@/services/tradeService';
 
 interface TradeState {
   // Data
@@ -73,13 +73,7 @@ export const useTradeStore = create<TradeState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      const api = getApi();
-      const filters: any = {};
-      if (accountType) {
-        filters.type = accountType;
-      }
-      
-      const trades = await api.loadTrades(filters);
+      const trades = await tradeService.loadTrades(accountType);
       get().invalidateCache();
       set({ trades: trades as Trade[], isLoading: false });
     } catch (error) {
@@ -91,12 +85,13 @@ export const useTradeStore = create<TradeState>((set, get) => ({
   // Save Trade - gibt jetzt das Trade-Objekt zurück
   saveTrade: async (trade, screenshot) => {
     try {
-      const api = getApi();
       // saveTrade gibt das gespeicherte Trade zurück (mit ID)
-      const savedTrade = await api.saveTrade(trade as any);
+      const savedTrade = await tradeService.saveTrade(trade as any);
       
-      // Screenshot speichern wenn vorhanden
+      // Screenshot speichern wenn vorhanden (via webApi für Screenshots)
       if (savedTrade && screenshot) {
+        const { getApi } = await import('@/services/webApi');
+        const api = getApi();
         await api.saveScreenshot(String(savedTrade.id), screenshot);
       }
       
@@ -114,11 +109,12 @@ export const useTradeStore = create<TradeState>((set, get) => ({
   // Delete Trade - ID ist jetzt string
   deleteTrade: async (id: string) => {
     try {
+      // Delete screenshot first (via webApi)
+      const { getApi } = await import('@/services/webApi');
       const api = getApi();
-      // Delete screenshot first
       await api.deleteScreenshot(id);
       
-      const success = await api.deleteTrade(id);
+      const success = await tradeService.deleteTrade(id);
       
       if (success) {
         get().invalidateCache();

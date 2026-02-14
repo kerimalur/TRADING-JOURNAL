@@ -256,6 +256,26 @@ export function Backtest() {
     showToast('Session beendet', 'info');
   };
 
+  const reopenSession = () => {
+    if (!currentSession) return;
+    const updatedSession: BacktestSession = {
+      ...currentSession, isPaused: true, isCompleted: false, updatedAt: Date.now(),
+    };
+    saveSessions(sessions.map(s => s.id === currentSessionId ? updatedSession : s));
+    showToast('Session wieder geöffnet', 'success');
+  };
+
+  const deleteTradeFromSession = (tradeId: string) => {
+    if (!currentSession) return;
+    const updatedSession: BacktestSession = {
+      ...currentSession,
+      trades: currentSession.trades.filter(t => t.id !== tradeId),
+      updatedAt: Date.now(),
+    };
+    saveSessions(sessions.map(s => s.id === currentSessionId ? updatedSession : s));
+    showToast('Trade gelöscht', 'info');
+  };
+
   return (
     <div className="page-container">
       {/* Header */}
@@ -282,9 +302,16 @@ export function Backtest() {
                   <div key={session.id}
                     className={clsx('flex items-center justify-between p-3 hover:bg-white/[0.03] cursor-pointer', session.id === currentSessionId && 'bg-accent-primary/10')}
                     onClick={() => { setCurrentSessionId(session.id); setShowSessionList(false); }}>
-                    <div>
-                      <div className="font-medium">{session.name}</div>
-                      <div className="text-xs text-text-muted">{session.trades.length} Trades • {new Date(session.createdAt).toLocaleDateString('de-DE')}</div>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <div className="font-medium flex items-center gap-2">
+                          {session.name}
+                          {session.isCompleted && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-pnl-positive/20 text-pnl-positive">Abgeschlossen</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-text-muted">{session.trades.length} Trades • {new Date(session.createdAt).toLocaleDateString('de-DE')}</div>
+                      </div>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); if (confirm('Session wirklich löschen?')) deleteSession(session.id); }}
                       className="p-1 hover:bg-pnl-negative/20 rounded">
@@ -329,7 +356,12 @@ export function Backtest() {
                     </button>
                   </>
                 ) : (
-                  <span className="px-3 py-2 bg-text-muted/20 rounded-lg text-text-muted text-sm">Session beendet</span>
+                  <>
+                    <span className="px-3 py-2 bg-pnl-positive/20 rounded-lg text-pnl-positive text-sm font-medium">✓ Abgeschlossen</span>
+                    <button onClick={reopenSession} className="btn btn-secondary text-accent-primary hover:bg-accent-primary/20">
+                      <Play size={16} /> Wieder öffnen
+                    </button>
+                  </>
                 )}
                 <button onClick={createNewSession} className="btn btn-secondary"><RotateCcw size={16} /> Neue Session</button>
               </div>
@@ -481,6 +513,7 @@ export function Backtest() {
                       <th className="text-left py-2 px-3 text-text-muted font-medium">Result</th>
                       <th className="text-right py-2 px-3 text-text-muted font-medium">R</th>
                       <th className="text-center py-2 px-3 text-text-muted font-medium">Bild</th>
+                      <th className="text-center py-2 px-3 text-text-muted font-medium">Aktion</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -508,6 +541,15 @@ export function Backtest() {
                             <img src={trade.screenshot} alt="Screenshot" className="h-8 w-12 object-cover rounded cursor-pointer hover:opacity-80"
                               onClick={() => window.open(trade.screenshot, '_blank')} />
                           ) : <span className="text-text-muted/50">—</span>}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <button
+                            onClick={() => confirm('Trade wirklich löschen?') && deleteTradeFromSession(trade.id)}
+                            className="p-1 hover:bg-pnl-negative/20 rounded"
+                            title="Trade löschen"
+                          >
+                            <Trash2 size={14} className="text-pnl-negative" />
+                          </button>
                         </td>
                       </tr>
                     ))}
