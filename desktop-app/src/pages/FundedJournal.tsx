@@ -120,6 +120,7 @@ export function FundedJournal() {
   // 1. Die fehlenden Pflichtfelder (Die Ursache für deinen Fehler)
   entry_price: Number(tradeData.entryPrice), 
   exit_price: Number(tradeData.exitPrice),
+  quantity: Number(tradeData.quantity),
   symbol: tradeData.pair,     // Prüfe kurz: heißt es bei dir .pair oder .symbol?
   direction: tradeData.direction,
   quantity: Number(tradeData.quantity),
