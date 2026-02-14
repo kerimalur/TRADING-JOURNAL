@@ -59,8 +59,7 @@ function mapAppToDb(trade: Partial<Trade> & { id?: string }) {
     risk_percent: trade.riskPercent,
     risk_amount: trade.riskAmount,
     profit_amount: trade.profitAmount,
-    notes: trade.notes || '',
-    comment: trade.comment || '',
+    notes: trade.notes || ''   
     session_type: trade.sessionType || 'live',
     session: trade.session || '',
     type: trade.type,
