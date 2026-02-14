@@ -109,21 +109,49 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
       
       await tradeService.saveTrade({ ...tradeData, type: accountType });
       
+      // Get fresh config from store to ensure we have the latest balance
+      const currentConfig = configs?.[accountType];
+      
+      // Calculate profit if not provided: profitAmount = riskAmount * rMultiple
+      const calculatedProfit = tradeData.profitAmount ?? ((tradeData.riskAmount || 0) * (tradeData.rMultiple || 0));
+      
+      console.log('💰 Balance Update:', { 
+        hasConfig: !!currentConfig,
+        currentBalance: currentConfig?.currentBalance,
+        result: tradeData.result, 
+        profitAmount: tradeData.profitAmount,
+        calculatedProfit,
+        rMultiple: tradeData.rMultiple,
+        riskAmount: tradeData.riskAmount,
+        isNewTrade
+      });
+      
       // Update account balance based on profit/loss (except for breakeven)
-      if (config && tradeData.result !== 'breakeven') {
-        const profitAmount = tradeData.profitAmount || 0;
+      if (currentConfig && tradeData.result !== 'breakeven') {
+        const profitAmount = calculatedProfit;
         let balanceChange = profitAmount;
         
         // If editing, reverse the old trade's effect first
         if (oldTrade && oldTrade.result !== 'breakeven') {
-          const oldProfit = oldTrade.profitAmount || 0;
+          const oldProfit = oldTrade.profitAmount || ((oldTrade.riskAmount || 0) * (oldTrade.rMultiple || 0));
           balanceChange = profitAmount - oldProfit;
         }
         
+        const newBalance = currentConfig.currentBalance + (isNewTrade ? profitAmount : balanceChange);
+        
+        console.log('💰 Calculated balance change:', { 
+          oldBalance: currentConfig.currentBalance, 
+          profitAmount, 
+          balanceChange,
+          newBalance
+        });
+        
         if (balanceChange !== 0 || isNewTrade) {
-          const newBalance = config.currentBalance + (isNewTrade ? profitAmount : balanceChange);
-          await saveConfig({ ...config, currentBalance: Math.round(newBalance * 100) / 100 });
+          const success = await saveConfig({ ...currentConfig, currentBalance: Math.round(newBalance * 100) / 100 });
+          console.log('💰 Balance update result:', success, 'New balance:', newBalance);
         }
+      } else {
+        console.log('⚠️ Balance not updated:', { hasConfig: !!currentConfig, result: tradeData.result });
       }
       
       showToast(tradeData.id ? 'Trade aktualisiert' : 'Trade gespeichert', 'success');
@@ -142,11 +170,22 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
       try {
         await tradeService.deleteTrade(trade.id);
         
+        // Get fresh config from store
+        const currentConfig = configs?.[accountType];
+        
         // Reverse the balance change (except for breakeven)
-        if (config && trade.result !== 'breakeven') {
-          const profitAmount = trade.profitAmount || 0;
-          const newBalance = config.currentBalance - profitAmount;
-          await saveConfig({ ...config, currentBalance: Math.round(newBalance * 100) / 100 });
+        if (currentConfig && trade.result !== 'breakeven') {
+          // Calculate profit if not stored
+          const profitAmount = trade.profitAmount || ((trade.riskAmount || 0) * (trade.rMultiple || 0));
+          const newBalance = currentConfig.currentBalance - profitAmount;
+          
+          console.log('💰 Delete - Reversing balance:', {
+            oldBalance: currentConfig.currentBalance,
+            profitAmount,
+            newBalance
+          });
+          
+          await saveConfig({ ...currentConfig, currentBalance: Math.round(newBalance * 100) / 100 });
         }
         
         showToast('Trade erfolgreich gelöscht', 'success');
