@@ -25,17 +25,13 @@ import { AnimatePresence } from 'framer-motion';
 import { Dashboard } from '@/pages/Dashboard';
 import { FundedJournal } from '@/pages/FundedJournal';
 import { EKJournal } from '@/pages/EKJournal';
-import { CurrencyAnalysis } from '@/pages/CurrencyAnalysis';
 import { Settings } from '@/pages/Settings';
 import { EquityCurve } from '@/pages/EquityCurve';
 import { Backtest } from '@/pages/Backtest';
 import { Calendar } from '@/pages/Calendar';
-import { Simulation } from '@/pages/Simulation';
-import { COTData } from '@/pages/COTData';
-import { MachineLearning } from '@/pages/MachineLearning';
-import { News } from '@/pages/News';
 import { Outlook } from '@/pages/Outlook';
 import { StrategyBuilder } from '@/pages/StrategyBuilder';
+import { Fundamentals } from '@/pages/Fundamentals';
 
 // Debug removed - AuthDebug no longer needed
 
@@ -227,15 +223,11 @@ function AppContent() {
                 <Route path="/funded" element={<FundedJournal />} />
                 <Route path="/ek" element={<EKJournal />} />
                 <Route path="/equity" element={<EquityCurve />} />
-                <Route path="/currency" element={<CurrencyAnalysis />} />
                 <Route path="/backtest" element={<Backtest />} />
                 <Route path="/calendar" element={<Calendar />} />
-                <Route path="/simulation" element={<Simulation />} />
-                <Route path="/cot" element={<COTData />} />
-                <Route path="/news" element={<News />} />
                 <Route path="/outlook" element={<Outlook />} />
+                <Route path="/fundamentals" element={<Fundamentals />} />
                 <Route path="/strategy" element={<StrategyBuilder />} />
-                <Route path="/ml" element={<MachineLearning />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </AnimatePresence>

@@ -352,7 +352,9 @@ export interface Outlook {
   };
   createdAt: string;
   updatedAt: string;
+  startedAt?: string;
   executedTradeId?: string;
+  journaledTo?: ('ek' | 'funded')[];
   targetEntry?: number;
   targetSL?: number;
   targetTP?: number;

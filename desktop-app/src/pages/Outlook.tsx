@@ -530,9 +530,11 @@ interface OutlookCardProps {
   onDelete: () => void;
   onStatusChange: (status: OutlookStatus) => void;
   onTransfer: () => void;
+  onStart: () => void;
+  onClose: () => void;
 }
 
-function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer }: OutlookCardProps) {
+function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, onStart, onClose }: OutlookCardProps) {
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const statusConfig = OUTLOOK_STATUS_CONFIG[outlook.status];
 
@@ -751,22 +753,49 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer }: 
           </button>
         </div>
 
-        {outlook.status !== 'executed' && outlook.status !== 'cancelled' && (
-          <button
-            onClick={onTransfer}
-            className="flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] font-semibold text-accent-primary hover:bg-accent-primary/10 rounded transition-colors"
-          >
-            Journal
-            <ArrowRight size={10} />
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {/* Start button for observation / waiting */}
+          {(outlook.status === 'observation' || outlook.status === 'waiting') && (
+            <button
+              onClick={onStart}
+              className="flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] font-semibold text-pnl-positive hover:bg-pnl-positive/10 rounded transition-colors"
+              title="Trade starten"
+            >
+              <Play size={10} />
+              Starten
+            </button>
+          )}
 
-        {outlook.status === 'executed' && outlook.executedTradeId && (
-          <span className="text-[10px] text-accent-primary/70 flex items-center gap-1 font-mono">
-            <CheckCircle2 size={10} />
-            #{outlook.executedTradeId.slice(-6)}
-          </span>
-        )}
+          {/* Close button for active trades */}
+          {outlook.status === 'active' && (
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] font-semibold text-accent-gold hover:bg-accent-gold/10 rounded transition-colors"
+              title="Trade abschliessen"
+            >
+              <CheckCircle2 size={10} />
+              Abschließen
+            </button>
+          )}
+
+          {/* Legacy journal transfer (non-active, non-executed, non-cancelled) */}
+          {outlook.status !== 'executed' && outlook.status !== 'cancelled' && outlook.status !== 'active' && outlook.status !== 'observation' && outlook.status !== 'waiting' && (
+            <button
+              onClick={onTransfer}
+              className="flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] font-semibold text-accent-primary hover:bg-accent-primary/10 rounded transition-colors"
+            >
+              Journal
+              <ArrowRight size={10} />
+            </button>
+          )}
+
+          {outlook.status === 'executed' && outlook.executedTradeId && (
+            <span className="text-[10px] text-accent-primary/70 flex items-center gap-1 font-mono">
+              <CheckCircle2 size={10} />
+              #{outlook.executedTradeId.slice(-6)}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

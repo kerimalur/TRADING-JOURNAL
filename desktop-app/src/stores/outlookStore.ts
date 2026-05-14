@@ -74,6 +74,7 @@ interface OutlookState {
     direction: 'long' | 'short';
     notes: string;
     outlookId: string;
+    targetAccounts: ('ek' | 'funded')[];
   }> | null;
   
   // Actions
@@ -102,6 +103,10 @@ interface OutlookState {
   // Journal Integration
   transferToJournal: (id: string) => void;
   clearPrefillData: () => void;
+
+  // Trade Start / Close
+  startTrade: (id: string) => void;
+  closeTrade: (id: string, accounts: ('ek' | 'funded')[]) => void;
   
   // Export / Import
   exportOutlooks: () => string;
@@ -511,6 +516,53 @@ export const useOutlookStore = create<OutlookState>((set, get) => ({
   // Clear Prefill Data
   clearPrefillData: () => {
     set({ prefillTradeData: null });
+  },
+
+  // Start Trade: set status to active and record startedAt
+  startTrade: (id) => {
+    get().updateOutlook(id, {
+      status: 'active',
+      startedAt: new Date().toISOString(),
+    });
+  },
+
+  // Close Trade: journal to selected accounts and mark as executed
+  closeTrade: (id, accounts) => {
+    const outlook = get().outlooks.find(o => o.id === id);
+    if (!outlook) return;
+
+    const formattedPair = outlook.symbol.includes('/')
+      ? outlook.symbol
+      : `${outlook.symbol.slice(0, 3)}/${outlook.symbol.slice(3)}`;
+
+    let notes = `📊 OUTLOOK TRANSFER\n\nThesis: ${outlook.thesis}`;
+    if (outlook.cotBias) {
+      notes += `\n\nCOT Bias:`;
+      notes += `\n- ${outlook.cotBias.base.currency}: ${outlook.cotBias.base.signal.replace('_', ' ').toUpperCase()} (${outlook.cotBias.base.percentile}%)`;
+      notes += `\n- ${outlook.cotBias.quote.currency}: ${outlook.cotBias.quote.signal.replace('_', ' ').toUpperCase()} (${outlook.cotBias.quote.percentile}%)`;
+    }
+    if (outlook.tags && outlook.tags.length > 0) {
+      notes += `\n\nTags: ${outlook.tags.join(', ')}`;
+    }
+    if (outlook.confidence) {
+      notes += `\n\nConfidence: ${'⭐'.repeat(outlook.confidence)}`;
+    }
+
+    // Store prefill + target accounts so the page can navigate
+    set({
+      prefillTradeData: {
+        pair: formattedPair,
+        direction: outlook.direction,
+        notes,
+        outlookId: outlook.id,
+        targetAccounts: accounts,
+      },
+    });
+
+    get().updateOutlook(id, {
+      status: 'executed',
+      journaledTo: accounts,
+    });
   },
 
   // ============================================================

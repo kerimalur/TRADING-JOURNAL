@@ -16,10 +16,6 @@ import {
   ChevronRight,
   Zap,
   Calendar,
-  Activity,
-  Database,
-  Brain,
-  Newspaper,
   Lightbulb,
   Target,
 } from 'lucide-react';
@@ -40,14 +36,10 @@ const navItems: NavItem[] = [
   { path: '/calendar', label: 'Kalender', icon: <Calendar size={18} />, group: 'Übersicht' },
   { path: '/funded', label: 'Funded', icon: <DollarSign size={18} />, group: 'Trading' },
   { path: '/ek', label: 'Eigenkapital', icon: <Wallet size={18} />, group: 'Trading' },
-  { path: '/backtest', label: 'Backtest', icon: <Zap size={18} />, group: 'Trading' },
-  { path: '/currency', label: 'Währungen', icon: <Globe2 size={18} />, group: 'Markt' },
-  { path: '/cot', label: 'COT Daten', icon: <Database size={18} />, group: 'Markt' },
-  { path: '/news', label: 'News', icon: <Newspaper size={18} />, group: 'Markt' },
-  { path: '/outlook', label: 'Outlook', icon: <Target size={18} />, group: 'Markt' },
-  { path: '/simulation', label: 'Simulation', icon: <Activity size={18} />, group: 'Tools' },
+  { path: '/outlook', label: 'Outlook', icon: <Target size={18} />, group: 'Trading' },
+  { path: '/fundamentals', label: 'Fundamentals', icon: <Globe2 size={18} />, group: 'Markt' },
   { path: '/strategy', label: 'Strategie', icon: <Lightbulb size={18} />, group: 'Tools' },
-  { path: '/ml', label: 'ML Bereich', icon: <Brain size={18} />, group: 'Tools' },
+  { path: '/backtest', label: 'Backtest', icon: <Zap size={18} />, group: 'Tools' },
   { path: '/settings', label: 'Einstellungen', icon: <Settings size={18} />, group: 'System' },
 ];
 
