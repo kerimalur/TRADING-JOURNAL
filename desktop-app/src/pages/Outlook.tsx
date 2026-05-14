@@ -1068,10 +1068,14 @@ export function Outlook() {
     clearPrefillData,
     downloadExport,
     importOutlooks,
+    startTrade,
+    closeTrade,
   } = useOutlookStore();
 
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [closeDialog, setCloseDialog] = useState<string | null>(null);
+  const [closeAccounts, setCloseAccounts] = useState<{ ek: boolean; funded: boolean }>({ ek: false, funded: false });
 
   useEffect(() => {
     loadOutlooks();
@@ -1099,16 +1103,32 @@ export function Outlook() {
     loadOutlooks();
   };
 
-  // Navigate to journal when prefill data is set
+  // Navigate to journal when prefill data is set (after closeTrade)
   useEffect(() => {
     if (prefillTradeData) {
-      showToast('Outlook wird in Journal uebernommen...', 'success');
-      // Store prefill data in sessionStorage for TradeForm to pick up
+      showToast('Outlook wird in Journal übernommen...', 'success');
       sessionStorage.setItem('tradePrefill', JSON.stringify(prefillTradeData));
+      const targets = prefillTradeData.targetAccounts ?? ['ek'];
       clearPrefillData();
-      navigate('/ek'); // or /funded based on preference
+      navigate(targets[0] === 'funded' ? '/funded' : '/ek');
     }
   }, [prefillTradeData, navigate, clearPrefillData, showToast]);
+
+  // Close-Trade-Handler: ruft closeTrade auf und schließt Dialog
+  const handleConfirmClose = () => {
+    if (!closeDialog) return;
+    const accounts: ('ek' | 'funded')[] = [];
+    if (closeAccounts.ek)     accounts.push('ek');
+    if (closeAccounts.funded) accounts.push('funded');
+    if (accounts.length === 0) {
+      showToast('Bitte mindestens ein Konto auswählen', 'error');
+      return;
+    }
+    closeTrade(closeDialog, accounts);
+    setCloseDialog(null);
+    setCloseAccounts({ ek: false, funded: false });
+    showToast('Trade abgeschlossen – Journal wird geöffnet', 'success');
+  };
 
   const filteredOutlooks = getFilteredOutlooks();
 
@@ -1348,6 +1368,8 @@ export function Outlook() {
                 onDelete={() => setDeleteConfirm(outlook.id)}
                 onStatusChange={(status) => setStatus(outlook.id, status)}
                 onTransfer={() => handleTransfer(outlook.id)}
+                onStart={() => startTrade(outlook.id)}
+                onClose={() => setCloseDialog(outlook.id)}
               />
             </motion.div>
           ))}
@@ -1405,6 +1427,69 @@ export function Outlook() {
           onClose={() => setShowImportModal(false)}
           onImport={handleTradingViewImport}
         />
+      )}
+
+      {/* ── Close-Trade-Dialog ── */}
+      {closeDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.15 }}
+            className="bg-[#0d0f14] border border-white/[0.06] rounded-lg shadow-2xl p-5 max-w-sm w-full"
+          >
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full bg-accent-gold/15 flex items-center justify-center">
+                <CheckCircle2 className="text-accent-gold" size={16} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary">Trade abschließen</h3>
+                <p className="text-[11px] text-text-muted">In welche(s) Journal soll der Trade eingetragen werden?</p>
+              </div>
+            </div>
+
+            {/* Account-Auswahl */}
+            <div className="space-y-2 mb-5">
+              {(
+                [
+                  { key: 'ek'     as const, label: 'Eigenkapital-Journal' },
+                  { key: 'funded' as const, label: 'Funded-Journal'       },
+                ] as const
+              ).map(({ key, label }) => (
+                <label
+                  key={key}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-white/[0.06] hover:border-accent-primary/30 cursor-pointer transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={closeAccounts[key]}
+                    onChange={e => setCloseAccounts(prev => ({ ...prev, [key]: e.target.checked }))}
+                    className="w-3.5 h-3.5 rounded accent-accent-primary"
+                  />
+                  <span className="text-sm text-text-primary">{label}</span>
+                </label>
+              ))}
+            </div>
+
+            {/* Aktionen */}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setCloseDialog(null); setCloseAccounts({ ek: false, funded: false }); }}
+                className="px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleConfirmClose}
+                disabled={!closeAccounts.ek && !closeAccounts.funded}
+                className="px-3 py-1.5 text-xs font-medium bg-accent-gold hover:bg-accent-gold/90 disabled:opacity-40 text-black rounded transition-colors"
+              >
+                Abschließen & Journalen
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
     </PageTransition>

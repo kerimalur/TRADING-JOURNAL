@@ -8,7 +8,7 @@
 
 import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import {
-  Plus, Filter, Grid, List, RefreshCw, Settings
+  Plus, Filter, Grid, List, RefreshCw, Settings, PlusCircle, ChevronDown, Check
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -33,7 +33,7 @@ interface JournalPageProps {
 }
 
 export function JournalPage({ accountType, title, icon }: JournalPageProps) {
-  const { loadConfigs, configs, saveConfig } = useAccountStore();
+  const { loadConfigs, configs, saveConfig, createAccount, setActiveAccount, getFundedAccounts } = useAccountStore();
   const { showToast } = useUIStore();
 
   // Trade data state
@@ -47,6 +47,22 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
   const [showTradeForm, setShowTradeForm] = useState(false);
   const [editingTrade, setEditingTrade] = useState<Trade | undefined>();
   const [viewingTrade, setViewingTrade] = useState<Trade | null>(null);
+
+  // Account-Setup & Switcher
+  const [showSetupForm, setShowSetupForm] = useState(false);
+  const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
+  const [setupForm, setSetupForm] = useState({
+    name: accountType === 'ek' ? 'Eigenkapital' : 'Funded Account',
+    broker: '',
+    accountNumber: '',
+    initialBalance: accountType === 'ek' ? 10000 : 100000,
+    currency: 'USD',
+    defaultRisk: accountType === 'ek' ? 0.5 : 1.0,
+    enableGoals: accountType === 'funded',
+    profitTarget: 8,
+    maxDrawdown: 5,
+  });
+  const [isSavingSetup, setIsSavingSetup] = useState(false);
 
   // Filters
   const [filters, setFilters] = useState<{
@@ -219,6 +235,219 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
   const resetFilters = () => setFilters({});
 
   // ============================================================
+  // ACCOUNT SETUP HANDLER
+  // ============================================================
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSetup(true);
+    try {
+      const profitTargetAbs = setupForm.enableGoals
+        ? setupForm.initialBalance * (1 + setupForm.profitTarget / 100)
+        : undefined;
+      const maxDrawdownAbs = setupForm.enableGoals
+        ? setupForm.initialBalance * (1 - setupForm.maxDrawdown / 100)
+        : undefined;
+
+      const success = await createAccount({
+        name:                setupForm.name,
+        broker:              setupForm.broker,
+        accountNumber:       setupForm.accountNumber,
+        type:                accountType,
+        currency:            setupForm.currency,
+        initialStartBalance: setupForm.initialBalance,
+        currentBalance:      setupForm.initialBalance,
+        defaultRiskPerTrade: setupForm.defaultRisk,
+        enableGoals:         setupForm.enableGoals,
+        profitTargetValue:   setupForm.enableGoals ? setupForm.profitTarget : undefined,
+        profitTargetType:    setupForm.enableGoals ? 'percent' : undefined,
+        profitTarget:        profitTargetAbs,
+        maxDrawdownValue:    setupForm.enableGoals ? setupForm.maxDrawdown : undefined,
+        maxDrawdownType:     setupForm.enableGoals ? 'percent' : undefined,
+        maxDrawdown:         maxDrawdownAbs,
+        isActive:            true,
+        isDefault:           true,
+      });
+
+      if (success) {
+        showToast('Konto erfolgreich eingerichtet!', 'success');
+        setShowSetupForm(false);
+        await loadConfigs();
+        loadTradesData();
+      } else {
+        showToast('Fehler beim Einrichten', 'error');
+      }
+    } catch {
+      showToast('Fehler beim Einrichten', 'error');
+    } finally {
+      setIsSavingSetup(false);
+    }
+  };
+
+  // Computed values für Account-Switcher
+  const fundedAccounts = accountType === 'funded' ? getFundedAccounts() : [];
+  const showSwitcher   = accountType === 'funded' && fundedAccounts.length > 1;
+
+  // ============================================================
+  // KEIN ACCOUNT → SETUP-BILDSCHIRM
+  // ============================================================
+  if (!isLoading && config === null && !configs?.ek && accountType === 'ek') {
+    // handled below via unified check
+  }
+  if (!isLoading && config === null) {
+    const label = accountType === 'ek' ? 'Eigenkapital-Konto' : 'Funded Account';
+    return (
+      <PageTransition>
+        <div className="page-container">
+          <div className="page-header">
+            <h1 className="page-title">{icon}{title}</h1>
+          </div>
+
+          <div className="glass-card p-10 text-center max-w-lg mx-auto mt-12">
+            <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-accent-primary/10 flex items-center justify-center">
+              <PlusCircle size={32} className="text-accent-primary" />
+            </div>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">Kein {label} vorhanden</h2>
+            <p className="text-text-muted text-sm mb-6">
+              Richte zuerst dein {label} ein, um Trades zu journalen.
+            </p>
+
+            {!showSetupForm ? (
+              <button
+                className="btn-primary mx-auto"
+                onClick={() => setShowSetupForm(true)}
+              >
+                <PlusCircle size={16} />
+                {label} einrichten
+              </button>
+            ) : (
+              <form onSubmit={handleCreateAccount} className="text-left space-y-4 mt-4">
+                <div>
+                  <label className="input-label">Name</label>
+                  <input
+                    className="input"
+                    value={setupForm.name}
+                    onChange={e => setSetupForm(f => ({ ...f, name: e.target.value }))}
+                    required
+                  />
+                </div>
+                {accountType === 'funded' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="input-label">Broker</label>
+                        <input
+                          className="input"
+                          placeholder="z.B. FTMO"
+                          value={setupForm.broker}
+                          onChange={e => setSetupForm(f => ({ ...f, broker: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="input-label">Kontonummer</label>
+                        <input
+                          className="input"
+                          placeholder="123456"
+                          value={setupForm.accountNumber}
+                          onChange={e => setSetupForm(f => ({ ...f, accountNumber: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="input-label">Startkapital</label>
+                    <input
+                      type="number"
+                      className="input"
+                      value={setupForm.initialBalance}
+                      onChange={e => setSetupForm(f => ({ ...f, initialBalance: Number(e.target.value) }))}
+                      required
+                      min={0}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Währung</label>
+                    <select
+                      className="select"
+                      value={setupForm.currency}
+                      onChange={e => setSetupForm(f => ({ ...f, currency: e.target.value }))}
+                    >
+                      <option>USD</option>
+                      <option>EUR</option>
+                      <option>GBP</option>
+                      <option>CHF</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="input-label">Standard-Risiko pro Trade (%)</label>
+                  <input
+                    type="number"
+                    className="input"
+                    value={setupForm.defaultRisk}
+                    step="0.1"
+                    min="0.1"
+                    max="10"
+                    onChange={e => setSetupForm(f => ({ ...f, defaultRisk: Number(e.target.value) }))}
+                  />
+                </div>
+                {accountType === 'funded' && (
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={setupForm.enableGoals}
+                        onChange={e => setSetupForm(f => ({ ...f, enableGoals: e.target.checked }))}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-text-primary">Ziele aktivieren (Profit-Target & Max. Drawdown)</span>
+                    </label>
+                    {setupForm.enableGoals && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="input-label">Profit-Target (%)</label>
+                          <input
+                            type="number"
+                            className="input"
+                            value={setupForm.profitTarget}
+                            step="0.5"
+                            min="0"
+                            onChange={e => setSetupForm(f => ({ ...f, profitTarget: Number(e.target.value) }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="input-label">Max. Drawdown (%)</label>
+                          <input
+                            type="number"
+                            className="input"
+                            value={setupForm.maxDrawdown}
+                            step="0.5"
+                            min="0"
+                            onChange={e => setSetupForm(f => ({ ...f, maxDrawdown: Number(e.target.value) }))}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="flex gap-3 pt-2">
+                  <button type="button" className="btn-secondary flex-1" onClick={() => setShowSetupForm(false)}>
+                    Abbrechen
+                  </button>
+                  <button type="submit" className="btn-primary flex-1" disabled={isSavingSetup}>
+                    {isSavingSetup ? 'Wird gespeichert…' : 'Konto anlegen'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      </PageTransition>
+    );
+  }
+
+  // ============================================================
   // RENDER
   // ============================================================
   return (
@@ -240,6 +469,49 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
                     ${config.currentBalance.toLocaleString('de-DE', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
+
+                {/* Account-Switcher – nur sichtbar wenn mehrere Funded Accounts */}
+                {showSwitcher && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowAccountSwitcher(v => !v)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-text-muted hover:text-text-primary bg-background-surface-hover rounded-lg border border-border transition-colors"
+                    >
+                      {config.name || 'Account'}
+                      <ChevronDown size={13} />
+                    </button>
+                    {showAccountSwitcher && (
+                      <div className="absolute left-0 top-full mt-1 z-20 min-w-[180px] bg-background-surface border border-border rounded-lg shadow-xl py-1">
+                        {fundedAccounts.map(acc => (
+                          <button
+                            key={acc.id}
+                            onClick={async () => {
+                              if (acc.id) {
+                                await setActiveAccount('funded', acc.id);
+                                setShowAccountSwitcher(false);
+                                await loadConfigs();
+                                loadTradesData();
+                              }
+                            }}
+                            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left hover:bg-background-surface-hover transition-colors"
+                          >
+                            <span className="truncate">{acc.name || acc.broker || 'Funded'}</span>
+                            {acc.id === config.id && <Check size={13} className="text-accent-primary flex-shrink-0" />}
+                          </button>
+                        ))}
+                        <div className="border-t border-border mt-1 pt-1">
+                          <button
+                            onClick={() => { setShowAccountSwitcher(false); setShowSetupForm(true); }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-accent-primary hover:bg-accent-primary/10 transition-colors"
+                          >
+                            <PlusCircle size={13} />
+                            Neuer Account
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -299,12 +571,13 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
 
         {/* Account Settings Panel */}
         <AccountSettings
-          config={config}
+          config={config ?? undefined}
           accountType={accountType}
           onSave={handleSaveConfig}
           showToast={showToast}
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
+          onAddAccount={accountType === 'funded' ? () => setShowSetupForm(true) : undefined}
         />
 
         {/* Filters Panel */}

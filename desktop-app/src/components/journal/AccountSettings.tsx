@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Settings, Save, X, Plus, BookOpen } from 'lucide-react';
+import { Settings, Save, X, Plus, BookOpen, PlusCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,6 +20,7 @@ interface AccountSettingsProps {
   showToast: (msg: string, type: 'success' | 'error') => void;
   isOpen: boolean;
   onClose: () => void;
+  onAddAccount?: () => void;
 }
 
 export function AccountSettings({
@@ -29,6 +30,7 @@ export function AccountSettings({
   showToast,
   isOpen,
   onClose,
+  onAddAccount,
 }: AccountSettingsProps) {
   const [form, setForm] = useState({
     initialStartBalance: 10000,
@@ -136,13 +138,32 @@ export function AccountSettings({
           <div className="glass-card p-6 mb-6 border-accent-primary/30">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Settings size={18} className="text-accent-primary" />
-                {accountType === 'ek' ? 'EK' : 'Funded'} Kontoeinstellungen
-              </h3>
-              <button onClick={onClose} className="p-2 hover:bg-background-surface-hover rounded-lg transition-colors">
-                <X size={18} className="text-text-muted" />
-              </button>
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Settings size={18} className="text-accent-primary" />
+                  {config?.name || (accountType === 'ek' ? 'Eigenkapital' : 'Funded')} – Einstellungen
+                </h3>
+                {(config?.broker || config?.accountNumber) && (
+                  <p className="text-xs text-text-muted mt-0.5 ml-7">
+                    {[config.broker, config.accountNumber].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {accountType === 'funded' && onAddAccount && (
+                  <button
+                    onClick={() => { onClose(); onAddAccount(); }}
+                    className="btn-ghost btn-sm flex items-center gap-1.5 text-accent-primary"
+                    title="Weiteren Funded Account hinzufügen"
+                  >
+                    <PlusCircle size={14} />
+                    Neuer Account
+                  </button>
+                )}
+                <button onClick={onClose} className="p-2 hover:bg-background-surface-hover rounded-lg transition-colors">
+                  <X size={18} className="text-text-muted" />
+                </button>
+              </div>
             </div>
 
             {/* Settings Form */}

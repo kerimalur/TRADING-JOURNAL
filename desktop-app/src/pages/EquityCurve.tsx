@@ -89,8 +89,8 @@ export function EquityCurve() {
   }, [filteredTrades]);
 
   const startBalance = accountFilter === 'ek'
-    ? configs?.ek.initialStartBalance || 10000
-    : configs?.funded.initialStartBalance || 100000;
+    ? configs?.ek?.initialStartBalance || 10000
+    : configs?.funded?.initialStartBalance || 100000;
 
   return (
     <PageTransition>

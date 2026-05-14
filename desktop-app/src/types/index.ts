@@ -101,6 +101,10 @@ export interface AccountChapter {
 }
 
 export interface AccountConfig {
+  id?: string;              // UUID aus accounts-Tabelle
+  name?: string;            // Anzeigename: "FTMO $100k #2"
+  broker?: string;          // "FTMO", "MFT", "IC Markets"
+  accountNumber?: string;   // Broker-Kontonummer
   initialStartBalance: number;
   currentBalance: number;
   currency: string;
@@ -115,11 +119,14 @@ export interface AccountConfig {
   maxDrawdown?: number;
   chapters?: AccountChapter[];
   activeChapterId?: string;
+  isActive?: boolean;
+  isDefault?: boolean;
 }
 
 export interface AccountConfigs {
-  ek: AccountConfig;
-  funded: AccountConfig;
+  ek: AccountConfig | null;
+  funded: AccountConfig | null;
+  fundedAccounts?: AccountConfig[];   // Alle Funded-Accounts (für Multi-Account)
 }
 
 // ============================================================
