@@ -9,10 +9,42 @@
 
 import { supabase } from '@/lib/supabase';
 import { requireSession } from './supabaseService';
+import { isElectron } from './webApi';
 import type { AccountConfig, AccountConfigs, AccountType, Transaction } from '@/types';
 
-const ACCOUNTS_TABLE   = 'accounts';
+const ACCOUNTS_TABLE    = 'accounts';
 const TRANSACTION_TABLE = 'transactions';
+
+// Offline = Electron-Desktop oder "Ohne Login"-Modus im Browser
+const isOffline = (): boolean => {
+  try {
+    return isElectron() || localStorage.getItem('trading-journal-offline-mode') === 'true';
+  } catch {
+    return true;
+  }
+};
+
+// ── localStorage-Schlüssel ──
+const LS_ACCOUNTS     = 'tradingJournal_accounts_v2';
+const LS_TRANSACTIONS = 'tradingJournal_transactions_v2';
+
+function lsGetAccounts(): AccountConfig[] {
+  try { return JSON.parse(localStorage.getItem(LS_ACCOUNTS) || '[]'); }
+  catch { return []; }
+}
+function lsSaveAccounts(list: AccountConfig[]): void {
+  localStorage.setItem(LS_ACCOUNTS, JSON.stringify(list));
+}
+function lsGetTransactions(): Transaction[] {
+  try { return JSON.parse(localStorage.getItem(LS_TRANSACTIONS) || '[]'); }
+  catch { return []; }
+}
+function lsSaveTransactions(list: Transaction[]): void {
+  localStorage.setItem(LS_TRANSACTIONS, JSON.stringify(list));
+}
+function lsGenId(): string {
+  return `local_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
 
 // ============================================================
 // INTERNE HILFSFUNKTION
@@ -74,6 +106,19 @@ function configToRow(config: AccountConfig, userId: string): Record<string, any>
 // ============================================================
 
 export async function loadAccountConfigs(): Promise<AccountConfigs> {
+  // ── Offline: localStorage ──
+  if (isOffline()) {
+    const all      = lsGetAccounts();
+    const ekRows     = all.filter(a => a.type === 'ek'     && a.isActive !== false);
+    const fundedRows = all.filter(a => a.type === 'funded' && a.isActive !== false);
+    return {
+      ek:             ekRows.find(a => a.isDefault) ?? ekRows[0] ?? null,
+      funded:         fundedRows.find(a => a.isDefault) ?? fundedRows[0] ?? null,
+      fundedAccounts: fundedRows,
+    };
+  }
+
+  // ── Online: Supabase ──
   const user = await requireSession();
 
   const { data, error } = await supabase
@@ -85,58 +130,45 @@ export async function loadAccountConfigs(): Promise<AccountConfigs> {
 
   if (error) throw error;
 
-  const rows = data || [];
-
+  const rows       = data || [];
   const ekRows     = rows.filter(r => r.type === 'ek');
   const fundedRows = rows.filter(r => r.type === 'funded');
 
-  // Standard-EK: Zeile mit is_default=true, sonst erster Eintrag
-  const ekDefault     = ekRows.find(r => r.is_default) ?? ekRows[0] ?? null;
-  // Standard-Funded: Zeile mit is_default=true, sonst erster Eintrag
-  const fundedDefault = fundedRows.find(r => r.is_default) ?? fundedRows[0] ?? null;
-
   return {
-    ek:             ekDefault     ? rowToConfig(ekDefault)     : null,
-    funded:         fundedDefault ? rowToConfig(fundedDefault) : null,
+    ek:             (ekRows.find(r => r.is_default)     ?? ekRows[0]     ?? null) ? rowToConfig(ekRows.find(r => r.is_default) ?? ekRows[0])     : null,
+    funded:         (fundedRows.find(r => r.is_default) ?? fundedRows[0] ?? null) ? rowToConfig(fundedRows.find(r => r.is_default) ?? fundedRows[0]) : null,
     fundedAccounts: fundedRows.map(rowToConfig),
   };
 }
 
 // ============================================================
-// SPEICHERN – Upsert über id oder (user_id + type + is_default)
+// SPEICHERN
 // ============================================================
 
 export async function saveAccountConfig(config: AccountConfig): Promise<boolean> {
+  // ── Offline ──
+  if (isOffline()) {
+    const all = lsGetAccounts();
+    const idx = config.id ? all.findIndex(a => a.id === config.id) : -1;
+    if (idx >= 0) { all[idx] = { ...all[idx], ...config }; }
+    else          { all.push({ ...config, id: lsGenId(), isActive: true }); }
+    lsSaveAccounts(all);
+    return true;
+  }
+
+  // ── Online ──
   const user = await requireSession();
   const payload = configToRow(config, user.id);
 
   if (config.id) {
-    // Update bestehenden Account
-    const { error } = await supabase
-      .from(ACCOUNTS_TABLE)
-      .update(payload)
-      .eq('id', config.id)
-      .eq('user_id', user.id);
-
+    const { error } = await supabase.from(ACCOUNTS_TABLE).update(payload).eq('id', config.id).eq('user_id', user.id);
     if (error) throw error;
   } else {
-    // Neuen Account anlegen – ist automatisch Standard wenn kein anderer existiert
-    const { data: existing } = await supabase
-      .from(ACCOUNTS_TABLE)
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('type', config.type)
-      .eq('is_active', true);
-
+    const { data: existing } = await supabase.from(ACCOUNTS_TABLE).select('id').eq('user_id', user.id).eq('type', config.type).eq('is_active', true);
     payload.is_default = !existing || existing.length === 0;
-
-    const { error } = await supabase
-      .from(ACCOUNTS_TABLE)
-      .insert([payload]);
-
+    const { error } = await supabase.from(ACCOUNTS_TABLE).insert([payload]);
     if (error) throw error;
   }
-
   return true;
 }
 
@@ -145,67 +177,66 @@ export async function saveAccountConfig(config: AccountConfig): Promise<boolean>
 // ============================================================
 
 export async function createAccount(config: Omit<AccountConfig, 'id'>): Promise<AccountConfig> {
+  // ── Offline ──
+  if (isOffline()) {
+    const all      = lsGetAccounts();
+    const sameType = all.filter(a => a.type === config.type && a.isActive !== false);
+    const newAcc: AccountConfig = {
+      ...config,
+      id:        lsGenId(),
+      isActive:  true,
+      isDefault: sameType.length === 0,
+    };
+    // Wenn erster Account → alle anderen des Typs deselektieren (keiner vorhanden)
+    lsSaveAccounts([...all, newAcc]);
+    return newAcc;
+  }
+
+  // ── Online ──
   const user = await requireSession();
   const payload = configToRow(config as AccountConfig, user.id);
   delete payload.id;
 
-  // Prüfen ob erster Account dieses Typs → automatisch Standard
-  const { data: existing } = await supabase
-    .from(ACCOUNTS_TABLE)
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('type', config.type)
-    .eq('is_active', true);
-
+  const { data: existing } = await supabase.from(ACCOUNTS_TABLE).select('id').eq('user_id', user.id).eq('type', config.type).eq('is_active', true);
   payload.is_default = !existing || existing.length === 0;
 
-  const { data, error } = await supabase
-    .from(ACCOUNTS_TABLE)
-    .insert([payload])
-    .select()
-    .single();
-
+  const { data, error } = await supabase.from(ACCOUNTS_TABLE).insert([payload]).select().single();
   if (error) throw error;
   return rowToConfig(data);
 }
 
 // ============================================================
-// STANDARD-ACCOUNT WECHSELN (nur Funded mit mehreren Accounts)
+// STANDARD-ACCOUNT WECHSELN
 // ============================================================
 
 export async function setDefaultAccount(accountId: string, type: AccountType): Promise<void> {
+  if (isOffline()) {
+    const all = lsGetAccounts().map(a =>
+      a.type === type ? { ...a, isDefault: a.id === accountId } : a
+    );
+    lsSaveAccounts(all);
+    return;
+  }
+
   const user = await requireSession();
-
-  // Alle anderen desselben Typs auf is_default=false setzen
-  await supabase
-    .from(ACCOUNTS_TABLE)
-    .update({ is_default: false, updated_at: new Date().toISOString() })
-    .eq('user_id', user.id)
-    .eq('type', type);
-
-  // Gewünschten als Standard setzen
-  const { error } = await supabase
-    .from(ACCOUNTS_TABLE)
-    .update({ is_default: true, updated_at: new Date().toISOString() })
-    .eq('id', accountId)
-    .eq('user_id', user.id);
-
+  await supabase.from(ACCOUNTS_TABLE).update({ is_default: false, updated_at: new Date().toISOString() }).eq('user_id', user.id).eq('type', type);
+  const { error } = await supabase.from(ACCOUNTS_TABLE).update({ is_default: true, updated_at: new Date().toISOString() }).eq('id', accountId).eq('user_id', user.id);
   if (error) throw error;
 }
 
 // ============================================================
-// ACCOUNT DEAKTIVIEREN (weich löschen)
+// ACCOUNT DEAKTIVIEREN
 // ============================================================
 
 export async function deactivateAccount(accountId: string): Promise<void> {
+  if (isOffline()) {
+    const all = lsGetAccounts().map(a => a.id === accountId ? { ...a, isActive: false, isDefault: false } : a);
+    lsSaveAccounts(all);
+    return;
+  }
+
   const user = await requireSession();
-
-  const { error } = await supabase
-    .from(ACCOUNTS_TABLE)
-    .update({ is_active: false, is_default: false, updated_at: new Date().toISOString() })
-    .eq('id', accountId)
-    .eq('user_id', user.id);
-
+  const { error } = await supabase.from(ACCOUNTS_TABLE).update({ is_active: false, is_default: false, updated_at: new Date().toISOString() }).eq('id', accountId).eq('user_id', user.id);
   if (error) throw error;
 }
 
@@ -214,6 +245,8 @@ export async function deactivateAccount(accountId: string): Promise<void> {
 // ============================================================
 
 export async function loadTransactions(): Promise<Transaction[]> {
+  if (isOffline()) return lsGetTransactions();
+
   const user = await requireSession();
 
   const { data, error } = await supabase
@@ -238,6 +271,20 @@ export async function loadTransactions(): Promise<Transaction[]> {
 export async function saveTransaction(
   tx: Omit<Transaction, 'id'> & { id?: string; accountId?: string }
 ): Promise<Transaction> {
+  // ── Offline ──
+  if (isOffline()) {
+    const all = lsGetTransactions();
+    if (tx.id) {
+      const idx = all.findIndex(t => t.id === tx.id);
+      if (idx >= 0) all[idx] = { ...all[idx], ...tx } as Transaction;
+      lsSaveTransactions(all);
+      return all[idx >= 0 ? idx : 0];
+    }
+    const newTx: Transaction = { id: lsGenId(), type: tx.type, transactionType: tx.transactionType, amount: tx.amount, date: tx.date, note: tx.note || '', createdAt: new Date().toISOString() };
+    lsSaveTransactions([newTx, ...all]);
+    return newTx;
+  }
+
   const user = await requireSession();
 
   const payload: Record<string, any> = {
@@ -275,6 +322,11 @@ export async function saveTransaction(
 }
 
 export async function removeTransaction(id: string): Promise<boolean> {
+  if (isOffline()) {
+    lsSaveTransactions(lsGetTransactions().filter(t => t.id !== id));
+    return true;
+  }
+
   const user = await requireSession();
 
   const { error } = await supabase
