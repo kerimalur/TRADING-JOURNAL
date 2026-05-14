@@ -141,28 +141,38 @@ function AppContent() {
   });
   const inElectron = isElectron();
 
-  // Auth Check (nur für Web)
+  // Auth Check – läuft IMMER (auch wenn offlineMode=true), damit OAuth-Callbacks
+  // nach Google-Login korrekt verarbeitet werden. Wenn eine Session existiert,
+  // wird offlineMode automatisch zurückgesetzt.
   useEffect(() => {
-    if (inElectron || offlineMode) {
+    if (inElectron) {
       setAuthLoading(false);
       return;
     }
 
-    // Initial Session Check
+    // Session beim Start prüfen (inkl. OAuth-Callback im URL-Hash)
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        // Eingeloggt → offline-Flag entfernen, damit die App Cloud-Modus nutzt
+        localStorage.removeItem('trading-journal-offline-mode');
+        setOfflineMode(false);
+      }
       setSession(session);
       setAuthLoading(false);
     });
 
-    // Listen for Auth Changes (Magic Link Callback)
+    // Auth-Zustandsänderungen (Google-OAuth, Logout, Token-Refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('🔐 Auth state changed:', _event);
+      if (session) {
+        localStorage.removeItem('trading-journal-offline-mode');
+        setOfflineMode(false);
+      }
       setSession(session);
       setAuthLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, [inElectron, offlineMode]);
+  }, [inElectron]); // offlineMode NICHT als Dep – Auth immer überwachen
 
   // Keyboard Shortcuts
   useEffect(() => {
