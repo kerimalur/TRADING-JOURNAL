@@ -42,7 +42,7 @@ import { clsx } from 'clsx';
 import { useOutlookStore, getUpcomingHighImpactNews, getCurrenciesFromSymbol, type UpcomingNewsEvent } from '@/stores/outlookStore';
 import { useUIStore } from '@/stores/uiStore';
 import type { Outlook, OutlookStatus, ConfidenceLevel, OutlookTag } from '@/types';
-import { OUTLOOK_STATUS_CONFIG, OUTLOOK_TAGS, getAllPairs, addCustomPair } from '@/types';
+import { OUTLOOK_STATUS_CONFIG, getConfluences, getAllPairs, addCustomPair } from '@/types';
 import { PageTransition } from '@/components/ui/PageTransition';
 import { MetricDisplay } from '@/components/ui/MetricDisplay';
 import { motion } from 'framer-motion';
@@ -158,6 +158,7 @@ interface OutlookFormProps {
 function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
   const isEditing = !!outlook;
   const { getCOTBias } = useOutlookStore();
+  const confluences = getConfluences();
 
   const [formData, setFormData] = useState<Partial<Outlook>>(() => ({
     symbol: 'EURUSD',
@@ -400,13 +401,13 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
             </div>
           </div>
 
-          {/* Tags */}
+          {/* Confluences */}
           <div>
             <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
-              Tags
+              Confluences
             </label>
             <div className="flex flex-wrap gap-1.5">
-              {OUTLOOK_TAGS.map((tag) => (
+              {confluences.map((tag: string) => (
                 <button
                   key={tag}
                   type="button"

@@ -22,37 +22,56 @@ import {
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUIStore } from '@/stores/uiStore';
+import { useAccountStore } from '@/stores/accountStore';
 
 interface NavItem {
   path: string;
   label: string;
   icon: React.ReactNode;
   group?: string;
+  accountId?: string; // für Multi-Funded-Switcher
 }
 
-const navItems: NavItem[] = [
-  { path: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} />, group: 'Übersicht' },
-  { path: '/equity', label: 'Equity Curve', icon: <TrendingUp size={18} />, group: 'Übersicht' },
-  { path: '/calendar', label: 'Kalender', icon: <Calendar size={18} />, group: 'Übersicht' },
-  { path: '/funded', label: 'Funded', icon: <DollarSign size={18} />, group: 'Trading' },
-  { path: '/ek', label: 'Eigenkapital', icon: <Wallet size={18} />, group: 'Trading' },
-  { path: '/outlook', label: 'Outlook', icon: <Target size={18} />, group: 'Trading' },
-  { path: '/fundamentals', label: 'Fundamentals', icon: <Globe2 size={18} />, group: 'Markt' },
-  { path: '/strategy', label: 'Strategie', icon: <Lightbulb size={18} />, group: 'Tools' },
-  { path: '/backtest', label: 'Backtest', icon: <Zap size={18} />, group: 'Tools' },
-  { path: '/settings', label: 'Einstellungen', icon: <Settings size={18} />, group: 'System' },
+// Statische Items ohne Funded (wird dynamisch eingefügt)
+const BASE_ITEMS: NavItem[] = [
+  { path: '/dashboard',   label: 'Dashboard',     icon: <LayoutDashboard size={18} />, group: 'Übersicht' },
+  { path: '/equity',      label: 'Equity Curve',  icon: <TrendingUp size={18} />,      group: 'Übersicht' },
+  { path: '/calendar',    label: 'Kalender',       icon: <Calendar size={18} />,        group: 'Übersicht' },
+  { path: '/ek',          label: 'Eigenkapital',   icon: <Wallet size={18} />,          group: 'Trading'   },
+  { path: '/outlook',     label: 'Outlook',        icon: <Target size={18} />,          group: 'Trading'   },
+  { path: '/fundamentals',label: 'Fundamentals',   icon: <Globe2 size={18} />,          group: 'Markt'     },
+  { path: '/strategy',    label: 'Strategie',      icon: <Lightbulb size={18} />,       group: 'Tools'     },
+  { path: '/backtest',    label: 'Backtest',       icon: <Zap size={18} />,             group: 'Tools'     },
+  { path: '/settings',    label: 'Einstellungen',  icon: <Settings size={18} />,        group: 'System'    },
 ];
 
-const groupedItems = navItems.reduce((acc, item) => {
-  const group = item.group || 'Other';
-  if (!acc[group]) acc[group] = [];
-  acc[group].push(item);
-  return acc;
-}, {} as Record<string, NavItem[]>);
+const GROUP_ORDER = ['Übersicht', 'Trading', 'Markt', 'Tools', 'System'];
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
+  const { configs, setActiveAccount } = useAccountStore();
   const location = useLocation();
+
+  // Funded-Accounts dynamisch als Nav-Items einbauen
+  const fundedAccounts = configs?.fundedAccounts ?? [];
+  const fundedItems: NavItem[] = fundedAccounts.length > 0
+    ? fundedAccounts.map(acc => ({
+        path: '/funded',
+        label: acc.broker
+          ? `Funded ${acc.broker}`
+          : acc.name ?? 'Funded',
+        icon: <DollarSign size={18} />,
+        group: 'Trading',
+        accountId: acc.id,
+      }))
+    : [{ path: '/funded', label: 'Funded', icon: <DollarSign size={18} />, group: 'Trading' }];
+
+  // Alle Items zusammenführen und nach Gruppen-Reihenfolge sortieren
+  const allItems = [...BASE_ITEMS, ...fundedItems];
+  const groupedItems = GROUP_ORDER.reduce((acc, group) => {
+    acc[group] = allItems.filter(i => i.group === group);
+    return acc;
+  }, {} as Record<string, NavItem[]>);
 
   return (
     <motion.aside
@@ -118,8 +137,11 @@ export function Sidebar() {
 
                 return (
                   <NavLink
-                    key={item.path}
+                    key={item.accountId ?? item.path + item.label}
                     to={item.path}
+                    onClick={() => {
+                      if (item.accountId) setActiveAccount('funded', item.accountId);
+                    }}
                     className={clsx(
                       'relative flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all duration-150',
                       isActive

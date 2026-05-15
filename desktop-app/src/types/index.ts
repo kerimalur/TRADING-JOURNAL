@@ -377,16 +377,37 @@ export const OUTLOOK_STATUS_CONFIG: Record<OutlookStatus, { label: string; color
   executed: { label: 'Ausgeführt', color: 'text-accent-primary', bgColor: 'bg-accent-primary/20' },
 };
 
-export const OUTLOOK_TAGS = [
+// Confluences – früher "Tags". Anpassbar über Settings (localStorage).
+// Standard-Confluences ohne COT-Divergenz (auf Wunsch entfernt).
+export const DEFAULT_CONFLUENCES = [
   'Fundamental',
-  'Technisch', 
+  'Technisch',
   'Event-basiert',
-  'COT-Divergenz',
   'Saisonal',
   'Intermarket',
+  'SMC',
+  'Liquidität',
+  'Imbalance',
 ] as const;
 
-export type OutlookTag = typeof OUTLOOK_TAGS[number];
+const CONFLUENCES_STORAGE_KEY = 'tradingJournal_confluences';
+
+export function getConfluences(): string[] {
+  try {
+    const stored = localStorage.getItem(CONFLUENCES_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [...DEFAULT_CONFLUENCES];
+  } catch {
+    return [...DEFAULT_CONFLUENCES];
+  }
+}
+
+export function saveConfluences(list: string[]): void {
+  localStorage.setItem(CONFLUENCES_STORAGE_KEY, JSON.stringify(list));
+}
+
+// Abwärtskompatibilität
+export const OUTLOOK_TAGS = DEFAULT_CONFLUENCES;
+export type OutlookTag = string;
 
 export const SETUP_DEFINITIONS: Record<string, SetupDefinition> = {
   setup_daily_bos: {

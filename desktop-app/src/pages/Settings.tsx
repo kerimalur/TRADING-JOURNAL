@@ -25,12 +25,16 @@ import {
   LogOut,
   Database,
   RefreshCw,
+  Tag,
+  Edit2,
+  Check,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAccountStore } from '@/stores/accountStore';
 import { useUIStore } from '@/stores/uiStore';
 import { getApi, isElectron } from '@/services/webApi';
 import { supabase } from '@/lib/supabase';
+import { getConfluences, saveConfluences } from '@/types';
 import type { TransactionType } from '@/types';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { clsx } from 'clsx';
@@ -40,12 +44,53 @@ export function Settings() {
   const { loadConfigs, transactions, addTransaction, deleteTransaction, getTransactions } = useAccountStore();
   const { showToast } = useUIStore();
 
-  const [authUser, setAuthUser]       = useState<SupabaseUser | null>(null);
+  const [authUser, setAuthUser]         = useState<SupabaseUser | null>(null);
+  const [authLoading, setAuthLoading]   = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const inElectron  = isElectron();
-  const offlineMode = localStorage.getItem('trading-journal-offline-mode') === 'true';
-  const storageMode: 'local' | 'cloud' = (!inElectron && !offlineMode && !!authUser) ? 'cloud' : 'local';
+  const inElectron = isElectron();
+
+  // Speichermodus: Cloud wenn eingeloggt, sonst Lokal
+  // authLoading=true → noch unbekannt (zeige nichts Falsches)
+  const isCloud = !inElectron && !!authUser;
+
+  // Confluence management
+  const [confluences, setConfluences]     = useState<string[]>(() => getConfluences());
+  const [newConfluence, setNewConfluence] = useState('');
+  const [editingIdx, setEditingIdx]       = useState<number | null>(null);
+  const [editValue, setEditValue]         = useState('');
+
+  const handleAddConfluence = () => {
+    const val = newConfluence.trim();
+    if (!val || confluences.includes(val)) return;
+    const updated = [...confluences, val];
+    setConfluences(updated);
+    saveConfluences(updated);
+    setNewConfluence('');
+    showToast('Confluence hinzugefügt', 'success');
+  };
+
+  const handleDeleteConfluence = (idx: number) => {
+    const updated = confluences.filter((_, i) => i !== idx);
+    setConfluences(updated);
+    saveConfluences(updated);
+  };
+
+  const handleStartEdit = (idx: number) => {
+    setEditingIdx(idx);
+    setEditValue(confluences[idx]);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingIdx === null) return;
+    const val = editValue.trim();
+    if (!val) return;
+    const updated = confluences.map((c, i) => (i === editingIdx ? val : c));
+    setConfluences(updated);
+    saveConfluences(updated);
+    setEditingIdx(null);
+    showToast('Confluence aktualisiert', 'success');
+  };
 
   // Transaction form
   const [showTransactionForm, setShowTransactionForm] = useState(false);
@@ -58,12 +103,26 @@ export function Settings() {
 
   useEffect(() => {
     loadConfigs();
-    if (!inElectron) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setAuthUser(session?.user ?? null);
-      });
+
+    if (inElectron) {
+      setAuthLoading(false);
+      return;
     }
-  }, []);
+
+    // Initial check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    // Immer auf Änderungen reagieren (Login/Logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [inElectron]);
 
   // ── Handlers ──
 
@@ -77,15 +136,20 @@ export function Settings() {
   };
 
   const handleSwitchToCloud = async () => {
-    // Entfernt offline-Modus → App lädt neu und zeigt Login
+    // Offline-Flag entfernen und direkt Google-OAuth starten – KEIN reload()
     localStorage.removeItem('trading-journal-offline-mode');
-    window.location.reload();
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
   };
 
-  const handleSwitchToLocal = () => {
+  const handleSwitchToLocal = async () => {
+    // Ausloggen und auf lokalen Speicher wechseln
+    await supabase.auth.signOut();
     localStorage.setItem('trading-journal-offline-mode', 'true');
     showToast('Auf lokalen Speicher umgestellt', 'success');
-    setTimeout(() => window.location.reload(), 500);
+    setTimeout(() => window.location.reload(), 600);
   };
 
   const handleAddTransaction = async () => {
@@ -161,62 +225,70 @@ export function Settings() {
         </div>
 
         <div className="p-5 space-y-3">
-          {/* Aktueller Modus */}
-          <div className={clsx(
-            'flex items-center justify-between p-4 rounded-xl border',
-            storageMode === 'cloud'
-              ? 'bg-accent-primary/[0.06] border-accent-primary/20'
-              : 'bg-accent-gold/[0.05]  border-accent-gold/15'
-          )}>
-            <div className="flex items-center gap-3">
-              {storageMode === 'cloud'
-                ? <Cloud size={18} className="text-accent-primary flex-shrink-0" />
-                : <HardDrive size={18} className="text-accent-gold flex-shrink-0" />
-              }
-              <div>
-                <div className="text-sm font-semibold text-text-primary">
-                  {storageMode === 'cloud' ? 'Supabase Cloud' : 'Lokaler Speicher'}
+          {/* Ladeindikator während Auth-Status noch unbekannt */}
+          {authLoading ? (
+            <div className="flex items-center gap-3 p-4 rounded-xl border border-white/[0.06] bg-white/[0.02]">
+              <RefreshCw size={16} className="text-text-muted animate-spin" />
+              <span className="text-xs text-text-muted">Verbindung wird geprüft…</span>
+            </div>
+          ) : (
+            <>
+              {/* Aktueller Modus */}
+              <div className={clsx(
+                'flex items-center justify-between p-4 rounded-xl border',
+                isCloud
+                  ? 'bg-accent-primary/[0.06] border-accent-primary/20'
+                  : 'bg-accent-gold/[0.05] border-accent-gold/15'
+              )}>
+                <div className="flex items-center gap-3">
+                  {isCloud
+                    ? <Cloud size={18} className="text-accent-primary flex-shrink-0" />
+                    : <HardDrive size={18} className="text-accent-gold flex-shrink-0" />
+                  }
+                  <div>
+                    <div className="text-sm font-semibold text-text-primary">
+                      {isCloud ? 'Supabase Cloud' : 'Lokaler Speicher'}
+                    </div>
+                    <div className="text-[11px] text-text-muted">
+                      {isCloud
+                        ? `Daten werden in Supabase synchronisiert · ${authUser?.email}`
+                        : inElectron
+                          ? 'Desktop-App: Daten lokal auf diesem Gerät'
+                          : 'Daten im Browser gespeichert (kein Sync)'}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-[11px] text-text-muted">
-                  {storageMode === 'cloud'
-                    ? 'Daten werden in Supabase synchronisiert'
-                    : inElectron
-                      ? 'Desktop-App: Daten lokal auf diesem Gerät'
-                      : 'Daten im Browser-Speicher (kein Sync)'}
-                </div>
+                <span className={clsx(
+                  'text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full',
+                  isCloud ? 'bg-accent-primary/20 text-accent-primary' : 'bg-accent-gold/20 text-accent-gold'
+                )}>
+                  {isCloud ? 'Cloud' : 'Lokal'}
+                </span>
               </div>
-            </div>
-            <span className={clsx(
-              'text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full',
-              storageMode === 'cloud'
-                ? 'bg-accent-primary/20 text-accent-primary'
-                : 'bg-accent-gold/20 text-accent-gold'
-            )}>
-              {storageMode === 'cloud' ? 'Aktiv' : 'Lokal'}
-            </span>
-          </div>
 
-          {/* Wechsel-Buttons – nur für Web, nicht Electron */}
-          {!inElectron && (
-            <div className="flex gap-3">
-              {storageMode === 'local' ? (
-                <button
-                  onClick={handleSwitchToCloud}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-accent-primary text-white text-xs font-semibold hover:bg-accent-primary/90 transition-colors"
-                >
-                  <Cloud size={13} />
-                  Zu Supabase Cloud wechseln
-                </button>
-              ) : (
-                <button
-                  onClick={handleSwitchToLocal}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-text-muted text-xs font-semibold hover:text-text-primary hover:bg-white/[0.08] transition-colors"
-                >
-                  <HardDrive size={13} />
-                  Zu lokalem Speicher wechseln
-                </button>
+              {/* Wechsel-Buttons – nur für Web, nicht Electron */}
+              {!inElectron && (
+                <div className="flex gap-3">
+                  {!isCloud ? (
+                    <button
+                      onClick={handleSwitchToCloud}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-accent-primary text-white text-xs font-semibold hover:bg-accent-primary/90 transition-colors"
+                    >
+                      <Cloud size={13} />
+                      Mit Google anmelden &amp; Cloud nutzen
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSwitchToLocal}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-text-muted text-xs font-semibold hover:text-text-primary hover:bg-white/[0.08] transition-colors"
+                    >
+                      <HardDrive size={13} />
+                      Abmelden &amp; lokal speichern
+                    </button>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </motion.div>
@@ -358,6 +430,82 @@ export function Settings() {
         </div>
       </motion.div>
 
+      {/* ── CONFLUENCES ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="rounded-xl border border-white/[0.06] overflow-hidden"
+      >
+        <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
+          <Tag size={15} className="text-accent-primary" />
+          <span className="text-sm font-bold text-text-primary">Confluences</span>
+          <span className="text-[10px] text-text-muted ml-1">— für Trades &amp; Outlooks</span>
+        </div>
+
+        <div className="p-5 space-y-3">
+          {/* Neue Confluence hinzufügen */}
+          <div className="flex gap-2">
+            <input
+              className={inputClass + ' flex-1'}
+              placeholder="Neue Confluence (z.B. HTF Bias)"
+              value={newConfluence}
+              onChange={e => setNewConfluence(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddConfluence()}
+            />
+            <button
+              onClick={handleAddConfluence}
+              disabled={!newConfluence.trim()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent-primary/20 text-accent-primary text-xs font-semibold hover:bg-accent-primary/30 disabled:opacity-40 transition-colors"
+            >
+              <Plus size={13} />
+              Hinzufügen
+            </button>
+          </div>
+
+          {/* Liste */}
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {confluences.map((c, idx) => (
+              <div key={idx} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] group transition-colors">
+                {editingIdx === idx ? (
+                  <>
+                    <input
+                      className="flex-1 bg-transparent text-xs text-text-primary outline-none border-b border-accent-primary/50"
+                      value={editValue}
+                      onChange={e => setEditValue(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingIdx(null); }}
+                      autoFocus
+                    />
+                    <button onClick={handleSaveEdit} className="p-1 text-pnl-positive hover:text-pnl-positive/80 transition-colors">
+                      <Check size={13} />
+                    </button>
+                    <button onClick={() => setEditingIdx(null)} className="p-1 text-text-muted hover:text-text-primary transition-colors">
+                      <X size={13} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex-1 text-xs text-text-primary">{c}</span>
+                    <button
+                      onClick={() => handleStartEdit(idx)}
+                      className="p-1 text-text-muted/40 opacity-0 group-hover:opacity-100 hover:text-accent-primary transition-all"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteConfluence(idx)}
+                      className="p-1 text-text-muted/40 opacity-0 group-hover:opacity-100 hover:text-pnl-negative transition-all"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+
       {/* ── BACKUP ── */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -414,7 +562,7 @@ export function Settings() {
         <div className="p-5 space-y-2">
           {[
             { label: 'Version',   value: '1.2.0' },
-            { label: 'Speicher',  value: storageMode === 'cloud' ? 'Supabase Cloud' : 'Lokal' },
+            { label: 'Speicher',  value: authLoading ? '…' : isCloud ? 'Supabase Cloud' : 'Lokal' },
             { label: 'Login',     value: authUser ? `Google · ${authUser.email}` : (inElectron ? 'Desktop' : 'Nicht angemeldet') },
           ].map(item => (
             <div key={item.label} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.03]">
