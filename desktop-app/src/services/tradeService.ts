@@ -42,6 +42,7 @@ function mapDbToApp(row: any): Trade {
     setup_market_structure: row.setup_market_structure ?? false,
     setup_weekly_gva: row.setup_weekly_gva ?? false,
     setup_3day_gva: row.setup_3day_gva ?? false,
+    confluences: Array.isArray(row.confluences) ? row.confluences : [],
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || new Date().toISOString(),
     // Chapter support
@@ -77,6 +78,7 @@ function mapAppToDb(trade: Partial<Trade> & { id?: string }) {
     setup_market_structure: trade.setup_market_structure ?? false,
     setup_weekly_gva: trade.setup_weekly_gva ?? false,
     setup_3day_gva: trade.setup_3day_gva ?? false,
+    confluences: trade.confluences ?? [],
     chapter_id: trade.chapterId,
   };
 }

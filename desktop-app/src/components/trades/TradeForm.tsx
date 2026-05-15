@@ -10,7 +10,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Save, Camera, Trash2, Calculator, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 import { clsx } from '@/utils';
 import type { Trade, AccountConfig } from '@/types';
-import { PAIR_LIST, SETUP_DEFINITIONS } from '@/types';
+import { PAIR_LIST, getConfluences } from '@/types';
 import { useAccountStore } from '@/stores/accountStore';
 import { calculateRiskAmount, calculateProfitAmount } from '@/utils/calculations';
 import { getApi } from '@/services/webApi';
@@ -67,6 +67,7 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
       h4Zone: false,
       m15Entry: false,
       notes: prefill?.notes || '',
+      confluences: prefill?.confluences || (trade?.confluences ?? []),
       ...trade
     };
   });
@@ -134,13 +135,6 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
       });
     }
   }, [accountConfig?.currentBalance, errors]);
-
-  const handleSetupToggle = (setup: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [setup]: !prev[setup as keyof Trade]
-    }));
-  };
 
   const handleScreenshotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -464,34 +458,35 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
             </div>
           </div>
 
-          {/* Setups & Confluence */}
+          {/* Confluences */}
           <div>
-            <label className="input-label mb-3">Setups & Confluence</label>
+            <label className="input-label mb-3">Confluences</label>
             <div className="space-y-2">
-              {Object.entries(SETUP_DEFINITIONS).map(([key, setup]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => handleSetupToggle(key)}
-                  className={clsx(
-                    'w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium text-sm transition-all text-left',
-                    formData[key as keyof Trade]
-                      ? 'border-2'
-                      : 'bg-background-surface-dark border border-border text-text-muted hover:text-text-primary'
-                  )}
-                  style={formData[key as keyof Trade] ? {
-                    backgroundColor: `${setup.color}20`,
-                    borderColor: setup.color,
-                    color: setup.color
-                  } : undefined}
-                >
-                  <div>
-                    <span className="font-semibold">{setup.label}</span>
-                    <span className="text-xs opacity-70 ml-2">({setup.short})</span>
-                  </div>
-                  <span className="text-xs opacity-60">{setup.description}</span>
-                </button>
-              ))}
+              {getConfluences().length === 0 ? (
+                <p className="text-xs text-text-muted">Keine Confluences definiert. Bitte unter Einstellungen hinzufügen.</p>
+              ) : (
+                getConfluences().map((confluence) => {
+                  const isSelected = (formData.confluences || []).includes(confluence);
+                  return (
+                    <button
+                      key={confluence}
+                      type="button"
+                      onClick={() => {
+                        const current = formData.confluences || [];
+                        handleChange('confluences', isSelected ? current.filter(c => c !== confluence) : [...current, confluence]);
+                      }}
+                      className={clsx(
+                        'w-full flex items-center px-4 py-3 rounded-lg font-medium text-sm transition-all text-left',
+                        isSelected
+                          ? 'bg-accent-primary/15 border-2 border-accent-primary text-accent-primary'
+                          : 'bg-background-surface-dark border border-border text-text-muted hover:text-text-primary hover:border-border-light'
+                      )}
+                    >
+                      {confluence}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
 

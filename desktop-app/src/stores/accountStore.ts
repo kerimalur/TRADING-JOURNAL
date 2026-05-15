@@ -25,6 +25,7 @@ interface AccountState {
   loadConfigs: () => Promise<void>;
   saveConfig: (config: AccountConfig) => Promise<boolean>;
   createAccount: (config: Omit<AccountConfig, 'id'>) => Promise<boolean>;
+  deleteAccount: (accountId: string, accountType: AccountType) => Promise<boolean>;
   setActiveAccount: (type: AccountType, id: string) => Promise<void>;
   addTransaction: (type: AccountType, transactionType: TransactionType, amount: number, note?: string) => Promise<boolean>;
   deleteTransaction: (id: string) => Promise<void>;
@@ -35,6 +36,7 @@ interface AccountState {
   getBalance: (type: AccountType) => number;
   getTransactions: (type: AccountType) => Transaction[];
   getFundedAccounts: () => AccountConfig[];
+  getEkAccounts: () => AccountConfig[];
   hasAccount: (type: AccountType) => boolean;
 }
 
@@ -165,6 +167,34 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   // ============================================================
+  // ACCOUNT LÖSCHEN
+  // ============================================================
+
+  deleteAccount: async (accountId, accountType) => {
+    try {
+      await configService.deleteAccount(accountId, accountType);
+      set(state => {
+        if (!state.configs) return {};
+        const updated: AccountConfigs = { ...state.configs };
+        if (accountType === 'ek') {
+          const remaining = (state.configs.ekAccounts || []).filter(a => a.id !== accountId);
+          updated.ekAccounts = remaining;
+          updated.ek = remaining[0] ?? null;
+        } else {
+          const remaining = (state.configs.fundedAccounts || []).filter(a => a.id !== accountId);
+          updated.fundedAccounts = remaining;
+          updated.funded = remaining[0] ?? null;
+        }
+        return { configs: updated };
+      });
+      return true;
+    } catch (error) {
+      console.error('deleteAccount Fehler:', error);
+      return false;
+    }
+  },
+
+  // ============================================================
   // TRANSAKTIONEN
   // ============================================================
 
@@ -223,5 +253,6 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   getBalance: (type) => get().getConfig(type)?.currentBalance ?? 0,
   getTransactions: (type) => get().transactions.filter(t => t.type === type),
   getFundedAccounts: () => get().configs?.fundedAccounts ?? [],
+  getEkAccounts: () => get().configs?.ekAccounts ?? [],
   hasAccount: (type) => get().getConfig(type) !== null,
 }));

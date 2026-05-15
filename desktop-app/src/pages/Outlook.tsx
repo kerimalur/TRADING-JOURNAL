@@ -211,10 +211,10 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        className="bg-[#0d0f14] border border-white/[0.06] rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-background-surface border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between p-6 border-b border-border sticky top-0 bg-background-surface z-10">
           <div className="flex items-center gap-2.5">
             <Target className="text-accent-primary" size={18} />
             <h2 className="text-sm font-semibold text-text-primary tracking-wide">
@@ -230,11 +230,11 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Symbol & Direction */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
+              <label className="input-label">
                 Symbol
               </label>
               <div className="flex gap-1.5">
@@ -264,7 +264,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
+              <label className="input-label">
                 Richtung
               </label>
               <div className="flex gap-1.5">
@@ -332,7 +332,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
 
           {/* Thesis */}
           <div>
-            <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
+            <label className="input-label">
               Trading-These
             </label>
             <textarea
@@ -347,7 +347,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
 
           {/* Confidence */}
           <div>
-            <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
+            <label className="input-label">
               Confidence
             </label>
             <div className="flex gap-1.5">
@@ -375,7 +375,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
 
           {/* Status */}
           <div>
-            <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
+            <label className="input-label">
               Status
             </label>
             <div className="flex flex-wrap gap-1.5">
@@ -403,7 +403,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
 
           {/* Confluences */}
           <div>
-            <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1.5">
+            <label className="input-label">
               Confluences
             </label>
             <div className="flex flex-wrap gap-1.5">
@@ -1496,3 +1496,4 @@ export function Outlook() {
     </PageTransition>
   );
 }
+

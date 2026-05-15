@@ -23,6 +23,7 @@ import {
   Shield,
   User,
   LogOut,
+  LogIn,
   Database,
   RefreshCw,
   Tag,
@@ -212,6 +213,57 @@ export function Settings() {
           <p className="text-[11px] text-text-muted">Speicher, Login & Backup</p>
         </div>
       </div>
+
+      {/* ── PROMINENTER ANMELDEN / ABMELDEN BUTTON ── */}
+      {!inElectron && (
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+            <LogIn size={15} className="text-accent-primary" />
+            <span className="text-sm font-bold text-text-primary">Konto</span>
+          </div>
+          <div className="p-5">
+            {authUser ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary font-bold">
+                    {authUser.email?.[0]?.toUpperCase() ?? 'U'}
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-text-primary">{authUser.user_metadata?.full_name || authUser.email}</div>
+                    <div className="text-xs text-text-muted flex items-center gap-1">
+                      <CheckCircle2 size={11} className="text-pnl-positive" />
+                      Angemeldet · Cloud Sync aktiv
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pnl-negative/10 text-pnl-negative text-sm font-semibold hover:bg-pnl-negative/20 transition-colors disabled:opacity-50"
+                >
+                  {isLoggingOut ? <RefreshCw size={14} className="animate-spin" /> : <LogOut size={14} />}
+                  Abmelden
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium text-text-primary">Nicht angemeldet</div>
+                  <div className="text-xs text-text-muted">Lokal gespeichert · kein Sync</div>
+                </div>
+                <a
+                  href="/"
+                  onClick={e => { e.preventDefault(); localStorage.removeItem('trading-journal-offline-mode'); window.location.reload(); }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-primary/10 text-accent-primary text-sm font-semibold hover:bg-accent-primary/20 transition-colors"
+                >
+                  <LogIn size={14} />
+                  Anmelden
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── SPEICHERMODUS ── */}
       <motion.div

@@ -72,6 +72,8 @@ function rowToConfig(row: any): AccountConfig {
     activeChapterId:      row.active_chapter_id ?? undefined,
     isActive:             row.is_active  ?? true,
     isDefault:            row.is_default ?? false,
+    dailyDrawdownValue:   row.daily_drawdown_value != null ? Number(row.daily_drawdown_value) : undefined,
+    dailyDrawdownType:    row.daily_drawdown_type ?? undefined,
   };
 }
 
@@ -85,7 +87,7 @@ function configToRow(config: AccountConfig, userId: string): Record<string, any>
     currency:              config.currency      || 'USD',
     initial_balance:       config.initialStartBalance,
     current_balance:       config.currentBalance,
-    default_risk_per_trade: config.defaultRiskPerTrade,
+    default_risk_per_trade: config.defaultRiskPerTrade ?? 1.0,
     enable_goals:          config.enableGoals    ?? false,
     profit_target_value:   config.profitTargetValue  ?? null,
     profit_target_type:    config.profitTargetType   ?? null,
@@ -93,6 +95,8 @@ function configToRow(config: AccountConfig, userId: string): Record<string, any>
     max_drawdown_value:    config.maxDrawdownValue    ?? null,
     max_drawdown_type:     config.maxDrawdownType     ?? null,
     max_drawdown:          config.maxDrawdown           ?? null,
+    daily_drawdown_value:  config.dailyDrawdownValue   ?? null,
+    daily_drawdown_type:   config.dailyDrawdownType    ?? null,
     chapters:              config.chapters      ?? [],
     active_chapter_id:     config.activeChapterId ?? null,
     is_active:             config.isActive  ?? true,
@@ -114,6 +118,7 @@ export async function loadAccountConfigs(): Promise<AccountConfigs> {
     return {
       ek:             ekRows.find(a => a.isDefault) ?? ekRows[0] ?? null,
       funded:         fundedRows.find(a => a.isDefault) ?? fundedRows[0] ?? null,
+      ekAccounts:     ekRows,
       fundedAccounts: fundedRows,
     };
   }
@@ -137,6 +142,7 @@ export async function loadAccountConfigs(): Promise<AccountConfigs> {
   return {
     ek:             (ekRows.find(r => r.is_default)     ?? ekRows[0]     ?? null) ? rowToConfig(ekRows.find(r => r.is_default) ?? ekRows[0])     : null,
     funded:         (fundedRows.find(r => r.is_default) ?? fundedRows[0] ?? null) ? rowToConfig(fundedRows.find(r => r.is_default) ?? fundedRows[0]) : null,
+    ekAccounts:     ekRows.map(rowToConfig),
     fundedAccounts: fundedRows.map(rowToConfig),
   };
 }
@@ -237,6 +243,54 @@ export async function deactivateAccount(accountId: string): Promise<void> {
 
   const user = await requireSession();
   const { error } = await supabase.from(ACCOUNTS_TABLE).update({ is_active: false, is_default: false, updated_at: new Date().toISOString() }).eq('id', accountId).eq('user_id', user.id);
+  if (error) throw error;
+}
+
+// ============================================================
+// ACCOUNT + ALLE TRADES LÖSCHEN
+// ============================================================
+
+export async function deleteAccount(accountId: string, accountType: AccountType): Promise<void> {
+  // ── Offline ──
+  if (isOffline()) {
+    const LS_TRADES = 'tradingJournal_trades_v2';
+    try {
+      const trades: any[] = JSON.parse(localStorage.getItem(LS_TRADES) || '[]');
+      // Delete trades of this account (by account_id or by type as fallback)
+      const remaining = trades.filter(t => {
+        if (t.account_id && t.account_id === accountId) return false;
+        if (!t.account_id && t.type === accountType) {
+          // Only delete if it’s the last account of this type
+          const remaining = lsGetAccounts().filter(a => a.type === accountType && a.isActive !== false);
+          if (remaining.length <= 1) return false;
+        }
+        return true;
+      });
+      localStorage.setItem(LS_TRADES, JSON.stringify(remaining));
+    } catch {}
+    const all = lsGetAccounts().filter(a => a.id !== accountId);
+    lsSaveAccounts(all);
+    return;
+  }
+
+  // ── Online ──
+  const user = await requireSession();
+  // Delete trades: first by account_id, then by type for trades without account_id
+  await supabase.from('trades').delete().eq('account_id', accountId).eq('user_id', user.id);
+  // Check if there are other active accounts of this type
+  const { data: others } = await supabase
+    .from(ACCOUNTS_TABLE)
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('type', accountType)
+    .eq('is_active', true)
+    .neq('id', accountId);
+  // If no other accounts of this type, also delete trades without account_id
+  if (!others || others.length === 0) {
+    await supabase.from('trades').delete().is('account_id', null).eq('type', accountType).eq('user_id', user.id);
+  }
+  // Delete the account itself
+  const { error } = await supabase.from(ACCOUNTS_TABLE).delete().eq('id', accountId).eq('user_id', user.id);
   if (error) throw error;
 }
 

@@ -56,6 +56,8 @@ export interface Trade {
   setup_market_structure?: boolean;
   setup_weekly_gva?: boolean;
   setup_3day_gva?: boolean;
+  // Confluences (new – same list as in Settings)
+  confluences?: string[];
   // Timestamps
   createdAt: string;
   updatedAt: string;
@@ -115,6 +117,8 @@ export interface AccountConfig {
   profitTargetType?: 'percent' | 'absolute';
   maxDrawdownValue?: number;
   maxDrawdownType?: 'percent' | 'absolute';
+  dailyDrawdownValue?: number;
+  dailyDrawdownType?: 'percent' | 'absolute';
   profitTarget?: number;
   maxDrawdown?: number;
   chapters?: AccountChapter[];
@@ -126,6 +130,7 @@ export interface AccountConfig {
 export interface AccountConfigs {
   ek: AccountConfig | null;
   funded: AccountConfig | null;
+  ekAccounts?: AccountConfig[];       // Alle EK-Accounts (für Multi-Account)
   fundedAccounts?: AccountConfig[];   // Alle Funded-Accounts (für Multi-Account)
 }
 

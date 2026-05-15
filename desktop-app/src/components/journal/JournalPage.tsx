@@ -33,7 +33,7 @@ interface JournalPageProps {
 }
 
 export function JournalPage({ accountType, title, icon }: JournalPageProps) {
-  const { loadConfigs, configs, saveConfig, createAccount, setActiveAccount, getFundedAccounts } = useAccountStore();
+  const { loadConfigs, configs, saveConfig, createAccount, deleteAccount, setActiveAccount, getFundedAccounts, getEkAccounts } = useAccountStore();
   const { showToast } = useUIStore();
 
   // Trade data state
@@ -54,13 +54,11 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
   const [setupForm, setSetupForm] = useState({
     name: accountType === 'ek' ? 'Eigenkapital' : 'Funded Account',
     broker: '',
-    accountNumber: '',
     initialBalance: accountType === 'ek' ? 10000 : 100000,
     currency: 'USD',
-    defaultRisk: accountType === 'ek' ? 0.5 : 1.0,
-    enableGoals: accountType === 'funded',
     profitTarget: 8,
     maxDrawdown: 5,
+    dailyDrawdown: 2,
   });
   const [isSavingSetup, setIsSavingSetup] = useState(false);
 
@@ -241,29 +239,30 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
     e.preventDefault();
     setIsSavingSetup(true);
     try {
-      const profitTargetAbs = setupForm.enableGoals
+      const isFunded = accountType === 'funded';
+      const profitTargetAbs = isFunded
         ? setupForm.initialBalance * (1 + setupForm.profitTarget / 100)
         : undefined;
-      const maxDrawdownAbs = setupForm.enableGoals
+      const maxDrawdownAbs = isFunded
         ? setupForm.initialBalance * (1 - setupForm.maxDrawdown / 100)
         : undefined;
 
       const success = await createAccount({
         name:                setupForm.name,
         broker:              setupForm.broker,
-        accountNumber:       setupForm.accountNumber,
         type:                accountType,
         currency:            setupForm.currency,
         initialStartBalance: setupForm.initialBalance,
         currentBalance:      setupForm.initialBalance,
-        defaultRiskPerTrade: setupForm.defaultRisk,
-        enableGoals:         setupForm.enableGoals,
-        profitTargetValue:   setupForm.enableGoals ? setupForm.profitTarget : undefined,
-        profitTargetType:    setupForm.enableGoals ? 'percent' : undefined,
+        enableGoals:         isFunded,
+        profitTargetValue:   isFunded ? setupForm.profitTarget : undefined,
+        profitTargetType:    isFunded ? 'percent' : undefined,
         profitTarget:        profitTargetAbs,
-        maxDrawdownValue:    setupForm.enableGoals ? setupForm.maxDrawdown : undefined,
-        maxDrawdownType:     setupForm.enableGoals ? 'percent' : undefined,
+        maxDrawdownValue:    isFunded ? setupForm.maxDrawdown : undefined,
+        maxDrawdownType:     isFunded ? 'percent' : undefined,
         maxDrawdown:         maxDrawdownAbs,
+        dailyDrawdownValue:  isFunded ? setupForm.dailyDrawdown : undefined,
+        dailyDrawdownType:   isFunded ? 'percent' : undefined,
         isActive:            true,
         isDefault:           true,
       });
@@ -281,6 +280,12 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
     } finally {
       setIsSavingSetup(false);
     }
+  };
+
+  const handleDeleteAccount = async (accountId: string) => {
+    await deleteAccount(accountId, accountType);
+    await loadConfigs();
+    loadTradesData();
   };
 
   // Computed values für Account-Switcher
@@ -342,15 +347,6 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
                           onChange={e => setSetupForm(f => ({ ...f, broker: e.target.value }))}
                         />
                       </div>
-                      <div>
-                        <label className="input-label">Kontonummer</label>
-                        <input
-                          className="input"
-                          placeholder="123456"
-                          value={setupForm.accountNumber}
-                          onChange={e => setSetupForm(f => ({ ...f, accountNumber: e.target.value }))}
-                        />
-                      </div>
                     </div>
                   </>
                 )}
@@ -380,55 +376,41 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
                     </select>
                   </div>
                 </div>
-                <div>
-                  <label className="input-label">Standard-Risiko pro Trade (%)</label>
-                  <input
-                    type="number"
-                    className="input"
-                    value={setupForm.defaultRisk}
-                    step="0.1"
-                    min="0.1"
-                    max="10"
-                    onChange={e => setSetupForm(f => ({ ...f, defaultRisk: Number(e.target.value) }))}
-                  />
-                </div>
                 {accountType === 'funded' && (
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="input-label">Profit-Target (%)</label>
                       <input
-                        type="checkbox"
-                        checked={setupForm.enableGoals}
-                        onChange={e => setSetupForm(f => ({ ...f, enableGoals: e.target.checked }))}
-                        className="rounded"
+                        type="number"
+                        className="input"
+                        value={setupForm.profitTarget}
+                        step="0.5"
+                        min="0"
+                        onChange={e => setSetupForm(f => ({ ...f, profitTarget: Number(e.target.value) }))}
                       />
-                      <span className="text-sm text-text-primary">Ziele aktivieren (Profit-Target & Max. Drawdown)</span>
-                    </label>
-                    {setupForm.enableGoals && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="input-label">Profit-Target (%)</label>
-                          <input
-                            type="number"
-                            className="input"
-                            value={setupForm.profitTarget}
-                            step="0.5"
-                            min="0"
-                            onChange={e => setSetupForm(f => ({ ...f, profitTarget: Number(e.target.value) }))}
-                          />
-                        </div>
-                        <div>
-                          <label className="input-label">Max. Drawdown (%)</label>
-                          <input
-                            type="number"
-                            className="input"
-                            value={setupForm.maxDrawdown}
-                            step="0.5"
-                            min="0"
-                            onChange={e => setSetupForm(f => ({ ...f, maxDrawdown: Number(e.target.value) }))}
-                          />
-                        </div>
-                      </div>
-                    )}
+                    </div>
+                    <div>
+                      <label className="input-label">Max. Drawdown (%)</label>
+                      <input
+                        type="number"
+                        className="input"
+                        value={setupForm.maxDrawdown}
+                        step="0.5"
+                        min="0"
+                        onChange={e => setSetupForm(f => ({ ...f, maxDrawdown: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="input-label">Tages-Drawdown (%)</label>
+                      <input
+                        type="number"
+                        className="input"
+                        value={setupForm.dailyDrawdown}
+                        step="0.5"
+                        min="0"
+                        onChange={e => setSetupForm(f => ({ ...f, dailyDrawdown: Number(e.target.value) }))}
+                      />
+                    </div>
                   </div>
                 )}
                 <div className="flex gap-3 pt-2">
@@ -571,13 +553,13 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
 
         {/* Account Settings Panel */}
         <AccountSettings
-          config={config ?? undefined}
+          accounts={accountType === 'ek' ? getEkAccounts() : getFundedAccounts()}
           accountType={accountType}
-          onSave={handleSaveConfig}
+          onDeleteAccount={handleDeleteAccount}
+          onAddAccount={() => setShowSetupForm(true)}
           showToast={showToast}
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
-          onAddAccount={accountType === 'funded' ? () => setShowSetupForm(true) : undefined}
         />
 
         {/* Filters Panel */}

@@ -212,6 +212,10 @@ export function Dashboard() {
           || session.user.email?.split('@')[0]
           || 'Trader';
         setUserName(name);
+      } else {
+        // Offline mode: use locally saved name
+        const localName = localStorage.getItem('tradingJournal_displayName');
+        if (localName) setUserName(localName);
       }
     });
   }, []);

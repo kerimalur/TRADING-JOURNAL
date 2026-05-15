@@ -51,6 +51,8 @@ interface LoginScreenProps {
 function LoginScreen({ onSkipLogin }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [nameError, setNameError] = useState('');
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -67,6 +69,15 @@ function LoginScreen({ onSkipLogin }: LoginScreenProps) {
     setLoading(false);
   };
 
+  const handleSkipWithName = () => {
+    if (!displayName.trim()) {
+      setNameError('Bitte gib deinen Namen ein');
+      return;
+    }
+    localStorage.setItem('tradingJournal_displayName', displayName.trim());
+    onSkipLogin();
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background text-text-primary items-center justify-center">
       <div className="w-full max-w-sm p-8 bg-background-surface border border-border rounded-2xl shadow-2xl">
@@ -79,7 +90,20 @@ function LoginScreen({ onSkipLogin }: LoginScreenProps) {
         </div>
 
         <h1 className="text-xl font-bold mb-1 text-center text-text-primary">Trading Journal</h1>
-        <p className="text-sm text-text-muted text-center mb-8">Melde dich an, um fortzufahren</p>
+        <p className="text-sm text-text-muted text-center mb-6">Melde dich an, um fortzufahren</p>
+
+        {/* Name input for skip login */}
+        <div className="mb-4">
+          <label className="input-label">Dein Name</label>
+          <input
+            type="text"
+            className="input"
+            placeholder="z.B. Max"
+            value={displayName}
+            onChange={e => { setDisplayName(e.target.value); setNameError(''); }}
+          />
+          {nameError && <p className="mt-1 text-xs text-pnl-negative">{nameError}</p>}
+        </div>
 
         {/* Google Button */}
         <button
@@ -115,7 +139,7 @@ function LoginScreen({ onSkipLogin }: LoginScreenProps) {
         </div>
 
         <button
-          onClick={onSkipLogin}
+          onClick={handleSkipWithName}
           className="w-full p-3 bg-background border border-border hover:border-accent-primary/50 text-text-muted hover:text-text-primary rounded-xl transition-colors text-sm"
         >
           Ohne Login fortfahren (lokal)
