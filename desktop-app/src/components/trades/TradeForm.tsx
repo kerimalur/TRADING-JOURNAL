@@ -18,7 +18,7 @@ import { getApi } from '@/services/webApi';
 interface TradeFormProps {
   trade?: Trade;
   accountType: 'funded' | 'ek';
-  onSave: (trade: Omit<Trade, 'id'> & { id?: string }) => Promise<void>;
+  onSave: (trade: Omit<Trade, 'id'> & { id?: string }) => Promise<Trade | null | void>;
   onClose: () => void;
 }
 
@@ -209,12 +209,13 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
         updatedAt: new Date().toISOString()
       } as Omit<Trade, 'id'> & { id?: string };
 
-      await onSave(tradeData);
+      const savedTrade = await onSave(tradeData);
 
-      // Save screenshot if present
-      if (screenshot && tradeData.id) {
+      // Save screenshot if present – use returned trade ID for new trades
+      const savedId = (savedTrade as Trade | null)?.id ?? tradeData.id;
+      if (screenshot && savedId) {
         const api = getApi();
-        await api.saveScreenshot(tradeData.id, screenshot);
+        await api.saveScreenshot(savedId, screenshot);
       }
 
       onClose();

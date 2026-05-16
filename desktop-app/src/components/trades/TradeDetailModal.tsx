@@ -160,7 +160,7 @@ export function TradeDetailModal({ trade, onClose, onEdit, onDelete }: TradeDeta
               <p className="text-xl font-semibold font-mono text-text-primary">
                 {trade.riskPercent || 1}% 
                 {trade.riskAmount && (
-                  <span className="text-text-muted text-sm ml-1">({trade.riskAmount.toLocaleString('de-DE')} CHF)</span>
+                  <span className="text-text-muted text-sm ml-1">({trade.riskAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CHF)</span>
                 )}
               </p>
             </div>
