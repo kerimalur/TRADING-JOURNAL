@@ -49,8 +49,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'SF Pro Display', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'SF Mono', 'monospace'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['Inter', 'system-ui', 'sans-serif'],
       },
       fontSize: {
         'display': ['3rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
