@@ -81,9 +81,19 @@ export function News() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [dataSource, setDataSource] = useState<string>('loading');
 
-  // Lade Wirtschaftskalender beim Start
+  // Lade Wirtschaftskalender beim Start – täglich automatisch aktualisieren
   useEffect(() => {
-    loadCalendar();
+    const today = new Date().toISOString().split('T')[0];
+    const lastLoad = localStorage.getItem('ff_calendar_last_load_date');
+    if (lastLoad !== today) {
+      // Noch nicht heute geladen → frisch laden und Datum speichern
+      loadCalendar().then(() => {
+        localStorage.setItem('ff_calendar_last_load_date', today);
+      });
+    } else {
+      // Bereits heute geladen – trotzdem laden (nutzt Cache in webApi)
+      loadCalendar();
+    }
   }, []);
 
   const loadCalendar = async () => {
@@ -91,80 +101,38 @@ export function News() {
 
     try {
       const api = getApi();
-      // Nutze unified API für Wirtschaftskalender
       if (api.fetchEconomicCalendar) {
-        console.log('📅 Fetching economic calendar...');
+        console.log('📅 Forex Factory: Wirtschaftskalender laden...');
         const result = await api.fetchEconomicCalendar();
 
-        if (result.success && result.data) {
-          // Konvertiere Daten ins richtige Format
-          let calendarEvents: EconomicEvent[] = [];
-
-          if (result.source === 'scheduled') {
-            // Scheduled Events kommen bereits im richtigen Format
-            calendarEvents = result.data.map((item: any, index: number) => ({
-              id: item.id || `sched-${index}`,
-              date: item.date,
-              time: item.time || '00:00',
-              currency: item.currency,
-              impact: item.impact as 'high' | 'medium' | 'low',
-              event: item.event,
-              forecast: item.forecast,
-              previous: item.previous,
-              actual: item.actual,
-            }));
-          } else if (result.source === 'forexfactory') {
-            // Forex Factory Format
-            calendarEvents = result.data.map((item: any, index: number) => ({
-              id: item.id || `ff-${index}`,
-              date: item.date,
-              time: item.time || 'All Day',
-              currency: item.currency,
-              impact: item.impact as 'high' | 'medium' | 'low',
-              event: item.event,
-              forecast: item.forecast,
-              previous: item.previous,
-              actual: item.actual,
-            }));
-          } else if (result.source === 'fxstreet' || result.source === 'investing') {
-            // Konvertiere von externem Format
-            calendarEvents = result.data.map((item: any, index: number) => ({
-              id: item.id || `event-${index}`,
-              date: item.date || item.dateUtc?.split('T')[0],
-              time: item.time || item.dateUtc?.split('T')[1]?.substring(0, 5) || '00:00',
-              currency: item.currency || item.countryCode,
-              impact: item.impact || (item.volatility === 3 ? 'high' : item.volatility === 2 ? 'medium' : 'low'),
-              event: item.event || item.name,
-              forecast: item.forecast,
-              previous: item.previous,
-              actual: item.actual,
-            }));
-          } else {
-            // Web API format (Firefox Factory XML parsed)
-            calendarEvents = result.data.map((item: any, index: number) => ({
-              id: `event-${index}`,
-              date: item.date,
-              time: item.time || '00:00',
-              currency: item.country,
-              impact: item.impact as 'high' | 'medium' | 'low',
-              event: item.title,
-              forecast: item.forecast,
-              previous: item.previous,
-            }));
-          }
+        if (result.success && result.data && result.data.length > 0) {
+          // Forex Factory JSON Format: { id, date, time, currency, impact, event, forecast, previous, actual }
+          const calendarEvents: EconomicEvent[] = result.data.map((item: any, index: number) => ({
+            id: item.id || `ff-${index}`,
+            date: item.date,
+            time: item.time || 'All Day',
+            currency: item.currency || item.country,
+            impact: (item.impact || 'low') as 'high' | 'medium' | 'low',
+            event: item.event || item.title,
+            forecast: item.forecast,
+            previous: item.previous,
+            actual: item.actual,
+          }));
 
           setEvents(calendarEvents);
-          setDataSource(result.source || 'api');
+          setDataSource(result.cached ? 'cache' : 'forexfactory');
           setLastUpdate(new Date());
-          console.log(`✅ Calendar loaded: ${calendarEvents.length} events from ${result.source}`);
+          console.log(`✅ Kalender geladen: ${calendarEvents.length} Events (${result.source || 'forexfactory'})`);
+        } else {
+          setEvents(FALLBACK_EVENTS);
+          setDataSource('offline');
         }
       } else {
-        console.log('⚠️ Electron API not available, using fallback');
         setEvents(FALLBACK_EVENTS);
-        setDataSource('fallback');
+        setDataSource('offline');
       }
     } catch (error) {
-      console.error('Calendar load error:', error);
+      console.error('Kalender Fehler:', error);
       setEvents(FALLBACK_EVENTS);
       setDataSource('error');
     } finally {

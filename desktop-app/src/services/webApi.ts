@@ -283,9 +283,10 @@ export const webOutlookApi = {
 export const webExternalApi = {
   // COT Data from CFTC
   async fetchCOTData(): Promise<any> {
+    // Reihenfolge: Dollar Index, Euro FX, CHF, GBP, JPY, CAD, AUD, NZD
     const CFTC_CODES: Record<string, string> = {
-      EUR: '099741', GBP: '096742', JPY: '097741', CAD: '090741',
-      AUD: '232741', NZD: '112741', CHF: '092741', USD: '098662',
+      DXY: '098661', EUR: '099741', CHF: '092741', GBP: '096742',
+      JPY: '097741', CAD: '090741', AUD: '232741', NZD: '112741',
     };
 
     try {
@@ -364,72 +365,43 @@ export const webExternalApi = {
     }
   },
 
-  // Economic Calendar from Forex Factory
+  // Economic Calendar from Forex Factory (JSON)
   async fetchEconomicCalendar(): Promise<any> {
     try {
-      const response = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.xml');
+      const response = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json');
       if (!response.ok) throw new Error('Calendar fetch failed');
       
-      const text = await response.text();
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(text, 'text/xml');
-      const events = xml.querySelectorAll('event');
+      const rawEvents: any[] = await response.json();
       
-      const calendarEvents: any[] = [];
-      events.forEach((event, index) => {
-        const title = event.querySelector('title')?.textContent || '';
-        const country = event.querySelector('country')?.textContent || '';
-        const dateStr = event.querySelector('date')?.textContent || '';
-        const timeStr = event.querySelector('time')?.textContent || '';
-        let impact = (event.querySelector('impact')?.textContent || '').toLowerCase();
-        const forecast = event.querySelector('forecast')?.textContent || '';
-        const previous = event.querySelector('previous')?.textContent || '';
-        
-        // Convert date from MM-DD-YYYY to ISO format
-        let isoDate = '';
-        if (dateStr) {
-          const [month, day, year] = dateStr.split('-');
-          if (month && day && year) {
-            isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          }
-        }
-        
-        // Convert time to 24h format
-        let time24 = timeStr;
-        if (timeStr && timeStr.includes('am')) {
-          time24 = timeStr.replace('am', '').trim();
-          const parts = time24.split(':');
-          time24 = `${parts[0].padStart(2, '0')}:${parts[1] || '00'}`;
-        } else if (timeStr && timeStr.includes('pm')) {
-          time24 = timeStr.replace('pm', '').trim();
-          const parts = time24.split(':');
-          const hour = parseInt(parts[0]) === 12 ? 12 : parseInt(parts[0]) + 12;
-          time24 = `${hour}:${parts[1] || '00'}`;
-        }
-        
-        // Normalize impact
-        if (impact !== 'high' && impact !== 'medium' && impact !== 'low') {
-          impact = 'low';
-        }
-        
-        calendarEvents.push({
-          id: `ff-${index}`,
-          event: title,
-          currency: country,
-          date: isoDate,
-          time: time24,
-          impact: impact as 'high' | 'medium' | 'low',
-          forecast: forecast || undefined,
-          previous: previous || undefined,
-          source: 'forexfactory'
+      const calendarEvents = rawEvents
+        .filter((e: any) => (e.impact || '').toLowerCase() !== 'holiday')
+        .map((e: any, index: number) => {
+          const dt = new Date(e.date);
+          const isoDate = dt.toISOString().split('T')[0];
+          const time24 = dt.toLocaleTimeString('de-DE', {
+            hour: '2-digit', minute: '2-digit',
+            timeZone: 'Europe/Berlin'
+          });
+          const impact = (e.impact || '').toLowerCase();
+          return {
+            id: `ff-${index}`,
+            event: e.title,
+            currency: e.country,
+            date: isoDate,
+            time: time24,
+            impact: impact === 'high' ? 'high' : impact === 'medium' ? 'medium' : 'low',
+            forecast: e.forecast || undefined,
+            previous: e.previous || undefined,
+            actual: e.actual || undefined,
+            source: 'forexfactory'
+          } as any;
         });
-      });
       
       saveToStorage(STORAGE_KEYS.CALENDAR, { data: calendarEvents, timestamp: Date.now() });
       return { success: true, data: calendarEvents, source: 'forexfactory' };
     } catch (error) {
       const cached = getFromStorage<any>(STORAGE_KEYS.CALENDAR, null);
-      if (cached) return { success: true, data: cached.data, cached: true };
+      if (cached) return { success: true, data: cached.data, cached: true, source: 'cache' };
       return { success: false, error: String(error) };
     }
   },

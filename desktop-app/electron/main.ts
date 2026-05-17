@@ -772,15 +772,16 @@ function registerIPCHandlers(): void {
    */
   ipcMain.handle('fetchCOTData', async () => {
     // CFTC Contract Market Codes für Währungs-Futures (CME + ICE)
+    // Reihenfolge gemäß insider-week.com: Dollar Index, Euro FX, CHF, GBP, JPY, CAD, AUD, NZD
     const CURRENCIES = [
+      { id: 'DXY', cftcCode: '098661', name: 'DOLLAR INDEX' },
       { id: 'EUR', cftcCode: '099741', name: 'EURO FX' },
+      { id: 'CHF', cftcCode: '092741', name: 'SWISS FRANC' },
       { id: 'GBP', cftcCode: '096742', name: 'BRITISH POUND' },
       { id: 'JPY', cftcCode: '097741', name: 'JAPANESE YEN' },
       { id: 'CAD', cftcCode: '090741', name: 'CANADIAN DOLLAR' },
       { id: 'AUD', cftcCode: '232741', name: 'AUSTRALIAN DOLLAR' },
-      { id: 'NZD', cftcCode: '112741', name: 'NZ DOLLAR' },
-      { id: 'CHF', cftcCode: '092741', name: 'SWISS FRANC' },
-      { id: 'USD', cftcCode: '098662', name: 'USD INDEX' },
+      { id: 'NZD', cftcCode: '112741', name: 'NEW ZEALAND DOLLAR' },
     ];
 
     try {
@@ -907,13 +908,13 @@ function registerIPCHandlers(): void {
     try {
       console.log('📅 Fetching Forex Factory calendar...');
       
-      // Forex Factory XML Feed (reliable, updates frequently)
-      const ffUrl = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml';
+      // Forex Factory JSON Feed (Fair Economy Media)
+      const ffUrl = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
       
       const response = await fetch(ffUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/xml, text/xml, */*'
+          'Accept': 'application/json'
         }
       });
       
@@ -921,60 +922,32 @@ function registerIPCHandlers(): void {
         throw new Error(`HTTP ${response.status}`);
       }
       
-      const xmlText = await response.text();
+      const rawEvents = (await response.json()) as any[];
       
-      // Parse XML manually (kein DOM Parser in Node)
-      const events: any[] = [];
-      const eventMatches = xmlText.match(/<event>[\s\S]*?<\/event>/g) || [];
-      
-      for (const eventXml of eventMatches) {
-        const getTag = (tag: string) => {
-          const match = eventXml.match(new RegExp(`<${tag}>(?:<\\!\\[CDATA\\[)?([^<]*?)(?:\\]\\]>)?<\\/${tag}>`));
-          return match ? match[1].trim() : '';
-        };
-        
-        const title = getTag('title');
-        const country = getTag('country');
-        const date = getTag('date');
-        const time = getTag('time');
-        const impact = getTag('impact').toLowerCase();
-        const forecast = getTag('forecast');
-        const previous = getTag('previous');
-        const url = getTag('url');
-        
-        // Konvertiere Datum von MM-DD-YYYY zu ISO
-        let isoDate = '';
-        if (date) {
-          const [month, day, year] = date.split('-');
-          isoDate = `${year}-${month}-${day}`;
-        }
-        
-        // Konvertiere Zeit in 24h Format
-        let time24 = time;
-        if (time && time.includes('am')) {
-          time24 = time.replace('am', '').trim();
-          const [h, m] = time24.split(':');
-          time24 = `${h.padStart(2, '0')}:${m || '00'}`;
-        } else if (time && time.includes('pm')) {
-          time24 = time.replace('pm', '').trim();
-          const [h, m] = time24.split(':');
-          const hour = parseInt(h) === 12 ? 12 : parseInt(h) + 12;
-          time24 = `${hour}:${m || '00'}`;
-        }
-        
-        events.push({
-          id: `ff-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          date: isoDate,
-          time: time24,
-          currency: country,
-          impact: impact === 'high' ? 'high' : impact === 'medium' ? 'medium' : 'low',
-          event: title,
-          forecast: forecast || undefined,
-          previous: previous || undefined,
-          url: url || undefined,
-          source: 'forexfactory'
+      const events: any[] = rawEvents
+        .filter((e: any) => e.impact && e.impact.toLowerCase() !== 'holiday')
+        .map((e: any, index: number) => {
+          // date is ISO datetime: "2026-05-17T18:30:00-04:00"
+          const dt = new Date(e.date);
+          const isoDate = dt.toISOString().split('T')[0];
+          const time24 = dt.toLocaleTimeString('de-DE', {
+            hour: '2-digit', minute: '2-digit',
+            timeZone: 'Europe/Berlin'
+          });
+          const impact = (e.impact || '').toLowerCase();
+          return {
+            id: `ff-${index}`,
+            date: isoDate,
+            time: time24,
+            currency: e.country,
+            impact: impact === 'high' ? 'high' : impact === 'medium' ? 'medium' : 'low',
+            event: e.title,
+            forecast: e.forecast || undefined,
+            previous: e.previous || undefined,
+            actual: e.actual || undefined,
+            source: 'forexfactory'
+          };
         });
-      }
       
       console.log(`✅ Forex Factory: ${events.length} events loaded`);
       
