@@ -32,6 +32,9 @@ import { Calendar } from '@/pages/Calendar';
 import { Outlook } from '@/pages/Outlook';
 import { StrategyBuilder } from '@/pages/StrategyBuilder';
 import { Fundamentals } from '@/pages/Fundamentals';
+import { News } from '@/pages/News';
+import { COTData } from '@/pages/COTData';
+import { CurrencyAnalysis } from '@/pages/CurrencyAnalysis';
 
 // Debug removed - AuthDebug no longer needed
 
@@ -260,6 +263,9 @@ function AppContent() {
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/outlook" element={<Outlook />} />
                 <Route path="/fundamentals" element={<Fundamentals />} />
+                <Route path="/news"         element={<News />} />
+                <Route path="/cot"          element={<COTData />} />
+                <Route path="/zinsen"       element={<CurrencyAnalysis />} />
                 <Route path="/strategy" element={<StrategyBuilder />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>

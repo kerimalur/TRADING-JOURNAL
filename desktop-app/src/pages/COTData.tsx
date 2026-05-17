@@ -89,6 +89,19 @@ export function COTData() {
       const cachedDate = localStorage.getItem('cotLastUpdate');
 
       if (cached && cachedDate) {
+        const parsedCache = JSON.parse(cached);
+
+        // Cache-Invalidierung: Wenn alte USD-Einträge vorhanden (vor DXY-Umbenennung), neu laden
+        const hasOldFormat = Array.isArray(parsedCache) && parsedCache.some((d: any) => d.currency === 'USD');
+        if (hasOldFormat) {
+          localStorage.removeItem('cotData');
+          localStorage.removeItem('cotHistory');
+          localStorage.removeItem('cotLastUpdate');
+          localStorage.removeItem('cotDataSource');
+          await fetchCOTData();
+          return;
+        }
+
         const lastUpdateDate = new Date(cachedDate);
         const now = new Date();
 
