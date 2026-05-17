@@ -284,8 +284,9 @@ export const webExternalApi = {
   // COT Data from CFTC
   async fetchCOTData(): Promise<any> {
     // Reihenfolge: Dollar Index, Euro FX, CHF, GBP, JPY, CAD, AUD, NZD
+    // 098662 = aktueller ICE USD INDEX Kontrakt (aktiv)
     const CFTC_CODES: Record<string, string> = {
-      DXY: '098661', EUR: '099741', CHF: '092741', GBP: '096742',
+      DXY: '098662', EUR: '099741', CHF: '092741', GBP: '096742',
       JPY: '097741', CAD: '090741', AUD: '232741', NZD: '112741',
     };
 

@@ -773,8 +773,10 @@ function registerIPCHandlers(): void {
   ipcMain.handle('fetchCOTData', async () => {
     // CFTC Contract Market Codes für Währungs-Futures (CME + ICE)
     // Reihenfolge gemäß insider-week.com: Dollar Index, Euro FX, CHF, GBP, JPY, CAD, AUD, NZD
+    // Hinweis: 098662 = aktueller ICE USD INDEX Kontrakt (aktiv, ab 2009+)
+    //          098661 = alter eingestellter Kontrakt von 1992 – NICHT verwenden!
     const CURRENCIES = [
-      { id: 'DXY', cftcCode: '098661', name: 'DOLLAR INDEX' },
+      { id: 'DXY', cftcCode: '098662', name: 'DOLLAR INDEX' },
       { id: 'EUR', cftcCode: '099741', name: 'EURO FX' },
       { id: 'CHF', cftcCode: '092741', name: 'SWISS FRANC' },
       { id: 'GBP', cftcCode: '096742', name: 'BRITISH POUND' },

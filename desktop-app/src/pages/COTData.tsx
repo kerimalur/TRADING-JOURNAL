@@ -38,7 +38,7 @@ import { MetricDisplay } from '@/components/ui/MetricDisplay';
 // Währungen und ihre CFTC Codes
 // Reihenfolge: Dollar Index, Euro FX, Swiss Franc, British Pound, JPY, CAD, AUD, NZD
 const CURRENCIES = [
-  { id: 'DXY', name: 'DXY',  cftcCode: '098661', flag: '🇺🇸' },
+  { id: 'DXY', name: 'DXY',  cftcCode: '098662', flag: '🇺🇸' },
   { id: 'EUR', name: 'EUR',  cftcCode: '099741', flag: '🇪🇺' },
   { id: 'CHF', name: 'CHF',  cftcCode: '092741', flag: '🇨🇭' },
   { id: 'GBP', name: 'GBP',  cftcCode: '096742', flag: '🇬🇧' },
