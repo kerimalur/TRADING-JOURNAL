@@ -83,6 +83,40 @@ function savePrefs(p: DashboardPrefs) {
   localStorage.setItem(PREFS_KEY, JSON.stringify(p));
 }
 
+async function loadPrefsFromSupabase(): Promise<DashboardPrefs | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return null;
+    const { data } = await supabase
+      .from('user_preferences')
+      .select('preferences')
+      .eq('user_id', session.user.id)
+      .single();
+    if (data?.preferences?.dashboardPrefs) {
+      return { ...DEFAULT_PREFS, ...data.preferences.dashboardPrefs };
+    }
+  } catch { /* ignore, fallback to localStorage */ }
+  return null;
+}
+
+async function savePrefsToSupabase(p: DashboardPrefs): Promise<void> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    const userId = session.user.id;
+    // Merge with existing preferences so we don't overwrite other keys
+    const { data: existing } = await supabase
+      .from('user_preferences')
+      .select('preferences')
+      .eq('user_id', userId)
+      .single();
+    const merged = { ...(existing?.preferences ?? {}), dashboardPrefs: p };
+    await supabase
+      .from('user_preferences')
+      .upsert({ user_id: userId, preferences: merged }, { onConflict: 'user_id' });
+  } catch { /* ignore, prefs already saved to localStorage */ }
+}
+
 // ── Monatskalender-Komponente ──────────────────────────────────────────
 function MonthCalendar({ heatmapData }: { heatmapData: HeatmapDay[] }) {
   const now   = new Date();
@@ -204,7 +238,7 @@ export function Dashboard() {
     else if (hour < 18)  setGreeting('Guten Tag');
     else                 setGreeting('Guten Abend');
 
-    // Google-Name aus Supabase-Session
+    // Google-Name aus Supabase-Session + Dashboard Prefs laden
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const name = session.user.user_metadata?.full_name
@@ -212,6 +246,13 @@ export function Dashboard() {
           || session.user.email?.split('@')[0]
           || 'Trader';
         setUserName(name);
+        // Load dashboard prefs from Supabase (overrides localStorage if available)
+        loadPrefsFromSupabase().then(cloudPrefs => {
+          if (cloudPrefs) {
+            setPrefs(cloudPrefs);
+            savePrefs(cloudPrefs); // keep localStorage in sync
+          }
+        });
       } else {
         // Offline mode: use locally saved name
         const localName = localStorage.getItem('tradingJournal_displayName');
@@ -223,6 +264,7 @@ export function Dashboard() {
   const handlePrefsChange = (newPrefs: DashboardPrefs) => {
     setPrefs(newPrefs);
     savePrefs(newPrefs);
+    savePrefsToSupabase(newPrefs); // fire-and-forget
   };
 
   // Immer alle Trades (kein Zeitfilter mehr in der UI)

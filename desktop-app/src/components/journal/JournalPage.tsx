@@ -116,19 +116,24 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
   // ============================================================
   // HANDLERS
   // ============================================================
-  const handleSaveTrade = async (tradeData: Omit<Trade, 'id'> & { id?: string }) => {
+  const handleSaveTrade = async (tradeData: Omit<Trade, 'id'> & { id?: string }): Promise<Trade | null> => {
     try {
       const isNewTrade = !tradeData.id;
       const oldTrade = isNewTrade ? null : trades.find(t => t.id === tradeData.id);
-      
-      await tradeService.saveTrade({ ...tradeData, type: accountType });
-      
-      // Get fresh config from store to ensure we have the latest balance
-      const currentConfig = configs?.[accountType];
-      
-      // Calculate profit if not provided: profitAmount = riskAmount * rMultiple
+
+      // Calculate profit before saving so we can set balance fields
       const calculatedProfit = tradeData.profitAmount ?? ((tradeData.riskAmount || 0) * (tradeData.rMultiple || 0));
-      
+      const currentConfig = configs?.[accountType];
+
+      // Auto-fill accountBalanceBefore / accountBalanceAfter for new trades
+      let enrichedTradeData = { ...tradeData, type: accountType };
+      if (isNewTrade && currentConfig) {
+        enrichedTradeData.accountBalanceBefore = currentConfig.currentBalance;
+        enrichedTradeData.accountBalanceAfter = Math.round((currentConfig.currentBalance + calculatedProfit) * 100) / 100;
+      }
+
+      const savedTrade = await tradeService.saveTrade(enrichedTradeData);
+
       console.log('💰 Balance Update:', { 
         hasConfig: !!currentConfig,
         currentBalance: currentConfig?.currentBalance,
@@ -173,9 +178,11 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
       setEditingTrade(undefined);
       loadTradesData();
       await loadConfigs();
+      return savedTrade ?? null;
     } catch (error: any) {
       console.error('Speicherfehler:', error);
       showToast('Speichern fehlgeschlagen: ' + (error.message || 'Unbekannter Fehler'), 'error');
+      return null;
     }
   };
 

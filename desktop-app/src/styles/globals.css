@@ -29,7 +29,7 @@ body {
   background: #0a0a0c;
   color: #FAFAFA;
   overflow: hidden;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'tnum' 0;
 }
 
 /* ============================================================ */
@@ -45,7 +45,7 @@ h6, .text-h6 { @apply text-xs font-semibold uppercase tracking-wider; }
 
 .text-body { @apply text-sm text-text-secondary leading-relaxed; }
 .text-small { @apply text-xs text-text-muted; }
-.text-mono { @apply font-mono tabular-nums; }
+.text-mono { @apply tabular-nums; font-variant-numeric: tabular-nums; }
 
 /* ============================================================ */
 /* SCROLLBAR                                                     */
