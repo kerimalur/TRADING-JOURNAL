@@ -56,38 +56,7 @@ const IMPACT_COLORS = {
   high: { bg: 'bg-pnl-negative/20', text: 'text-pnl-negative', border: 'border-pnl-negative' },
 };
 
-// Fallback Events für den Fall dass API nicht verfügbar ist
 const FALLBACK_EVENTS: EconomicEvent[] = [];
-
-const SAMPLE_NEWS: NewsArticle[] = [
-  {
-    id: '1',
-    title: 'Fed Signals Potential Rate Cut in March',
-    summary: 'Federal Reserve officials have indicated they may continue cutting interest rates as inflation cools toward 2% target.',
-    source: 'Reuters',
-    url: 'https://reuters.com',
-    publishedAt: new Date().toISOString(),
-    relatedCurrencies: ['USD'],
-  },
-  {
-    id: '2',
-    title: 'ECB Continues Rate Cuts Amid Weak Growth',
-    summary: 'The European Central Bank cut rates again as eurozone growth remains sluggish.',
-    source: 'Bloomberg',
-    url: 'https://bloomberg.com',
-    publishedAt: new Date(Date.now() - 3600000).toISOString(),
-    relatedCurrencies: ['EUR'],
-  },
-  {
-    id: '3',
-    title: 'BoJ Normalizes Policy - Rates at 0.5%',
-    summary: 'Bank of Japan continues policy normalization, raising rates to highest level since 2008.',
-    source: 'FXStreet',
-    url: 'https://fxstreet.com',
-    publishedAt: new Date(Date.now() - 7200000).toISOString(),
-    relatedCurrencies: ['JPY'],
-  },
-];
 
 const staggerContainer = {
   hidden: { opacity: 0 },
@@ -104,7 +73,7 @@ const staggerItem = {
 
 export function News() {
   const [events, setEvents] = useState<EconomicEvent[]>([]);
-  const [news] = useState<NewsArticle[]>(SAMPLE_NEWS);
+  const [news] = useState<NewsArticle[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>([]);
   const [impactFilter, setImpactFilter] = useState<'all' | 'high' | 'medium'>('all');

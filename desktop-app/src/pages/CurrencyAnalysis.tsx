@@ -112,17 +112,9 @@ export function CurrencyAnalysis() {
   const refreshData = async () => {
     setIsLoading(true);
 
-    // Default/Fallback Zinssaetze (Stand: Februar 2026)
-    let interestRates: Record<string, { rate: number; change: 'up' | 'down' | 'hold'; next: string; lastMeeting?: string; centralBank?: string }> = {
-      'USD': { rate: 4.25, change: 'down', next: '2026-03-19', lastMeeting: '2026-01-29', centralBank: 'Federal Reserve' },
-      'EUR': { rate: 2.75, change: 'down', next: '2026-03-06', lastMeeting: '2026-01-30', centralBank: 'ECB' },
-      'GBP': { rate: 4.00, change: 'down', next: '2026-03-20', lastMeeting: '2026-02-06', centralBank: 'Bank of England' },
-      'JPY': { rate: 0.50, change: 'up', next: '2026-03-14', lastMeeting: '2026-01-24', centralBank: 'Bank of Japan' },
-      'CAD': { rate: 3.50, change: 'down', next: '2026-03-12', lastMeeting: '2026-01-29', centralBank: 'Bank of Canada' },
-      'AUD': { rate: 3.60, change: 'down', next: '2026-03-04', lastMeeting: '2026-02-04', centralBank: 'RBA' },
-      'NZD': { rate: 4.25, change: 'down', next: '2026-04-09', lastMeeting: '2026-02-19', centralBank: 'RBNZ' },
-      'CHF': { rate: 0.75, change: 'hold', next: '2026-03-20', lastMeeting: '2025-12-12', centralBank: 'SNB' },
-    };
+    // Zinssaetze – nur ueber API laden, keine Fallback-Daten
+    let interestRates: Record<string, { rate: number; change: 'up' | 'down' | 'hold'; next: string; lastMeeting?: string; centralBank?: string }> = {};
+    let apiDataLoaded = false;
 
     // Versuche Zinssaetze ueber unified API zu laden (falls verfuegbar)
     try {
@@ -132,11 +124,20 @@ export function CurrencyAnalysis() {
         const result = await api.fetchInterestRates();
         if (result.success && result.data) {
           interestRates = result.data;
+          apiDataLoaded = true;
           console.log('Interest rates loaded from API');
         }
       }
     } catch (e) {
-      console.log('Interest rates API not available, using cached data');
+      console.log('Interest rates API not available');
+    }
+
+    // Kein API-Zugriff → leere Anzeige, keine Dummy-Daten
+    if (!apiDataLoaded) {
+      setCurrencyData([]);
+      setUpcomingEvents([]);
+      setIsLoading(false);
+      return;
     }
 
     // Lade COT-Daten aus Cache
