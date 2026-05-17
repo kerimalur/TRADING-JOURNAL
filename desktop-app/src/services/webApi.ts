@@ -369,7 +369,9 @@ export const webExternalApi = {
   // Economic Calendar from Forex Factory (JSON)
   async fetchEconomicCalendar(): Promise<any> {
     try {
-      const response = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json');
+      // Use server-side proxy to avoid CORS restrictions in web deployment
+      const proxyUrl = '/api/calendar';
+      const response = await fetch(proxyUrl);
       if (!response.ok) throw new Error('Calendar fetch failed');
       
       const rawEvents: any[] = await response.json();
@@ -407,17 +409,17 @@ export const webExternalApi = {
     }
   },
 
-  // Interest Rates (hardcoded current values - would need real API)
+  // Interest Rates (hardcoded current values – Stand Mai 2026)
   async fetchInterestRates(): Promise<any> {
     const rates = {
-      USD: { rate: 5.25, change: 0 },
-      EUR: { rate: 4.50, change: 0 },
-      GBP: { rate: 5.25, change: 0 },
-      JPY: { rate: 0.25, change: 0.15 },
-      CHF: { rate: 1.75, change: 0 },
-      CAD: { rate: 5.00, change: -0.25 },
-      AUD: { rate: 4.35, change: 0 },
-      NZD: { rate: 5.50, change: 0 },
+      USD: { rate: 4.50, change: 'down', centralBank: 'Federal Reserve', lastMeeting: '2026-05-07', next: '2026-06-11' },
+      EUR: { rate: 2.25, change: 'down', centralBank: 'ECB',              lastMeeting: '2026-04-17', next: '2026-06-05' },
+      GBP: { rate: 4.25, change: 'down', centralBank: 'Bank of England', lastMeeting: '2026-05-08', next: '2026-06-19' },
+      JPY: { rate: 0.50, change: 'up',   centralBank: 'Bank of Japan',   lastMeeting: '2026-04-30', next: '2026-06-17' },
+      CHF: { rate: 0.25, change: 'down', centralBank: 'SNB',             lastMeeting: '2026-03-20', next: '2026-06-19' },
+      CAD: { rate: 2.75, change: 'down', centralBank: 'Bank of Canada',  lastMeeting: '2026-04-16', next: '2026-06-04' },
+      AUD: { rate: 4.10, change: 'down', centralBank: 'RBA',             lastMeeting: '2026-05-06', next: '2026-06-03' },
+      NZD: { rate: 3.50, change: 'down', centralBank: 'RBNZ',            lastMeeting: '2026-04-09', next: '2026-07-09' },
     };
     
     saveToStorage(STORAGE_KEYS.INTEREST_RATES, { data: rates, timestamp: Date.now() });

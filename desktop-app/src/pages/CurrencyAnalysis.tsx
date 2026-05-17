@@ -100,7 +100,7 @@ export function CurrencyAnalysis() {
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'pairs'>('overview');
+  const [_activeTab, _setActiveTab] = useState<'overview' | 'pairs'>('overview');
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyData | null>(null);
   const [selectedPair, setSelectedPair] = useState<PairRecommendation | null>(null);
 
@@ -562,31 +562,6 @@ export function CurrencyAnalysis() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Pill segment control */}
-          <div className="flex bg-white/[0.03] rounded-full p-0.5 border border-white/[0.06]">
-            {(['overview', 'pairs'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={clsx(
-                  'relative px-4 py-1.5 rounded-full text-[11px] font-medium uppercase tracking-[0.08em] transition-all duration-200',
-                  activeTab === tab
-                    ? 'text-black'
-                    : 'text-text-muted hover:text-text-secondary'
-                )}
-              >
-                {activeTab === tab && (
-                  <motion.div
-                    layoutId="tab-pill"
-                    className="absolute inset-0 rounded-full bg-accent-gold"
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                  />
-                )}
-                <span className="relative z-10">{tab === 'overview' ? 'Currencies' : 'Pairs'}</span>
-              </button>
-            ))}
-          </div>
-
           <button
             onClick={refreshData}
             disabled={isLoading}
@@ -603,15 +578,12 @@ export function CurrencyAnalysis() {
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        {activeTab === 'overview' ? (
-          <motion.div
-            key="overview"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
+      <div>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+        >
             <BentoGrid cols={4} className="mb-6">
               {/* ================================================================
                   INFO CARD (wide)
@@ -630,6 +602,10 @@ export function CurrencyAnalysis() {
                     <p className="text-[10px] text-text-muted mt-1.5 flex items-center gap-1.5 opacity-60">
                       <AlertTriangle size={10} />
                       COT-Daten muessen auf der COT-Seite geladen werden
+                    </p>
+                    <p className="text-[10px] text-text-muted mt-1 flex items-center gap-1.5 opacity-50">
+                      <Info size={10} />
+                      Zinsdaten: statisch · Stand Mai 2026 · Datum je Währung = letzte Zentralbanksitzung
                     </p>
                   </div>
                 </div>
@@ -688,11 +664,18 @@ export function CurrencyAnalysis() {
                         <span className="font-mono text-xs font-bold text-text-primary">{data.currency}</span>
                       </div>
 
-                      {/* Rate */}
-                      <div className="w-14 flex-shrink-0 text-right">
-                        <span className="font-mono tabular-nums text-xs text-text-secondary">{data.interestRate}%</span>
-                        {data.rateChange === 'up' && <TrendingUp size={10} className="inline ml-1 text-pnl-positive" />}
-                        {data.rateChange === 'down' && <TrendingDown size={10} className="inline ml-1 text-pnl-negative" />}
+                      {/* Rate + Last meeting */}
+                      <div className="w-20 flex-shrink-0 text-right">
+                        <div>
+                          <span className="font-mono tabular-nums text-xs text-text-secondary">{data.interestRate}%</span>
+                          {data.rateChange === 'up' && <TrendingUp size={10} className="inline ml-1 text-pnl-positive" />}
+                          {data.rateChange === 'down' && <TrendingDown size={10} className="inline ml-1 text-pnl-negative" />}
+                        </div>
+                        {data.lastMeeting && (
+                          <div className="text-[9px] text-text-muted font-mono tabular-nums opacity-60">
+                            {new Date(data.lastMeeting).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                          </div>
+                        )}
                       </div>
 
                       {/* Bias pills */}
@@ -755,14 +738,14 @@ export function CurrencyAnalysis() {
               </BentoCell>
             </BentoGrid>
           </motion.div>
-        ) : (
-          <motion.div
-            key="pairs"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
+        </div>
+
+      {/* ================================================================
+          (PAIR RECOMMENDATIONS — moved to Global/Übersicht)
+          ================================================================ */}
+      {/* hidden */}
+      {false && (
+          <motion.div>
             {/* ================================================================
                 PAIR RECOMMENDATIONS
                 ================================================================ */}
@@ -878,7 +861,6 @@ export function CurrencyAnalysis() {
             )}
           </motion.div>
         )}
-      </AnimatePresence>
 
       {/* ================================================================
           UPCOMING HIGH-IMPACT EVENTS

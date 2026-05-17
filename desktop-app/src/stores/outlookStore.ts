@@ -264,6 +264,8 @@ export const useOutlookStore = create<OutlookState>((set, get) => ({
       targetEntry: outlookData.targetEntry,
       targetSL: outlookData.targetSL,
       targetTP: outlookData.targetTP,
+      interestingZone: outlookData.interestingZone,
+      imageData: outlookData.imageData,
       expiresAt: outlookData.expiresAt,
       createdAt: outlookData.createdAt || now,
       updatedAt: now,

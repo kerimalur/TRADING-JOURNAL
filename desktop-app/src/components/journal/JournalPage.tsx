@@ -8,7 +8,7 @@
 
 import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import {
-  Plus, Filter, Grid, List, RefreshCw, Settings, PlusCircle, ChevronDown, Check
+  Plus, Filter, Grid, List, RefreshCw, Settings, PlusCircle, ChevronDown, Check, Edit2, Target
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -62,6 +62,11 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
   });
   const [isSavingSetup, setIsSavingSetup] = useState(false);
 
+  // EK Capital Goal
+  const [goalAmount, setGoalAmount] = useState<number | null>(null);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState('');
+
   // Filters
   const [filters, setFilters] = useState<{
     result?: TradeResult | 'all';
@@ -93,6 +98,24 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
     loadTradesData();
     loadConfigs();
   }, [accountType]);
+
+  // Load/save EK capital goal from localStorage
+  useEffect(() => {
+    if (accountType !== 'ek') return;
+    const configId = configs?.[accountType]?.id || 'default';
+    const saved = localStorage.getItem(`ek-capital-goal-${configId}`);
+    if (saved) setGoalAmount(parseFloat(saved));
+  }, [accountType, configs?.[accountType]?.id]);
+
+  const handleSaveGoal = () => {
+    const val = parseFloat(goalInput);
+    if (!isNaN(val) && val > 0) {
+      const configId = configs?.[accountType]?.id || 'default';
+      setGoalAmount(val);
+      localStorage.setItem(`ek-capital-goal-${configId}`, String(val));
+    }
+    setEditingGoal(false);
+  };
 
   // ============================================================
   // FILTERING
@@ -557,6 +580,77 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
             </button>
           </div>
         </div>
+
+        {/* EK Capital Goal Progress */}
+        {accountType === 'ek' && config && (
+          <div className="mb-4 p-4 rounded-xl bg-background-card border border-border">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Target size={14} className="text-accent-gold" />
+                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Kapitalziel</span>
+              </div>
+              {!editingGoal ? (
+                <button
+                  onClick={() => { setGoalInput(goalAmount ? String(goalAmount) : ''); setEditingGoal(true); }}
+                  className="flex items-center gap-1 text-[10px] text-text-muted hover:text-accent-primary transition-colors"
+                >
+                  <Edit2 size={11} />
+                  {goalAmount ? 'Ziel ändern' : 'Ziel setzen'}
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={goalInput}
+                    onChange={e => setGoalInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveGoal()}
+                    placeholder="z.B. 50000"
+                    className="w-28 bg-white/[0.04] border border-accent-primary/30 rounded px-2 py-0.5 text-xs font-mono text-text-primary focus:outline-none focus:border-accent-primary/60"
+                    autoFocus
+                  />
+                  <button onClick={handleSaveGoal} className="text-[10px] text-accent-primary hover:text-accent-primary/80 font-semibold">OK</button>
+                  <button onClick={() => setEditingGoal(false)} className="text-[10px] text-text-muted hover:text-text-primary">Abbruch</button>
+                </div>
+              )}
+            </div>
+            {goalAmount ? (
+              <>
+                <div className="flex justify-between text-xs text-text-muted mb-1.5 font-mono tabular-nums">
+                  <span>
+                    {config.currentBalance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} {config.currency || 'USD'}
+                  </span>
+                  <span className="text-accent-gold">
+                    Ziel: {goalAmount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} {config.currency || 'USD'}
+                  </span>
+                </div>
+                <div className="relative h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
+                  {(() => {
+                    const start = config.initialStartBalance || 0;
+                    const current = config.currentBalance;
+                    const goal = goalAmount;
+                    const pct = Math.min(100, Math.max(0, ((current - start) / (goal - start)) * 100));
+                    return (
+                      <motion.div
+                        className="absolute top-0 left-0 h-full rounded-full bg-gradient-to-r from-accent-primary to-accent-gold"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+                      />
+                    );
+                  })()}
+                </div>
+                <div className="flex justify-between text-[10px] text-text-muted mt-1 font-mono tabular-nums">
+                  <span>Start: {(config.initialStartBalance || 0).toLocaleString('de-DE', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-accent-primary">
+                    {Math.min(100, Math.max(0, (((config.currentBalance - (config.initialStartBalance || 0)) / (goalAmount - (config.initialStartBalance || 0))) * 100))).toFixed(1)}% erreicht
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-text-muted">Setze ein Kapitalziel um deinen Fortschritt zu verfolgen.</p>
+            )}
+          </div>
+        )}
 
         {/* Account Settings Panel */}
         <AccountSettings

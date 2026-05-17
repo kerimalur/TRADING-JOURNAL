@@ -6,7 +6,7 @@
  * ========================================================================
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Globe2,
   TrendingUp, TrendingDown, Minus,
@@ -163,12 +163,51 @@ function ScoreBar({ score }: { score: number }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BIAS COMPUTATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+function computeOverallBias(d: CountryMacro, cotParsed: any[]): 'bullish' | 'bearish' | 'neutral' {
+  let score = 0;
+  // Rate trend weight
+  if (d.rateTrend === 'hiking')  score += 30;
+  else if (d.rateTrend === 'cutting') score -= 30;
+  // Policy stance weight
+  if (d.policyStance === 'hawkish') score += 20;
+  else if (d.policyStance === 'dovish') score -= 20;
+  // Economic score (40% weight)
+  score += d.economicScore * 0.4;
+  // COT signal
+  const cot = cotParsed.find((c: any) => c.currency === d.currency);
+  if (cot) {
+    if (cot.signal === 'strong_long')  score += 25;
+    else if (cot.signal === 'long')    score += 15;
+    else if (cot.signal === 'strong_short') score -= 25;
+    else if (cot.signal === 'short')   score -= 15;
+  }
+  return score > 20 ? 'bullish' : score < -20 ? 'bearish' : 'neutral';
+}
+
+const BIAS_CFG = {
+  bullish: { label: 'Bullish', color: 'text-pnl-positive', bg: 'bg-pnl-positive/10 border border-pnl-positive/25' },
+  neutral: { label: 'Neutral', color: 'text-text-muted',   bg: 'bg-white/[0.04] border border-white/[0.06]'       },
+  bearish: { label: 'Bearish', color: 'text-pnl-negative', bg: 'bg-pnl-negative/10 border border-pnl-negative/25' },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL TAB
 // ─────────────────────────────────────────────────────────────────────────────
 
 function GlobalTab() {
   const [selected, setSelected] = useState<string | null>(null);
+  const [cotData, setCotData] = useState<any[]>([]);
   const detail = MACRO_DATA.find(d => d.currency === selected) ?? null;
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('cotData');
+      if (raw) setCotData(JSON.parse(raw));
+    } catch {}
+  }, []);
 
   return (
     <div className="space-y-5">
@@ -181,6 +220,8 @@ function GlobalTab() {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {MACRO_DATA.map(d => {
           const stance   = POLICY_CFG[d.policyStance];
+          const bias     = computeOverallBias(d, cotData);
+          const biasCfg  = BIAS_CFG[bias];
           const isActive = selected === d.currency;
           return (
             <motion.button
@@ -203,9 +244,14 @@ function GlobalTab() {
                     <p className="text-[10px] text-text-muted leading-tight">{d.centralBank}</p>
                   </div>
                 </div>
-                <span className={clsx('text-[10px] font-semibold px-1.5 py-0.5 rounded', stance.bg, stance.color)}>
-                  {stance.label}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={clsx('text-[10px] font-semibold px-1.5 py-0.5 rounded', stance.bg, stance.color)}>
+                    {stance.label}
+                  </span>
+                  <span className={clsx('text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide', biasCfg.bg, biasCfg.color)}>
+                    {bias === 'bullish' ? '▲' : bias === 'bearish' ? '▼' : '—'} {biasCfg.label}
+                  </span>
+                </div>
               </div>
 
               {/* Rate + trend */}
