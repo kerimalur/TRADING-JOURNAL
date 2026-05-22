@@ -370,6 +370,8 @@ export interface Outlook {
   targetEntry?: number;
   targetSL?: number;
   targetTP?: number;
+  interestingZone?: number;
+  imageData?: string;
   tags?: string[];
   expiresAt?: string;
 }

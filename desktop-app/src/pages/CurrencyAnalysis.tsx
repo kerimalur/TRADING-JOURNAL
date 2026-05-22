@@ -100,7 +100,7 @@ export function CurrencyAnalysis() {
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'pairs'>('overview');
+  const [_activeTab, _setActiveTab] = useState<'overview' | 'pairs'>('overview');
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyData | null>(null);
   const [selectedPair, setSelectedPair] = useState<PairRecommendation | null>(null);
 
@@ -112,17 +112,9 @@ export function CurrencyAnalysis() {
   const refreshData = async () => {
     setIsLoading(true);
 
-    // Default/Fallback Zinssaetze (Stand: Februar 2026)
-    let interestRates: Record<string, { rate: number; change: 'up' | 'down' | 'hold'; next: string; lastMeeting?: string; centralBank?: string }> = {
-      'USD': { rate: 4.25, change: 'down', next: '2026-03-19', lastMeeting: '2026-01-29', centralBank: 'Federal Reserve' },
-      'EUR': { rate: 2.75, change: 'down', next: '2026-03-06', lastMeeting: '2026-01-30', centralBank: 'ECB' },
-      'GBP': { rate: 4.00, change: 'down', next: '2026-03-20', lastMeeting: '2026-02-06', centralBank: 'Bank of England' },
-      'JPY': { rate: 0.50, change: 'up', next: '2026-03-14', lastMeeting: '2026-01-24', centralBank: 'Bank of Japan' },
-      'CAD': { rate: 3.50, change: 'down', next: '2026-03-12', lastMeeting: '2026-01-29', centralBank: 'Bank of Canada' },
-      'AUD': { rate: 3.60, change: 'down', next: '2026-03-04', lastMeeting: '2026-02-04', centralBank: 'RBA' },
-      'NZD': { rate: 4.25, change: 'down', next: '2026-04-09', lastMeeting: '2026-02-19', centralBank: 'RBNZ' },
-      'CHF': { rate: 0.75, change: 'hold', next: '2026-03-20', lastMeeting: '2025-12-12', centralBank: 'SNB' },
-    };
+    // Zinssaetze – nur ueber API laden, keine Fallback-Daten
+    let interestRates: Record<string, { rate: number; change: 'up' | 'down' | 'hold'; next: string; lastMeeting?: string; centralBank?: string }> = {};
+    let apiDataLoaded = false;
 
     // Versuche Zinssaetze ueber unified API zu laden (falls verfuegbar)
     try {
@@ -132,11 +124,20 @@ export function CurrencyAnalysis() {
         const result = await api.fetchInterestRates();
         if (result.success && result.data) {
           interestRates = result.data;
+          apiDataLoaded = true;
           console.log('Interest rates loaded from API');
         }
       }
     } catch (e) {
-      console.log('Interest rates API not available, using cached data');
+      console.log('Interest rates API not available');
+    }
+
+    // Kein API-Zugriff → leere Anzeige, keine Dummy-Daten
+    if (!apiDataLoaded) {
+      setCurrencyData([]);
+      setUpcomingEvents([]);
+      setIsLoading(false);
+      return;
     }
 
     // Lade COT-Daten aus Cache
@@ -561,31 +562,6 @@ export function CurrencyAnalysis() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Pill segment control */}
-          <div className="flex bg-white/[0.03] rounded-full p-0.5 border border-white/[0.06]">
-            {(['overview', 'pairs'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={clsx(
-                  'relative px-4 py-1.5 rounded-full text-[11px] font-medium uppercase tracking-[0.08em] transition-all duration-200',
-                  activeTab === tab
-                    ? 'text-black'
-                    : 'text-text-muted hover:text-text-secondary'
-                )}
-              >
-                {activeTab === tab && (
-                  <motion.div
-                    layoutId="tab-pill"
-                    className="absolute inset-0 rounded-full bg-accent-gold"
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                  />
-                )}
-                <span className="relative z-10">{tab === 'overview' ? 'Currencies' : 'Pairs'}</span>
-              </button>
-            ))}
-          </div>
-
           <button
             onClick={refreshData}
             disabled={isLoading}
@@ -602,15 +578,12 @@ export function CurrencyAnalysis() {
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        {activeTab === 'overview' ? (
-          <motion.div
-            key="overview"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
+      <div>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+        >
             <BentoGrid cols={4} className="mb-6">
               {/* ================================================================
                   INFO CARD (wide)
@@ -629,6 +602,10 @@ export function CurrencyAnalysis() {
                     <p className="text-[10px] text-text-muted mt-1.5 flex items-center gap-1.5 opacity-60">
                       <AlertTriangle size={10} />
                       COT-Daten muessen auf der COT-Seite geladen werden
+                    </p>
+                    <p className="text-[10px] text-text-muted mt-1 flex items-center gap-1.5 opacity-50">
+                      <Info size={10} />
+                      Zinsdaten: statisch · Stand Mai 2026 · Datum je Währung = letzte Zentralbanksitzung
                     </p>
                   </div>
                 </div>
@@ -687,11 +664,18 @@ export function CurrencyAnalysis() {
                         <span className="font-mono text-xs font-bold text-text-primary">{data.currency}</span>
                       </div>
 
-                      {/* Rate */}
-                      <div className="w-14 flex-shrink-0 text-right">
-                        <span className="font-mono tabular-nums text-xs text-text-secondary">{data.interestRate}%</span>
-                        {data.rateChange === 'up' && <TrendingUp size={10} className="inline ml-1 text-pnl-positive" />}
-                        {data.rateChange === 'down' && <TrendingDown size={10} className="inline ml-1 text-pnl-negative" />}
+                      {/* Rate + Last meeting */}
+                      <div className="w-20 flex-shrink-0 text-right">
+                        <div>
+                          <span className="font-mono tabular-nums text-xs text-text-secondary">{data.interestRate}%</span>
+                          {data.rateChange === 'up' && <TrendingUp size={10} className="inline ml-1 text-pnl-positive" />}
+                          {data.rateChange === 'down' && <TrendingDown size={10} className="inline ml-1 text-pnl-negative" />}
+                        </div>
+                        {data.lastMeeting && (
+                          <div className="text-[9px] text-text-muted font-mono tabular-nums opacity-60">
+                            {new Date(data.lastMeeting).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                          </div>
+                        )}
                       </div>
 
                       {/* Bias pills */}
@@ -754,14 +738,14 @@ export function CurrencyAnalysis() {
               </BentoCell>
             </BentoGrid>
           </motion.div>
-        ) : (
-          <motion.div
-            key="pairs"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
+        </div>
+
+      {/* ================================================================
+          (PAIR RECOMMENDATIONS — moved to Global/Übersicht)
+          ================================================================ */}
+      {/* hidden */}
+      {false && (
+          <motion.div>
             {/* ================================================================
                 PAIR RECOMMENDATIONS
                 ================================================================ */}
@@ -877,7 +861,6 @@ export function CurrencyAnalysis() {
             )}
           </motion.div>
         )}
-      </AnimatePresence>
 
       {/* ================================================================
           UPCOMING HIGH-IMPACT EVENTS

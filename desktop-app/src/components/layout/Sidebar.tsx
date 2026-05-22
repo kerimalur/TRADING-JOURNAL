@@ -18,6 +18,9 @@ import {
   Calendar,
   Lightbulb,
   Target,
+  Newspaper,
+  BarChart2,
+  Percent,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -39,7 +42,10 @@ const BASE_ITEMS: NavItem[] = [
   { path: '/calendar',    label: 'Kalender',       icon: <Calendar size={18} />,        group: 'Übersicht' },
   { path: '/ek',          label: 'Eigenkapital',   icon: <Wallet size={18} />,          group: 'Trading'   },
   { path: '/outlook',     label: 'Outlook',        icon: <Target size={18} />,          group: 'Trading'   },
-  { path: '/fundamentals',label: 'Fundamentals',   icon: <Globe2 size={18} />,          group: 'Markt'     },
+  { path: '/fundamentals',label: 'Übersicht',      icon: <Globe2 size={18} />,          group: 'Markt'     },
+  { path: '/news',        label: 'News',           icon: <Newspaper size={18} />,       group: 'Markt'     },
+  { path: '/cot',         label: 'COT',            icon: <BarChart2 size={18} />,       group: 'Markt'     },
+  { path: '/zinsen',      label: 'Zinsen',         icon: <Percent size={18} />,         group: 'Markt'     },
   { path: '/strategy',    label: 'Strategie',      icon: <Lightbulb size={18} />,       group: 'Tools'     },
   { path: '/backtest',    label: 'Backtest',       icon: <Zap size={18} />,             group: 'Tools'     },
   { path: '/settings',    label: 'Einstellungen',  icon: <Settings size={18} />,        group: 'System'    },

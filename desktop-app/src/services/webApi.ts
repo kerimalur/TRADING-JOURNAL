@@ -283,9 +283,11 @@ export const webOutlookApi = {
 export const webExternalApi = {
   // COT Data from CFTC
   async fetchCOTData(): Promise<any> {
+    // Reihenfolge: Dollar Index, Euro FX, CHF, GBP, JPY, CAD, AUD, NZD
+    // 098662 = aktueller ICE USD INDEX Kontrakt (aktiv)
     const CFTC_CODES: Record<string, string> = {
-      EUR: '099741', GBP: '096742', JPY: '097741', CAD: '090741',
-      AUD: '232741', NZD: '112741', CHF: '092741', USD: '098662',
+      DXY: '098662', EUR: '099741', CHF: '092741', GBP: '096742',
+      JPY: '097741', CAD: '090741', AUD: '232741', NZD: '112741',
     };
 
     try {
@@ -364,90 +366,60 @@ export const webExternalApi = {
     }
   },
 
-  // Economic Calendar from Forex Factory
+  // Economic Calendar from Forex Factory (JSON)
   async fetchEconomicCalendar(): Promise<any> {
     try {
-      const response = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.xml');
+      // Use server-side proxy to avoid CORS restrictions in web deployment
+      const proxyUrl = '/api/calendar';
+      const response = await fetch(proxyUrl);
       if (!response.ok) throw new Error('Calendar fetch failed');
       
-      const buffer = await response.arrayBuffer();
-      const text = new TextDecoder('utf-8').decode(buffer);
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(text, 'text/xml');
-      const events = xml.querySelectorAll('event');
+      const rawEvents: any[] = await response.json();
       
-      const calendarEvents: any[] = [];
-      events.forEach((event, index) => {
-        const title = event.querySelector('title')?.textContent || '';
-        const country = event.querySelector('country')?.textContent || '';
-        const dateStr = event.querySelector('date')?.textContent || '';
-        const timeStr = event.querySelector('time')?.textContent || '';
-        let impact = (event.querySelector('impact')?.textContent || '').toLowerCase();
-        const forecast = event.querySelector('forecast')?.textContent || '';
-        const previous = event.querySelector('previous')?.textContent || '';
-        const actual   = event.querySelector('actual')?.textContent   || '';
-        
-        // Convert date from MM-DD-YYYY to ISO format
-        let isoDate = '';
-        if (dateStr) {
-          const [month, day, year] = dateStr.split('-');
-          if (month && day && year) {
-            isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          }
-        }
-        
-        // Convert time to 24h format
-        let time24 = timeStr;
-        if (timeStr && timeStr.includes('am')) {
-          time24 = timeStr.replace('am', '').trim();
-          const parts = time24.split(':');
-          time24 = `${parts[0].padStart(2, '0')}:${parts[1] || '00'}`;
-        } else if (timeStr && timeStr.includes('pm')) {
-          time24 = timeStr.replace('pm', '').trim();
-          const parts = time24.split(':');
-          const hour = parseInt(parts[0]) === 12 ? 12 : parseInt(parts[0]) + 12;
-          time24 = `${hour}:${parts[1] || '00'}`;
-        }
-        
-        // Normalize impact
-        if (impact !== 'high' && impact !== 'medium' && impact !== 'low') {
-          impact = 'low';
-        }
-        
-        calendarEvents.push({
-          id: `ff-${index}`,
-          event: title,
-          currency: country,
-          date: isoDate,
-          time: time24,
-          impact: impact as 'high' | 'medium' | 'low',
-          forecast: forecast || undefined,
-          previous: previous || undefined,
-          actual:   actual   || undefined,
-          source: 'forexfactory'
+      const calendarEvents = rawEvents
+        .filter((e: any) => (e.impact || '').toLowerCase() !== 'holiday')
+        .map((e: any, index: number) => {
+          const dt = new Date(e.date);
+          const isoDate = dt.toISOString().split('T')[0];
+          const time24 = dt.toLocaleTimeString('de-DE', {
+            hour: '2-digit', minute: '2-digit',
+            timeZone: 'Europe/Berlin'
+          });
+          const impact = (e.impact || '').toLowerCase();
+          return {
+            id: `ff-${index}`,
+            event: e.title,
+            currency: e.country,
+            date: isoDate,
+            time: time24,
+            impact: impact === 'high' ? 'high' : impact === 'medium' ? 'medium' : 'low',
+            forecast: e.forecast || undefined,
+            previous: e.previous || undefined,
+            actual: e.actual || undefined,
+            source: 'forexfactory'
+          } as any;
         });
-      });
       
       saveToStorage(STORAGE_KEYS.CALENDAR, { data: calendarEvents, timestamp: Date.now() });
       return { success: true, data: calendarEvents, source: 'forexfactory' };
     } catch (error) {
       const cached = getFromStorage<any>(STORAGE_KEYS.CALENDAR, null);
-      if (cached) return { success: true, data: cached.data, cached: true };
+      if (cached) return { success: true, data: cached.data, cached: true, source: 'cache' };
       return { success: false, error: String(error) };
     }
   },
 
-  // Interest Rates (hardcoded current values - would need real API)
+  // Interest Rates (hardcoded current values – Stand Mai 2026)
   async fetchInterestRates(): Promise<any> {
     const rates = {
-      USD: { rate: 5.25, change: 0 },
-      EUR: { rate: 4.50, change: 0 },
-      GBP: { rate: 5.25, change: 0 },
-      JPY: { rate: 0.25, change: 0.15 },
-      CHF: { rate: 1.75, change: 0 },
-      CAD: { rate: 5.00, change: -0.25 },
-      AUD: { rate: 4.35, change: 0 },
-      NZD: { rate: 5.50, change: 0 },
+      USD: { rate: 4.50, change: 'down', centralBank: 'Federal Reserve', lastMeeting: '2026-05-07', next: '2026-06-11' },
+      EUR: { rate: 2.25, change: 'down', centralBank: 'ECB',              lastMeeting: '2026-04-17', next: '2026-06-05' },
+      GBP: { rate: 4.25, change: 'down', centralBank: 'Bank of England', lastMeeting: '2026-05-08', next: '2026-06-19' },
+      JPY: { rate: 0.50, change: 'up',   centralBank: 'Bank of Japan',   lastMeeting: '2026-04-30', next: '2026-06-17' },
+      CHF: { rate: 0.25, change: 'down', centralBank: 'SNB',             lastMeeting: '2026-03-20', next: '2026-06-19' },
+      CAD: { rate: 2.75, change: 'down', centralBank: 'Bank of Canada',  lastMeeting: '2026-04-16', next: '2026-06-04' },
+      AUD: { rate: 4.10, change: 'down', centralBank: 'RBA',             lastMeeting: '2026-05-06', next: '2026-06-03' },
+      NZD: { rate: 3.50, change: 'down', centralBank: 'RBNZ',            lastMeeting: '2026-04-09', next: '2026-07-09' },
     };
     
     saveToStorage(STORAGE_KEYS.INTEREST_RATES, { data: rates, timestamp: Date.now() });

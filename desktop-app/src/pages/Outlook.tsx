@@ -170,6 +170,8 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
     targetEntry: undefined,
     targetSL: undefined,
     targetTP: undefined,
+    interestingZone: undefined,
+    imageData: undefined,
     expiresAt: undefined,
     ...outlook,
   }));
@@ -495,6 +497,63 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                   className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary/50 transition-colors"
                 />
               </div>
+
+              {/* Interesting Zone */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1">
+                  Interesting Zone / Zielpreis
+                </label>
+                <input
+                  type="number"
+                  step="0.00001"
+                  value={formData.interestingZone || ''}
+                  onChange={(e) => handleChange('interestingZone', e.target.value ? parseFloat(e.target.value) : undefined)}
+                  placeholder="z.B. 1.0820 (erwartete Zone)"
+                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-gold/50 transition-colors"
+                />
+              </div>
+
+              {/* Image Upload */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1">
+                  Chart-Screenshot
+                </label>
+                {formData.imageData ? (
+                  <div className="relative">
+                    <img
+                      src={formData.imageData}
+                      alt="Chart"
+                      className="w-full max-h-40 object-cover rounded border border-white/[0.06]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleChange('imageData', undefined)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 w-full py-4 border border-dashed border-white/[0.12] rounded cursor-pointer hover:border-accent-primary/40 hover:bg-white/[0.02] transition-all">
+                    <Upload size={13} className="text-text-muted" />
+                    <span className="text-xs text-text-muted">Bild auswählen</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          handleChange('imageData', ev.target?.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
             </div>
           )}
 
@@ -701,7 +760,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
       )}
 
       {/* Price targets - inline */}
-      {(outlook.targetEntry || outlook.targetSL || outlook.targetTP) && (
+      {(outlook.targetEntry || outlook.targetSL || outlook.targetTP || outlook.interestingZone) && (
         <div className="mx-3.5 mb-2 flex items-center gap-3 text-[10px] font-mono tabular-nums">
           {outlook.targetEntry && (
             <span>
@@ -721,6 +780,27 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
               <span className="text-pnl-positive font-semibold">{outlook.targetTP}</span>
             </span>
           )}
+          {outlook.interestingZone && (
+            <span className="flex items-center gap-1 bg-accent-gold/10 border border-accent-gold/25 px-1.5 py-0.5 rounded">
+              <span className="text-accent-gold uppercase tracking-[0.05em]">Zone </span>
+              <span className="text-accent-gold font-semibold">{outlook.interestingZone}</span>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Chart image thumbnail */}
+      {outlook.imageData && (
+        <div className="mx-3.5 mb-2">
+          <img
+            src={outlook.imageData}
+            alt="Chart"
+            className="w-full max-h-32 object-cover rounded border border-white/[0.06] cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(outlook.imageData, '_blank');
+            }}
+          />
         </div>
       )}
 

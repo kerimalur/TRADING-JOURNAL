@@ -36,15 +36,16 @@ import { BentoGrid, BentoCell } from '@/components/ui/BentoGrid';
 import { MetricDisplay } from '@/components/ui/MetricDisplay';
 
 // Währungen und ihre CFTC Codes
+// Reihenfolge: Dollar Index, Euro FX, Swiss Franc, British Pound, JPY, CAD, AUD, NZD
 const CURRENCIES = [
-  { id: 'EUR', name: 'EUR', cftcCode: '099741', flag: '🇪🇺' },
-  { id: 'GBP', name: 'GBP', cftcCode: '096742', flag: '🇬🇧' },
-  { id: 'JPY', name: 'JPY', cftcCode: '097741', flag: '🇯🇵' },
-  { id: 'CAD', name: 'CAD', cftcCode: '090741', flag: '🇨🇦' },
-  { id: 'AUD', name: 'AUD', cftcCode: '232741', flag: '🇦🇺' },
-  { id: 'NZD', name: 'NZD', cftcCode: '112741', flag: '🇳🇿' },
-  { id: 'CHF', name: 'CHF', cftcCode: '092741', flag: '🇨🇭' },
-  { id: 'USD', name: 'USD', cftcCode: '098662', flag: '🇺🇸' },
+  { id: 'DXY', name: 'DXY',  cftcCode: '098662', flag: '🇺🇸' },
+  { id: 'EUR', name: 'EUR',  cftcCode: '099741', flag: '🇪🇺' },
+  { id: 'CHF', name: 'CHF',  cftcCode: '092741', flag: '🇨🇭' },
+  { id: 'GBP', name: 'GBP',  cftcCode: '096742', flag: '🇬🇧' },
+  { id: 'JPY', name: 'JPY',  cftcCode: '097741', flag: '🇯🇵' },
+  { id: 'CAD', name: 'CAD',  cftcCode: '090741', flag: '🇨🇦' },
+  { id: 'AUD', name: 'AUD',  cftcCode: '232741', flag: '🇦🇺' },
+  { id: 'NZD', name: 'NZD',  cftcCode: '112741', flag: '🇳🇿' },
 ];
 
 interface CurrencyCOT {
@@ -88,6 +89,19 @@ export function COTData() {
       const cachedDate = localStorage.getItem('cotLastUpdate');
 
       if (cached && cachedDate) {
+        const parsedCache = JSON.parse(cached);
+
+        // Cache-Invalidierung: Wenn alte USD-Einträge vorhanden (vor DXY-Umbenennung), neu laden
+        const hasOldFormat = Array.isArray(parsedCache) && parsedCache.some((d: any) => d.currency === 'USD');
+        if (hasOldFormat) {
+          localStorage.removeItem('cotData');
+          localStorage.removeItem('cotHistory');
+          localStorage.removeItem('cotLastUpdate');
+          localStorage.removeItem('cotDataSource');
+          await fetchCOTData();
+          return;
+        }
+
         const lastUpdateDate = new Date(cachedDate);
         const now = new Date();
 

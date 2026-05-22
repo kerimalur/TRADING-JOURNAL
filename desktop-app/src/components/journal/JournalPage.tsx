@@ -8,7 +8,7 @@
 
 import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import {
-  Plus, Filter, Grid, List, RefreshCw, Settings, PlusCircle, ChevronDown, Check
+  Plus, Filter, Grid, List, RefreshCw, Settings, PlusCircle, ChevronDown, Check, Edit2, Target
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,6 +48,10 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
   const [editingTrade, setEditingTrade] = useState<Trade | undefined>();
   const [viewingTrade, setViewingTrade] = useState<Trade | null>(null);
 
+  // EK Ziel bearbeiten
+  const [showGoalEdit, setShowGoalEdit] = useState(false);
+  const [goalEditValue, setGoalEditValue] = useState(0);
+
   // Account-Setup & Switcher
   const [showSetupForm, setShowSetupForm] = useState(false);
   const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
@@ -62,6 +66,11 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
     dailyDrawdown: 2,
   });
   const [isSavingSetup, setIsSavingSetup] = useState(false);
+
+  // EK Capital Goal
+  const [goalAmount, setGoalAmount] = useState<number | null>(null);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState('');
 
   // Filters
   const [filters, setFilters] = useState<{
@@ -94,6 +103,24 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
     loadTradesData();
     loadConfigs();
   }, [accountType]);
+
+  // Load/save EK capital goal from localStorage
+  useEffect(() => {
+    if (accountType !== 'ek') return;
+    const configId = configs?.[accountType]?.id || 'default';
+    const saved = localStorage.getItem(`ek-capital-goal-${configId}`);
+    if (saved) setGoalAmount(parseFloat(saved));
+  }, [accountType, configs?.[accountType]?.id]);
+
+  const handleSaveGoal = () => {
+    const val = parseFloat(goalInput);
+    if (!isNaN(val) && val > 0) {
+      const configId = configs?.[accountType]?.id || 'default';
+      setGoalAmount(val);
+      localStorage.setItem(`ek-capital-goal-${configId}`, String(val));
+    }
+    setEditingGoal(false);
+  };
 
   // ============================================================
   // FILTERING
@@ -475,8 +502,8 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
                 </div>
 
                 {/* Goal Progress Bar – sichtbar wenn Ziel gesetzt */}
-                {config.enableGoals && config.profitTarget && config.profitTarget > 0 && (
-                  <div className="flex items-center gap-2">
+                {config.enableGoals && config.profitTarget && config.profitTarget > 0 ? (
+                  <div className="flex items-center gap-1.5">
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-[11px] text-text-muted">Ziel</span>
@@ -491,9 +518,69 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
                         />
                       </div>
                       <span className="text-[10px] text-text-muted font-mono">
-                        {config.currentBalance.toLocaleString('de-DE', { maximumFractionDigits: 0 })} / {config.profitTarget.toLocaleString('de-DE', { maximumFractionDigits: 0 })}
+                        {config.currentBalance.toLocaleString('de-DE', { maximumFractionDigits: 0 })} / {config.profitTarget.toLocaleString('de-DE', { maximumFractionDigits: 0 })} {config.currency}
                       </span>
                     </div>
+                    {accountType === 'ek' && (
+                      <button
+                        onClick={() => { setGoalEditValue(config.profitTarget!); setShowGoalEdit(true); }}
+                        className="p-1 rounded text-text-muted hover:text-accent-primary hover:bg-accent-primary/10 transition-colors"
+                        title="Ziel bearbeiten"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                ) : accountType === 'ek' && !showGoalEdit ? (
+                  <button
+                    onClick={() => { setGoalEditValue(0); setShowGoalEdit(true); }}
+                    className="flex items-center gap-1 text-[11px] text-text-muted hover:text-accent-primary transition-colors"
+                  >
+                    <Target size={12} />
+                    Ziel setzen
+                  </button>
+                ) : null}
+
+                {/* Inline Ziel-Editor */}
+                {accountType === 'ek' && showGoalEdit && (
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-background-surface-dark border border-border">
+                    <input
+                      type="number"
+                      className="w-24 bg-transparent text-xs font-mono text-text-primary outline-none border-b border-accent-primary/50 pb-0.5"
+                      placeholder="Ziel-Balance"
+                      value={goalEditValue || ''}
+                      min={0}
+                      onChange={e => setGoalEditValue(Number(e.target.value))}
+                      autoFocus
+                    />
+                    <button
+                      onClick={async () => {
+                        if (config && goalEditValue > 0) {
+                          await saveConfig({
+                            ...config,
+                            enableGoals: true,
+                            profitTargetType: 'absolute',
+                            profitTargetValue: goalEditValue,
+                            profitTarget: goalEditValue,
+                          });
+                          await loadConfigs();
+                          showToast('Ziel gespeichert', 'success');
+                        } else if (config && goalEditValue === 0) {
+                          await saveConfig({ ...config, enableGoals: false, profitTarget: undefined, profitTargetValue: undefined });
+                          await loadConfigs();
+                        }
+                        setShowGoalEdit(false);
+                      }}
+                      className="text-[11px] font-semibold text-pnl-positive hover:text-pnl-positive/80 transition-colors"
+                    >
+                      OK
+                    </button>
+                    <button
+                      onClick={() => setShowGoalEdit(false)}
+                      className="text-[11px] text-text-muted hover:text-text-primary transition-colors"
+                    >
+                      ✕
+                    </button>
                   </div>
                 )}
 
@@ -595,6 +682,77 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
             </button>
           </div>
         </div>
+
+        {/* EK Capital Goal Progress */}
+        {accountType === 'ek' && config && (
+          <div className="mb-4 p-4 rounded-xl bg-background-card border border-border">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Target size={14} className="text-accent-gold" />
+                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Kapitalziel</span>
+              </div>
+              {!editingGoal ? (
+                <button
+                  onClick={() => { setGoalInput(goalAmount ? String(goalAmount) : ''); setEditingGoal(true); }}
+                  className="flex items-center gap-1 text-[10px] text-text-muted hover:text-accent-primary transition-colors"
+                >
+                  <Edit2 size={11} />
+                  {goalAmount ? 'Ziel ändern' : 'Ziel setzen'}
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={goalInput}
+                    onChange={e => setGoalInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveGoal()}
+                    placeholder="z.B. 50000"
+                    className="w-28 bg-white/[0.04] border border-accent-primary/30 rounded px-2 py-0.5 text-xs font-mono text-text-primary focus:outline-none focus:border-accent-primary/60"
+                    autoFocus
+                  />
+                  <button onClick={handleSaveGoal} className="text-[10px] text-accent-primary hover:text-accent-primary/80 font-semibold">OK</button>
+                  <button onClick={() => setEditingGoal(false)} className="text-[10px] text-text-muted hover:text-text-primary">Abbruch</button>
+                </div>
+              )}
+            </div>
+            {goalAmount ? (
+              <>
+                <div className="flex justify-between text-xs text-text-muted mb-1.5 font-mono tabular-nums">
+                  <span>
+                    {config.currentBalance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} {config.currency || 'USD'}
+                  </span>
+                  <span className="text-accent-gold">
+                    Ziel: {goalAmount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} {config.currency || 'USD'}
+                  </span>
+                </div>
+                <div className="relative h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
+                  {(() => {
+                    const start = config.initialStartBalance || 0;
+                    const current = config.currentBalance;
+                    const goal = goalAmount;
+                    const pct = Math.min(100, Math.max(0, ((current - start) / (goal - start)) * 100));
+                    return (
+                      <motion.div
+                        className="absolute top-0 left-0 h-full rounded-full bg-gradient-to-r from-accent-primary to-accent-gold"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+                      />
+                    );
+                  })()}
+                </div>
+                <div className="flex justify-between text-[10px] text-text-muted mt-1 font-mono tabular-nums">
+                  <span>Start: {(config.initialStartBalance || 0).toLocaleString('de-DE', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-accent-primary">
+                    {Math.min(100, Math.max(0, (((config.currentBalance - (config.initialStartBalance || 0)) / (goalAmount - (config.initialStartBalance || 0))) * 100))).toFixed(1)}% erreicht
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-text-muted">Setze ein Kapitalziel um deinen Fortschritt zu verfolgen.</p>
+            )}
+          </div>
+        )}
 
         {/* Account Settings Panel */}
         <AccountSettings
