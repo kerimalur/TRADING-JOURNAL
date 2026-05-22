@@ -56,6 +56,7 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
     broker: '',
     initialBalance: accountType === 'ek' ? 10000 : 100000,
     currency: 'USD',
+    goalTarget: 0,
     profitTarget: 8,
     maxDrawdown: 5,
     dailyDrawdown: 2,
@@ -249,7 +250,7 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
       const isFunded = accountType === 'funded';
       const profitTargetAbs = isFunded
         ? setupForm.initialBalance * (1 + setupForm.profitTarget / 100)
-        : undefined;
+        : (setupForm.goalTarget > 0 ? setupForm.goalTarget : undefined);
       const maxDrawdownAbs = isFunded
         ? setupForm.initialBalance * (1 - setupForm.maxDrawdown / 100)
         : undefined;
@@ -261,9 +262,9 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
         currency:            setupForm.currency,
         initialStartBalance: setupForm.initialBalance,
         currentBalance:      setupForm.initialBalance,
-        enableGoals:         isFunded,
-        profitTargetValue:   isFunded ? setupForm.profitTarget : undefined,
-        profitTargetType:    isFunded ? 'percent' : undefined,
+        enableGoals:         isFunded || (setupForm.goalTarget > 0),
+        profitTargetValue:   isFunded ? setupForm.profitTarget : (setupForm.goalTarget > 0 ? setupForm.goalTarget : undefined),
+        profitTargetType:    isFunded ? 'percent' : (setupForm.goalTarget > 0 ? 'absolute' : undefined),
         profitTarget:        profitTargetAbs,
         maxDrawdownValue:    isFunded ? setupForm.maxDrawdown : undefined,
         maxDrawdownType:     isFunded ? 'percent' : undefined,
@@ -383,6 +384,20 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
                     </select>
                   </div>
                 </div>
+                {accountType === 'ek' && (
+                  <div>
+                    <label className="input-label">Ziel-Balance (optional)</label>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="z.B. 1500"
+                      value={setupForm.goalTarget || ''}
+                      min="0"
+                      onChange={e => setSetupForm(f => ({ ...f, goalTarget: Number(e.target.value) }))}
+                    />
+                    <p className="text-[11px] text-text-muted mt-1">Absoluter Zielbetrag in {setupForm.currency}</p>
+                  </div>
+                )}
                 {accountType === 'funded' && (
                   <div className="grid grid-cols-3 gap-3">
                     <div>
@@ -455,9 +470,32 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
                 <div>
                   <span className="text-sm text-text-muted">Balance: </span>
                   <span className="font-semibold font-mono text-accent-primary">
-                    ${config.currentBalance.toLocaleString('de-DE', { minimumFractionDigits: 2 })}
+                    {config.currentBalance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} {config.currency}
                   </span>
                 </div>
+
+                {/* Goal Progress Bar – sichtbar wenn Ziel gesetzt */}
+                {config.enableGoals && config.profitTarget && config.profitTarget > 0 && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[11px] text-text-muted">Ziel</span>
+                        <span className="text-[11px] font-mono text-text-primary">
+                          {Math.min(Math.round((config.currentBalance / config.profitTarget) * 100), 100)}%
+                        </span>
+                      </div>
+                      <div className="w-28 h-1.5 rounded-full bg-background-surface-dark overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-pnl-positive transition-all duration-500"
+                          style={{ width: `${Math.min((config.currentBalance / config.profitTarget) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-text-muted font-mono">
+                        {config.currentBalance.toLocaleString('de-DE', { maximumFractionDigits: 0 })} / {config.profitTarget.toLocaleString('de-DE', { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Account-Switcher – nur sichtbar wenn mehrere Funded Accounts */}
                 {showSwitcher && (

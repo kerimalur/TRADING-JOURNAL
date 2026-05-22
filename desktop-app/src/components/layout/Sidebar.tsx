@@ -66,8 +66,11 @@ export function Sidebar() {
       }))
     : [{ path: '/funded', label: 'Funded', icon: <DollarSign size={18} />, group: 'Trading' }];
 
-  // Alle Items zusammenführen und nach Gruppen-Reihenfolge sortieren
-  const allItems = [...BASE_ITEMS, ...fundedItems];
+  // Alle Items zusammenführen: Trading-Reihenfolge EK → Funded → Outlook
+  const tradingEk      = BASE_ITEMS.filter(i => i.group === 'Trading' && i.path === '/ek');
+  const tradingOutlook = BASE_ITEMS.filter(i => i.group === 'Trading' && i.path === '/outlook');
+  const nonTrading     = BASE_ITEMS.filter(i => i.group !== 'Trading');
+  const allItems = [...nonTrading, ...tradingEk, ...fundedItems, ...tradingOutlook];
   const groupedItems = GROUP_ORDER.reduce((acc, group) => {
     acc[group] = allItems.filter(i => i.group === group);
     return acc;

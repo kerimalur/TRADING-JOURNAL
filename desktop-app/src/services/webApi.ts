@@ -370,7 +370,8 @@ export const webExternalApi = {
       const response = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.xml');
       if (!response.ok) throw new Error('Calendar fetch failed');
       
-      const text = await response.text();
+      const buffer = await response.arrayBuffer();
+      const text = new TextDecoder('utf-8').decode(buffer);
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
       const events = xml.querySelectorAll('event');
@@ -384,6 +385,7 @@ export const webExternalApi = {
         let impact = (event.querySelector('impact')?.textContent || '').toLowerCase();
         const forecast = event.querySelector('forecast')?.textContent || '';
         const previous = event.querySelector('previous')?.textContent || '';
+        const actual   = event.querySelector('actual')?.textContent   || '';
         
         // Convert date from MM-DD-YYYY to ISO format
         let isoDate = '';
@@ -421,6 +423,7 @@ export const webExternalApi = {
           impact: impact as 'high' | 'medium' | 'low',
           forecast: forecast || undefined,
           previous: previous || undefined,
+          actual:   actual   || undefined,
           source: 'forexfactory'
         });
       });
