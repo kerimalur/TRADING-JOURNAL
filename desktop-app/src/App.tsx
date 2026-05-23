@@ -42,6 +42,9 @@ import { Watchlist } from '@/pages/Watchlist';
 // Utils
 import { isElectron } from '@/services/webApi';
 
+// Watchlist alert checker
+import { useWatchlistStore, checkAndFireAlerts } from '@/stores/watchlistStore';
+
 // i18n
 import '@/i18n';
 
@@ -162,6 +165,7 @@ function LoginScreen({ onSkipLogin }: LoginScreenProps) {
 function AppContent() {
   const location = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
+  const { watchlists, markAlertTriggered } = useWatchlistStore();
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [offlineMode, setOfflineMode] = useState(() => {
@@ -201,6 +205,18 @@ function AppContent() {
 
     return () => subscription.unsubscribe();
   }, [inElectron]); // offlineMode NICHT als Dep – Auth immer überwachen
+
+  // Global alert checker (every 30s)
+  useEffect(() => {
+    // Request notification permission on first run
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    const tick = () => checkAndFireAlerts(watchlists, markAlertTriggered);
+    tick();
+    const timer = setInterval(tick, 30_000);
+    return () => clearInterval(timer);
+  }, [watchlists, markAlertTriggered]);
 
   // Keyboard Shortcuts
   useEffect(() => {
