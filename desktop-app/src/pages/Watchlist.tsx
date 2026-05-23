@@ -7,6 +7,7 @@
  */
 
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus, Trash2, Search, X, Bell, BellOff, Edit2, Check,
   GripVertical, List,
@@ -161,36 +162,55 @@ function EmptyState({ onCreate }: { onCreate: (name: string) => void }) {
 // ============================================================
 
 interface ColorPickerProps {
+  anchorRect: DOMRect;
   current?: string;
   onChange: (color: string | undefined) => void;
   onClose: () => void;
 }
 
-function ColorPicker({ current, onChange, onClose }: ColorPickerProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9, y: -4 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ duration: 0.12 }}
-      className="absolute left-0 top-7 z-50 bg-background-surface-solid border border-border rounded-xl shadow-2xl p-2 grid grid-cols-5 gap-1.5"
-      onClick={e => e.stopPropagation()}
-    >
-      {WATCHLIST_COLORS.map((c, i) => (
-        <button
-          key={i} onClick={() => { onChange(c.value); onClose(); }}
-          title={c.name}
-          className={clsx(
-            'w-6 h-6 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center',
-            current === c.value ? 'border-white scale-110' : 'border-transparent',
-            !c.value && 'bg-background-elevated border-border'
-          )}
-          style={c.value ? { backgroundColor: c.value } : {}}
-        >
-          {!c.value && <span className="text-[8px] text-text-muted leading-none">x</span>}
-        </button>
-      ))}
-    </motion.div>
+function ColorPicker({ anchorRect, current, onChange, onClose }: ColorPickerProps) {
+  const pickerWidth  = 228;
+  const pickerHeight = 148;
+  const spaceBelow = window.innerHeight - anchorRect.bottom;
+  const spaceRight = window.innerWidth  - anchorRect.left;
+  const left = spaceRight < pickerWidth  ? Math.max(4, anchorRect.right - pickerWidth) : anchorRect.left;
+  const top  = spaceBelow < pickerHeight ? anchorRect.top - pickerHeight - 6 : anchorRect.bottom + 6;
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-[9998]" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: -4 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ duration: 0.12 }}
+        style={{ position: 'fixed', top, left, zIndex: 9999, minWidth: pickerWidth }}
+        className="bg-background-surface-solid border border-border rounded-xl shadow-2xl p-3"
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2.5">Farbe</p>
+        <div className="grid grid-cols-5 gap-2">
+          {WATCHLIST_COLORS.map((c, i) => (
+            <div key={i} className="flex flex-col items-center gap-1">
+              <button
+                onClick={() => { onChange(c.value); onClose(); }}
+                title={c.name}
+                className={clsx(
+                  'w-8 h-8 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center',
+                  current === c.value ? 'border-white scale-110' : 'border-transparent',
+                  !c.value && 'bg-background-elevated'
+                )}
+                style={c.value ? { backgroundColor: c.value } : {}}
+              >
+                {!c.value && <X size={12} className="text-text-muted" />}
+              </button>
+              <span className="text-[9px] text-text-muted leading-none">{c.name}</span>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </>,
+    document.body
   );
 }
 
@@ -364,8 +384,9 @@ interface AddSymbolModalProps {
 
 function AddSymbolModal({ watchlistId, existingSymbols, onClose }: AddSymbolModalProps) {
   const { addSymbol } = useWatchlistStore();
-  const [query, setQuery] = useState('');
+  const [query, setQuery]         = useState('');
   const [activeCategory, setActiveCategory] = useState<SymbolCategory | 'all'>('all');
+  const [selected, setSelected]   = useState<Set<string>>(new Set());
 
   const filtered = SYMBOL_DB.filter(s => {
     if (existingSymbols.includes(s.symbol)) return false;
@@ -384,8 +405,34 @@ function AddSymbolModal({ watchlistId, existingSymbols, onClose }: AddSymbolModa
     return acc;
   }, {});
 
-  const handleAdd = (entry: SymbolEntry) => {
-    addSymbol(watchlistId, { symbol: entry.symbol, displayName: entry.displayName, category: entry.category });
+  const allVisibleSelected = filtered.length > 0 && filtered.every(s => selected.has(s.symbol));
+
+  const toggleAll = () => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        filtered.forEach(s => next.delete(s.symbol));
+      } else {
+        filtered.forEach(s => next.add(s.symbol));
+      }
+      return next;
+    });
+  };
+
+  const toggleSymbol = (symbol: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(symbol)) next.delete(symbol);
+      else next.add(symbol);
+      return next;
+    });
+  };
+
+  const handleConfirm = () => {
+    const toAdd = SYMBOL_DB.filter(s => selected.has(s.symbol) && !existingSymbols.includes(s.symbol));
+    for (const entry of toAdd) {
+      addSymbol(watchlistId, { symbol: entry.symbol, displayName: entry.displayName, category: entry.category });
+    }
     onClose();
   };
 
@@ -421,6 +468,19 @@ function AddSymbolModal({ watchlistId, existingSymbols, onClose }: AddSymbolModa
           ))}
         </div>
 
+        {/* Select-all bar */}
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-between px-4 py-2 bg-background/40 border-b border-border/50 flex-shrink-0">
+            <span className="text-[11px] text-text-muted">
+              {selected.size > 0 ? `${selected.size} ausgewählt` : 'Klicken zum Auswählen'}
+            </span>
+            <button onClick={toggleAll}
+              className="text-[11px] font-medium text-accent-primary hover:text-accent-secondary transition-colors">
+              {allVisibleSelected ? 'Alle abwählen' : 'Alle auswählen'}
+            </button>
+          </div>
+        )}
+
         {/* List */}
         <div className="overflow-y-auto flex-1">
           {Object.keys(grouped).length === 0 ? (
@@ -431,21 +491,61 @@ function AddSymbolModal({ watchlistId, existingSymbols, onClose }: AddSymbolModa
                 <div className="px-4 py-1.5 text-[10px] font-semibold text-text-muted uppercase tracking-wider bg-background/60 sticky top-0">
                   {group}
                 </div>
-                {items.map(entry => (
-                  <button key={entry.symbol} onClick={() => handleAdd(entry)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-background-surface-hover transition-colors text-left">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-text-primary">{entry.displayName}</p>
-                      <p className="text-[11px] text-text-muted font-mono">{entry.symbol}</p>
-                    </div>
-                    <span className="text-[10px] text-text-muted bg-background-elevated px-1.5 py-0.5 rounded flex-shrink-0">
-                      {CATEGORY_LABELS[entry.category]}
-                    </span>
-                  </button>
-                ))}
+                {items.map(entry => {
+                  const isSelected = selected.has(entry.symbol);
+                  return (
+                    <button key={entry.symbol} onClick={() => toggleSymbol(entry.symbol)}
+                      className={clsx(
+                        'w-full flex items-center gap-3 px-4 py-2.5 transition-colors text-left',
+                        isSelected ? 'bg-accent-primary/[0.08]' : 'hover:bg-background-surface-hover'
+                      )}>
+                      {/* Checkbox */}
+                      <div className={clsx(
+                        'w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all',
+                        isSelected ? 'bg-accent-primary border-accent-primary' : 'border-border'
+                      )}>
+                        {isSelected && <Check size={10} className="text-white" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-text-primary">{entry.displayName}</p>
+                        <p className="text-[11px] text-text-muted font-mono">{entry.symbol}</p>
+                      </div>
+                      <span className="text-[10px] text-text-muted bg-background-elevated px-1.5 py-0.5 rounded flex-shrink-0">
+                        {CATEGORY_LABELS[entry.category]}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             ))
           )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 border-t border-border px-4 py-3 flex items-center justify-between gap-3">
+          <span className="text-xs text-text-muted">
+            {selected.size > 0
+              ? `${selected.size} Symbol${selected.size !== 1 ? 'e' : ''} zum Hinzufügen`
+              : 'Symbole oben auswählen'}
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose}
+              className="px-3 py-1.5 rounded-lg text-xs text-text-muted border border-border hover:border-white/20 transition-colors">
+              Abbrechen
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={selected.size === 0}
+              className={clsx(
+                'px-4 py-1.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5',
+                selected.size > 0
+                  ? 'bg-accent-primary hover:bg-accent-primary/90 text-white'
+                  : 'bg-background-elevated text-text-muted cursor-not-allowed opacity-50'
+              )}>
+              <Check size={13} />
+              {selected.size > 0 ? `${selected.size} hinzufügen` : 'Hinzufügen'}
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>
@@ -467,6 +567,8 @@ interface SymbolRowProps {
 function SymbolRow({ sym, watchlistId, onDragStart, onDragOver, onDrop }: SymbolRowProps) {
   const { removeSymbol, updateSymbolColor } = useWatchlistStore();
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [colorPickerAnchor, setColorPickerAnchor] = useState<DOMRect | null>(null);
+  const colorBtnRef = useRef<HTMLButtonElement>(null);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -481,7 +583,7 @@ function SymbolRow({ sym, watchlistId, onDragStart, onDragOver, onDrop }: Symbol
         onDragOver={e => { e.preventDefault(); onDragOver(); }}
         onDrop={e => { e.preventDefault(); onDrop(); }}
         onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => { setHovered(false); setConfirmRemove(false); setShowColorPicker(false); }}
+        onMouseLeave={() => { setHovered(false); setConfirmRemove(false); }}
         className={clsx(
           'group flex items-center gap-2 px-2 py-2 rounded-lg transition-colors border border-transparent',
           'hover:border-border/40 hover:bg-background-surface-hover',
@@ -493,16 +595,22 @@ function SymbolRow({ sym, watchlistId, onDragStart, onDragOver, onDrop }: Symbol
         </span>
 
         {/* Color dot */}
-        <div className="relative flex-shrink-0">
+        <div className="flex-shrink-0">
           <button
-            onClick={() => setShowColorPicker(v => !v)}
-            className="w-3.5 h-3.5 rounded-full border border-white/20 transition-transform hover:scale-125"
+            ref={colorBtnRef}
+            onClick={() => {
+              const rect = colorBtnRef.current?.getBoundingClientRect();
+              if (rect) setColorPickerAnchor(rect);
+              setShowColorPicker(v => !v);
+            }}
+            className="w-4 h-4 rounded-full border border-white/20 transition-transform hover:scale-125"
             style={{ backgroundColor: sym.color ?? 'rgba(255,255,255,0.15)' }}
-            title="Farbe aendern"
+            title="Farbe ändern"
           />
           <AnimatePresence>
-            {showColorPicker && (
+            {showColorPicker && colorPickerAnchor && (
               <ColorPicker
+                anchorRect={colorPickerAnchor}
                 current={sym.color}
                 onChange={color => updateSymbolColor(watchlistId, sym.id, color)}
                 onClose={() => setShowColorPicker(false)}

@@ -44,6 +44,7 @@ import { isElectron } from '@/services/webApi';
 
 // Watchlist alert checker
 import { useWatchlistStore, checkAndFireAlerts } from '@/stores/watchlistStore';
+import { useUIStore } from '@/stores/uiStore';
 
 // i18n
 import '@/i18n';
@@ -166,6 +167,7 @@ function AppContent() {
   const location = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
   const { watchlists, markAlertTriggered } = useWatchlistStore();
+  const { showToast } = useUIStore();
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [offlineMode, setOfflineMode] = useState(() => {
@@ -212,7 +214,7 @@ function AppContent() {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-    const tick = () => checkAndFireAlerts(watchlists, markAlertTriggered);
+    const tick = () => checkAndFireAlerts(watchlists, markAlertTriggered, showToast);
     tick();
     const timer = setInterval(tick, 30_000);
     return () => clearInterval(timer);

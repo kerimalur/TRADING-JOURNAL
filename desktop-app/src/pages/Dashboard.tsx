@@ -37,48 +37,57 @@ import { useWatchlistStore } from '@/stores/watchlistStore';
 const PREFS_KEY = 'tradingJournal_dashboardPrefs';
 
 interface DashboardPrefs {
-  showWinRate:        boolean;
-  showSparkline:      boolean;
-  showProfitLoss:     boolean;
-  showProfitFactor:   boolean;
-  showStreak:         boolean;
-  showRecentTrades:   boolean;
-  showHeatmap:        boolean;
-  showDetails:        boolean;
-  showOutlooks:       boolean;
-  showMonthCalendar:  boolean;
-  showWatchlist:      boolean;
-  showMarketSummary:  boolean;
+  showWinRate:          boolean;
+  showSparkline:        boolean;
+  showProfitLoss:       boolean;
+  showProfitFactor:     boolean;
+  showStreak:           boolean;
+  showRecentTrades:     boolean;
+  showHeatmap:          boolean;
+  showDetails:          boolean;
+  showOutlooks:         boolean;
+  showMonthCalendar:    boolean;
+  showWatchlist:        boolean;
+  showWidgetUebersicht: boolean;
+  showWidgetNews:       boolean;
+  showWidgetCOT:        boolean;
+  showWidgetZinsen:     boolean;
 }
 
 const DEFAULT_PREFS: DashboardPrefs = {
-  showWinRate:       true,
-  showSparkline:     true,
-  showProfitLoss:    true,
-  showProfitFactor:  true,
-  showStreak:        true,
-  showRecentTrades:  true,
-  showHeatmap:       true,
-  showDetails:       true,
-  showOutlooks:      true,
-  showMonthCalendar: true,
-  showWatchlist:     false,
-  showMarketSummary: false,
+  showWinRate:          true,
+  showSparkline:        true,
+  showProfitLoss:       true,
+  showProfitFactor:     true,
+  showStreak:           true,
+  showRecentTrades:     true,
+  showHeatmap:          true,
+  showDetails:          true,
+  showOutlooks:         true,
+  showMonthCalendar:    true,
+  showWatchlist:        false,
+  showWidgetUebersicht: false,
+  showWidgetNews:       false,
+  showWidgetCOT:        false,
+  showWidgetZinsen:     false,
 };
 
 const PREF_LABELS: Record<keyof DashboardPrefs, string> = {
-  showWinRate:       'Win Rate',
-  showSparkline:     'Total R Kurve',
-  showProfitLoss:    'Gewinn / Verlust',
-  showProfitFactor:  'Profit Factor & Expectancy',
-  showStreak:        'Trade Streak',
-  showRecentTrades:  'Letzte Trades',
-  showHeatmap:       'Aktivitäts-Heatmap',
-  showDetails:       'Performance Details',
-  showOutlooks:      'Aktive Outlooks',
-  showMonthCalendar: 'Monats-Kalender',
-  showWatchlist:     'Watchlist',
-  showMarketSummary: 'Markt-Übersicht',
+  showWinRate:          'Win Rate',
+  showSparkline:        'Total R Kurve',
+  showProfitLoss:       'Gewinn / Verlust',
+  showProfitFactor:     'Profit Factor & Expectancy',
+  showStreak:           'Trade Streak',
+  showRecentTrades:     'Letzte Trades',
+  showHeatmap:          'Aktivitäts-Heatmap',
+  showDetails:          'Performance Details',
+  showOutlooks:         'Aktive Outlooks',
+  showMonthCalendar:    'Monats-Kalender',
+  showWatchlist:        'Watchlist',
+  showWidgetUebersicht: 'Markt: Übersicht',
+  showWidgetNews:       'Markt: News',
+  showWidgetCOT:        'Markt: COT',
+  showWidgetZinsen:     'Markt: Zinsen',
 };
 
 function loadPrefs(): DashboardPrefs {
@@ -283,39 +292,34 @@ function WatchlistWidget({ navigate }: { navigate: (p: string) => void }) {
   );
 }
 
-// ── Market Summary Widget ──────────────────────────────────────────────
-function MarketSummaryWidget({ navigate }: { navigate: (p: string) => void }) {
-  const sections = [
-    { path: '/fundamentals', label: 'Übersicht',  icon: <Globe2 size={16} className="text-accent-cyan" />,     desc: 'Marktüberblick' },
-    { path: '/news',         label: 'News',        icon: <Newspaper size={16} className="text-amber-400" />,    desc: 'Wirtschaftsnews' },
-    { path: '/cot',          label: 'COT',         icon: <BarChart2 size={16} className="text-pnl-positive" />, desc: 'Commitments of Traders' },
-    { path: '/zinsen',       label: 'Zinsen',      icon: <Percent size={16} className="text-accent-primary" />, desc: 'Zinsdifferenzen' },
-  ];
-
+// ── Markt-Navigation Widget (generisch) ──────────────────────────────
+function DashNavWidget({
+  navigate, path, title, description, icon,
+}: {
+  navigate: (p: string) => void;
+  path: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-1.5 mb-3 px-1">
-        <Globe2 size={12} className="text-accent-primary" />
-        <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">Markt-Übersicht</span>
+    <button
+      onClick={() => navigate(path)}
+      className="flex flex-col h-full w-full items-start gap-3 group text-left"
+    >
+      <div className="flex items-center gap-1.5">
+        <div className="p-1.5 rounded-lg bg-white/[0.05] group-hover:bg-white/[0.09] transition-colors">
+          {icon}
+        </div>
+        <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">{title}</span>
       </div>
-      <div className="grid grid-cols-2 gap-2 flex-1">
-        {sections.map(s => (
-          <button
-            key={s.path}
-            onClick={() => navigate(s.path)}
-            className="flex flex-col items-start gap-1.5 p-2.5 rounded-xl bg-white/[0.02] border border-border hover:bg-white/[0.05] hover:border-border-light transition-all text-left group"
-          >
-            <div className="p-1.5 rounded-lg bg-background-elevated group-hover:scale-110 transition-transform">
-              {s.icon}
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-text-primary">{s.label}</p>
-              <p className="text-[10px] text-text-muted leading-tight">{s.desc}</p>
-            </div>
-          </button>
-        ))}
+      <div className="flex-1 flex flex-col justify-center">
+        <p className="text-xs text-text-muted leading-relaxed">{description}</p>
       </div>
-    </div>
+      <span className="text-[11px] text-accent-primary group-hover:text-accent-secondary transition-colors font-medium">
+        Öffnen →
+      </span>
+    </button>
   );
 }
 
@@ -741,10 +745,47 @@ export function Dashboard() {
             </BentoCell>
           )}
 
-          {/* MARKT-ÜBERSICHT */}
-          {prefs.showMarketSummary && (
+          {/* MARKT: ÜBERSICHT */}
+          {prefs.showWidgetUebersicht && (
             <BentoCell delay={0.48}>
-              <MarketSummaryWidget navigate={navigate} />
+              <DashNavWidget
+                navigate={navigate} path="/fundamentals" title="Übersicht"
+                description="Marktüberblick & Fundamentaldaten"
+                icon={<Globe2 size={16} className="text-accent-cyan" />}
+              />
+            </BentoCell>
+          )}
+
+          {/* MARKT: NEWS */}
+          {prefs.showWidgetNews && (
+            <BentoCell delay={0.49}>
+              <DashNavWidget
+                navigate={navigate} path="/news" title="News"
+                description="Wirtschaftsnews & Ereignisse"
+                icon={<Newspaper size={16} className="text-amber-400" />}
+              />
+            </BentoCell>
+          )}
+
+          {/* MARKT: COT */}
+          {prefs.showWidgetCOT && (
+            <BentoCell delay={0.50}>
+              <DashNavWidget
+                navigate={navigate} path="/cot" title="COT"
+                description="Commitments of Traders"
+                icon={<BarChart2 size={16} className="text-pnl-positive" />}
+              />
+            </BentoCell>
+          )}
+
+          {/* MARKT: ZINSEN */}
+          {prefs.showWidgetZinsen && (
+            <BentoCell delay={0.51}>
+              <DashNavWidget
+                navigate={navigate} path="/zinsen" title="Zinsen"
+                description="Zinsdifferenzen & Zentralbanken"
+                icon={<Percent size={16} className="text-accent-primary" />}
+              />
             </BentoCell>
           )}
 

@@ -281,7 +281,8 @@ export const useWatchlistStore = create<WatchlistState>((set) => {
 
 export function checkAndFireAlerts(
   watchlists: Watchlist[],
-  markTriggered: (wlId: string, symId: string, alertId: string, date: string) => void
+  markTriggered: (wlId: string, symId: string, alertId: string, date: string) => void,
+  showToast?: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void
 ): void {
   const now   = new Date();
   const today = now.toISOString().split('T')[0]; // "YYYY-MM-DD"
@@ -310,8 +311,15 @@ export function checkAndFireAlerts(
           const title = `Watchlist-Alarm: ${sym.displayName}`;
           const body  = alert.label || `${sym.displayName} – ${alert.time} Uhr`;
 
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(title, { body, icon: '/favicon.ico' });
+          // Try browser notification first, fallback to in-app toast
+          try {
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification(title, { body, icon: '/favicon.ico' });
+            } else {
+              showToast?.(`${title}: ${body}`, 'info');
+            }
+          } catch {
+            showToast?.(`${title}: ${body}`, 'info');
           }
 
           markTriggered(wl.id, sym.id, alert.id, today);
