@@ -17,3 +17,4 @@ export { COTData } from './COTData';
 export { MachineLearning } from './MachineLearning';
 export { RiskManagement } from './RiskManagement';
 export { Outlook } from './Outlook';
+export { Watchlist } from './Watchlist';

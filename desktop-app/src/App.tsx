@@ -35,6 +35,7 @@ import { Fundamentals } from '@/pages/Fundamentals';
 import { News } from '@/pages/News';
 import { COTData } from '@/pages/COTData';
 import { CurrencyAnalysis } from '@/pages/CurrencyAnalysis';
+import { Watchlist } from '@/pages/Watchlist';
 
 // Debug removed - AuthDebug no longer needed
 
@@ -267,6 +268,7 @@ function AppContent() {
                 <Route path="/cot"          element={<COTData />} />
                 <Route path="/zinsen"       element={<CurrencyAnalysis />} />
                 <Route path="/strategy" element={<StrategyBuilder />} />
+                <Route path="/watchlist" element={<Watchlist />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </AnimatePresence>

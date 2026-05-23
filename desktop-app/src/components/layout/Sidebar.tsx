@@ -21,6 +21,7 @@ import {
   Newspaper,
   BarChart2,
   Percent,
+  List,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,6 +49,7 @@ const BASE_ITEMS: NavItem[] = [
   { path: '/zinsen',      label: 'Zinsen',         icon: <Percent size={18} />,         group: 'Markt'     },
   { path: '/strategy',    label: 'Strategie',      icon: <Lightbulb size={18} />,       group: 'Tools'     },
   { path: '/backtest',    label: 'Backtest',       icon: <Zap size={18} />,             group: 'Tools'     },
+  { path: '/watchlist',   label: 'Watchlist',      icon: <List size={18} />,            group: 'Tools'     },
   { path: '/settings',    label: 'Einstellungen',  icon: <Settings size={18} />,        group: 'System'    },
 ];
 
