@@ -20,6 +20,12 @@ import * as fs from 'fs';
 
 const PROTOCOL_NAME = 'tradingjournal';
 
+// ============================================================
+// CALENDAR CACHE (in-memory, 2 Minuten TTL)
+// ============================================================
+let calendarCache: { data: any[]; timestamp: number } | null = null;
+const CALENDAR_CACHE_TTL = 2 * 60 * 1000; // 2 Minuten
+
 // Registriere das Protocol so früh wie möglich
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -904,37 +910,56 @@ function registerIPCHandlers(): void {
   });
 
   /**
-   * Wirtschaftskalender von Forex Factory (via faireconomy.media XML Feed)
+   * Wirtschaftskalender von Forex Factory (aktuelle + nächste Woche)
+   * Mit 2-Minuten-Cache damit Auto-Refresh nicht die API überladet
    */
   ipcMain.handle('fetchEconomicCalendar', async () => {
+    // Cache prüfen
+    if (calendarCache && Date.now() - calendarCache.timestamp < CALENDAR_CACHE_TTL) {
+      console.log('📅 Calendar: Serving from cache');
+      return { success: true, data: calendarCache.data, cached: true, source: 'cache' };
+    }
+
     try {
-      console.log('📅 Fetching Forex Factory calendar...');
-      
-      // Forex Factory JSON Feed (Fair Economy Media)
-      const ffUrl = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
-      
-      const response = await fetch(ffUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      console.log('📅 Fetching Forex Factory calendar (diese Woche + nächste Woche)...');
+
+      const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      };
+
+      // Beide Wochen parallel laden
+      const [thisWeekRes, nextWeekRes] = await Promise.allSettled([
+        fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', { headers }),
+        fetch('https://nfs.faireconomy.media/ff_calendar_nextweek.json', { headers }),
+      ]);
+
+      const rawAll: any[] = [];
+
+      if (thisWeekRes.status === 'fulfilled' && thisWeekRes.value.ok) {
+        const data = await thisWeekRes.value.json() as any[];
+        rawAll.push(...data);
+      } else {
+        console.warn('⚠️ Diese-Woche-Feed nicht erreichbar');
       }
-      
-      const rawEvents = (await response.json()) as any[];
-      
-      const events: any[] = rawEvents
+
+      if (nextWeekRes.status === 'fulfilled' && nextWeekRes.value.ok) {
+        const data = await nextWeekRes.value.json() as any[];
+        rawAll.push(...data);
+      }
+
+      if (rawAll.length === 0) {
+        throw new Error('Beide Kalender-Feeds haben keine Daten geliefert');
+      }
+
+      const events: any[] = rawAll
         .filter((e: any) => e.impact && e.impact.toLowerCase() !== 'holiday')
         .map((e: any, index: number) => {
-          // date is ISO datetime: "2026-05-17T18:30:00-04:00"
           const dt = new Date(e.date);
           const isoDate = dt.toISOString().split('T')[0];
           const time24 = dt.toLocaleTimeString('de-DE', {
             hour: '2-digit', minute: '2-digit',
-            timeZone: 'Europe/Berlin'
+            timeZone: 'Europe/Berlin',
           });
           const impact = (e.impact || '').toLowerCase();
           return {
@@ -947,28 +972,24 @@ function registerIPCHandlers(): void {
             forecast: e.forecast || undefined,
             previous: e.previous || undefined,
             actual: e.actual || undefined,
-            source: 'forexfactory'
+            source: 'forexfactory',
           };
+        })
+        .sort((a: any, b: any) => {
+          const dc = a.date.localeCompare(b.date);
+          return dc !== 0 ? dc : a.time.localeCompare(b.time);
         });
-      
-      console.log(`✅ Forex Factory: ${events.length} events loaded`);
-      
-      return { 
-        success: true, 
-        source: 'forexfactory', 
-        data: events 
-      };
-      
+
+      console.log(`✅ Forex Factory: ${events.length} Events geladen`);
+
+      // Cache aktualisieren
+      calendarCache = { data: events, timestamp: Date.now() };
+
+      return { success: true, source: 'forexfactory', data: events };
+
     } catch (error) {
-      console.error('❌ Forex Factory fetch failed:', error);
-      
-      // Fallback: Generiere echte Events basierend auf bekannten regelmäßigen Releases
-      console.log('📅 Using scheduled events fallback');
-      return { 
-        success: true, 
-        source: 'scheduled', 
-        data: generateScheduledEvents() 
-      };
+      console.error('❌ Forex Factory fetch fehlgeschlagen:', error);
+      return { success: false, error: String(error), data: [] };
     }
   });
 

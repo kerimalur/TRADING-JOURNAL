@@ -106,20 +106,20 @@ export function News() {
       const api = getApi();
       if (api.fetchEconomicCalendar) {
         const result = await api.fetchEconomicCalendar();
-        if (result.success && result.data && result.data.length > 0) {
-          const events: EconomicEvent[] = result.data.map((item: any, idx: number) => ({
+        if (result.success) {
+          const events: EconomicEvent[] = (result.data || []).map((item: any, idx: number) => ({
             id:       item.id || `ff-${idx}`,
             date:     item.date,
             time:     item.time || 'All Day',
-            currency: item.currency || item.country || 'â€”',
+            currency: item.currency || item.country || '–',
             impact:   (item.impact || 'low') as 'high' | 'medium' | 'low',
-            event:    item.event || item.title || 'â€”',
+            event:    item.event || item.title || '–',
             forecast: item.forecast,
             previous: item.previous,
             actual:   item.actual,
           }));
           setAllEvents(events);
-          setDataSource(result.cached ? 'cache' : 'forexfactory');
+          setDataSource(result.cached ? 'cache' : (result.source || 'forexfactory'));
           setLastUpdate(new Date());
         } else {
           setDataSource('offline');
@@ -134,6 +134,32 @@ export function News() {
       setIsLoading(false);
     }
   };
+
+  // Auto-Refresh alle 5 Minuten – holt aktualisierte Ist-Werte für bereits veröffentlichte Events
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const api = getApi();
+        if (!api.fetchEconomicCalendar) return;
+        const result = await api.fetchEconomicCalendar();
+        if (result.success && result.data) {
+          setAllEvents(result.data.map((item: any, idx: number) => ({
+            id:       item.id || `ff-${idx}`,
+            date:     item.date,
+            time:     item.time || 'All Day',
+            currency: item.currency || item.country || '–',
+            impact:   (item.impact || 'low') as 'high' | 'medium' | 'low',
+            event:    item.event || item.title || '–',
+            forecast: item.forecast,
+            previous: item.previous,
+            actual:   item.actual,
+          })));
+          setLastUpdate(new Date());
+        }
+      } catch { /* silent */ }
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const navigateDay = (delta: number) => {
     setSelectedDate(prev => addDays(prev, delta));
@@ -277,15 +303,15 @@ export function News() {
         {isLoading ? (
           <div className="flex items-center justify-center py-24 text-white/40">
             <RefreshCw size={20} className="animate-spin mr-2" />
-            <span className="text-sm">Lade Daten von ForexFactoryâ€¦</span>
+            <span className="text-sm">Lade Daten von ForexFactory…</span>
           </div>
         ) : dayEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Calendar size={40} className="text-white/20 mb-3" />
-            <p className="text-sm font-medium text-white/50">Keine Events fÃ¼r {formatDayLabel(selectedDate)}</p>
+            <p className="text-sm font-medium text-white/50">Keine Events für {formatDayLabel(selectedDate)}</p>
             <p className="text-[11px] text-white/30 mt-1">
               {allEvents.length === 0
-                ? 'Daten werden geladen. Klicke auf â€žAktualisieren".'
+                ? 'Daten werden geladen. Klicke auf „Aktualisieren".'  
                 : 'Kein Ereignis an diesem Tag oder Filter zu eng.'}
             </p>
           </div>
@@ -300,11 +326,11 @@ export function News() {
             {/* Tages-Zusammenfassung */}
             <div className="flex items-center gap-3 mb-4 text-xs text-white/40">
               <span className="tabular-nums font-mono">{dayEvents.length} Events</span>
-              <span>Â·</span>
+              <span>·</span>
               <span className="text-red-400 font-medium">{dayEvents.filter(e => e.impact === 'high').length} High</span>
-              <span>Â·</span>
+              <span>·</span>
               <span className="text-yellow-400">{dayEvents.filter(e => e.impact === 'medium').length} Medium</span>
-              <span>Â·</span>
+              <span>·</span>
               <span>{dayEvents.filter(e => e.impact === 'low').length} Low</span>
             </div>
 
@@ -334,7 +360,7 @@ export function News() {
                   )}
                 </div>
 
-                {/* Zeit + WÃ¤hrung */}
+                {/* Zeit + Währung */}
                 <div className="flex flex-col items-center gap-1 w-14 flex-shrink-0 pt-0.5">
                   <span className="font-mono tabular-nums text-xs text-white/60">{event.time}</span>
                   <span className={clsx(

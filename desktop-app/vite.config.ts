@@ -24,5 +24,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    proxy: {
+      '/api/calendar': {
+        target: 'https://nfs.faireconomy.media',
+        changeOrigin: true,
+        rewrite: () => '/ff_calendar_thisweek.json',
+      },
+    },
   },
 });
