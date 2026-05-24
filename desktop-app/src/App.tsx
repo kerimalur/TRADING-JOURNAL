@@ -44,6 +44,7 @@ import { isElectron } from '@/services/webApi';
 
 // Watchlist alert checker
 import { useWatchlistStore, checkAndFireAlerts } from '@/stores/watchlistStore';
+import { useWidgetSettingsStore } from '@/stores/widgetSettingsStore';
 import { useUIStore } from '@/stores/uiStore';
 
 // i18n
@@ -167,6 +168,7 @@ function AppContent() {
   const location = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
   const { watchlists, markAlertTriggered, loadFromSupabase } = useWatchlistStore();
+  const { loadFromSupabase: loadWidgetSettings } = useWidgetSettingsStore();
   const { showToast } = useUIStore();
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -201,6 +203,7 @@ function AppContent() {
         localStorage.removeItem('trading-journal-offline-mode');
         setOfflineMode(false);
         loadFromSupabase();
+        loadWidgetSettings();
       }
       setSession(session);
       setAuthLoading(false);

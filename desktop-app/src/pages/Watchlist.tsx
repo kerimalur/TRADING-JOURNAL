@@ -45,6 +45,7 @@ const SYMBOL_DB: SymbolEntry[] = [
   { symbol: 'USDCHF', displayName: 'USD/CHF', category: 'forex', subgroup: 'Major' },
   { symbol: 'USDCAD', displayName: 'USD/CAD', category: 'forex', subgroup: 'Major' },
   { symbol: 'AUDUSD', displayName: 'AUD/USD', category: 'forex', subgroup: 'Major' },
+  { symbol: 'NZDGBP', displayName: 'NZD/GBP', category: 'forex', subgroup: 'Cross' },
   { symbol: 'NZDUSD', displayName: 'NZD/USD', category: 'forex', subgroup: 'Major' },
   { symbol: 'EURGBP', displayName: 'EUR/GBP', category: 'forex', subgroup: 'Cross' },
   { symbol: 'EURJPY', displayName: 'EUR/JPY', category: 'forex', subgroup: 'Cross' },

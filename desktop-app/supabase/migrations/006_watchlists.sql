@@ -20,7 +20,16 @@ ALTER TABLE user_watchlists ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "user_watchlists: eigene Daten"
   ON user_watchlists FOR ALL USING (auth.uid() = user_id);
 
--- auto-updated_at trigger (Funktion aus 004_master_schema.sql)
+-- Stelle sicher, dass die Helper-Funktion existiert (idempotent)
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- auto-updated_at trigger
 CREATE OR REPLACE TRIGGER trg_user_watchlists_updated_at
   BEFORE UPDATE ON user_watchlists
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

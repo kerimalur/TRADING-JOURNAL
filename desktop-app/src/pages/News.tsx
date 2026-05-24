@@ -121,6 +121,12 @@ export function News() {
           setAllEvents(events);
           setDataSource(result.cached ? 'cache' : (result.source || 'forexfactory'));
           setLastUpdate(new Date());
+          // Persist to localStorage so Dashboard widget can read it
+          if (!result.cached) {
+            try {
+              localStorage.setItem('trading-journal-calendar-cache', JSON.stringify({ data: events, timestamp: Date.now() }));
+            } catch { /* quota */ }
+          }
         } else {
           setDataSource('offline');
         }

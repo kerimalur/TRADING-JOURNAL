@@ -9,7 +9,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Calendar, Plus, Printer, Download, TrendingUp,
   SlidersHorizontal, X, Check, Target,
-  List, Globe2, Newspaper, BarChart2, Percent, Bell,
+  List, Globe2, Newspaper, BarChart2, Percent, Bell, Settings2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -32,6 +32,7 @@ import { SparklineChart } from '@/components/ui/SparklineChart';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { OUTLOOK_STATUS_CONFIG } from '@/types';
 import { useWatchlistStore } from '@/stores/watchlistStore';
+import { useWidgetSettingsStore, DEFAULT_WIDGET_SETTINGS } from '@/stores/widgetSettingsStore';
 
 // ── Dashboard-Präferenzen (localStorage) ──────────────────────────────
 const PREFS_KEY = 'tradingJournal_dashboardPrefs';
@@ -301,9 +302,14 @@ function WatchlistWidget({ navigate }: { navigate: (p: string) => void }) {
 
 // ── News Mini-Widget ──────────────────────────────────────────────────
 const IMPACT_COLORS = { high: '#EF4444', medium: '#FF9800', low: '#787B86' } as const;
+const ALL_NEWS_CCY = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'NZD', 'CAD', 'CHF'];
 
 function NewsWidget({ navigate }: { navigate: (p: string) => void }) {
-  const today = new Date().toISOString().split('T')[0];
+  const { settings, updateNews } = useWidgetSettingsStore();
+  const ns = settings.news;
+  const [showSettings, setShowSettings] = useState(false);
+
+  const today    = new Date().toISOString().split('T')[0];
   const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })();
 
   const events = (() => {
@@ -313,67 +319,144 @@ function NewsWidget({ navigate }: { navigate: (p: string) => void }) {
       const cache = JSON.parse(raw);
       const allEvents: any[] = cache.data ?? [];
       return allEvents
-        .filter((e: any) => (e.date === today || e.date === tomorrow) && e.impact === 'high')
+        .filter((e: any) => {
+          const inDates = e.date === today || e.date === tomorrow;
+          const inImpact = ns.impact === 'all' ? true : e.impact === ns.impact || (ns.impact === 'medium' && e.impact === 'high');
+          const inCcy = ns.currencies.length === 0 || ns.currencies.includes(e.currency);
+          return inDates && inImpact && inCcy;
+        })
         .sort((a: any, b: any) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
         .slice(0, 4);
     } catch { return []; }
   })();
 
+  const toggleCcy = (ccy: string) => {
+    const next = ns.currencies.includes(ccy)
+      ? ns.currencies.filter(c => c !== ccy)
+      : [...ns.currencies, ccy];
+    updateNews({ currencies: next });
+  };
+
   return (
-    <button onClick={() => navigate('/news')} className="flex flex-col h-full w-full text-left group">
-      <div className="flex items-center gap-1.5 mb-2">
-        <div className="p-1.5 rounded-lg bg-amber-500/10 group-hover:bg-amber-500/15 transition-colors">
-          <Newspaper size={14} className="text-amber-400" />
-        </div>
-        <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">News / Kalender</span>
+    <div className="flex flex-col h-full w-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={() => navigate('/news')} className="flex items-center gap-1.5 flex-1 text-left group">
+          <div className="p-1.5 rounded-lg bg-amber-500/10 group-hover:bg-amber-500/15 transition-colors">
+            <Newspaper size={14} className="text-amber-400" />
+          </div>
+          <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">News / Kalender</span>
+        </button>
+        <button onClick={() => setShowSettings(p => !p)} className="p-1 rounded hover:bg-white/5 transition-colors flex-shrink-0">
+          <Settings2 size={11} className={showSettings ? 'text-accent-primary' : 'text-text-muted/50'} />
+        </button>
       </div>
+
+      {/* Settings panel */}
+      {showSettings && (
+        <div className="mb-2 p-2 rounded-lg bg-white/[0.04] border border-white/[0.07] space-y-1.5">
+          <div className="flex flex-wrap gap-1">
+            {ALL_NEWS_CCY.map(ccy => {
+              const active = ns.currencies.includes(ccy) || ns.currencies.length === 0;
+              return (
+                <button key={ccy} onClick={() => toggleCcy(ccy)}
+                  className={clsx('text-[9px] px-1.5 py-0.5 rounded font-semibold transition-colors',
+                    ns.currencies.length === 0 ? 'bg-amber-500/20 text-amber-400' :
+                    active ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-text-muted/50')}>
+                  {ccy}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex gap-1">
+            {(['high', 'medium', 'all'] as const).map(lvl => (
+              <button key={lvl} onClick={() => updateNews({ impact: lvl })}
+                className={clsx('text-[9px] px-1.5 py-0.5 rounded capitalize transition-colors',
+                  ns.impact === lvl ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-text-muted/50')}>
+                {lvl === 'high' ? 'Hoch' : lvl === 'medium' ? 'Mittel' : 'Alle'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Events */}
       <div className="flex-1 space-y-1 overflow-hidden">
         {events.length === 0 ? (
-          <p className="text-[11px] text-text-muted/60 italic">Keine High-Impact Events heute/morgen geladen</p>
+          <p className="text-[11px] text-text-muted/60 italic">Keine Events heute/morgen{ns.currencies.length > 0 ? ' (Filter aktiv)' : ''} — News-Seite öffnen zum Laden</p>
         ) : (
           events.map((e: any, i: number) => (
-            <div key={i} className="flex items-center gap-1.5">
+            <button key={i} onClick={() => navigate('/news')} className="flex items-center gap-1.5 w-full text-left hover:opacity-80">
               <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: IMPACT_COLORS[e.impact as keyof typeof IMPACT_COLORS] ?? '#787B86' }} />
               <span className="text-[10px] font-mono text-text-muted w-10 flex-shrink-0">{e.time ?? '??:??'}</span>
               <span className="text-[10px] font-semibold text-text-muted flex-shrink-0 w-7">{e.currency}</span>
               <span className="text-[10px] text-text-primary truncate">{e.event}</span>
-            </div>
+            </button>
           ))
         )}
       </div>
-      <span className="text-[11px] text-accent-primary group-hover:text-accent-secondary transition-colors font-medium mt-1">
+      <button onClick={() => navigate('/news')} className="text-[11px] text-accent-primary hover:text-accent-secondary transition-colors font-medium mt-1 text-left">
         Öffnen →
-      </span>
-    </button>
+      </button>
+    </div>
   );
 }
 
 // ── Zinsen Mini-Widget ────────────────────────────────────────────────
+const ALL_ZINSEN_CCY = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'NZD', 'CAD', 'CHF'];
+
 function ZinsenWidget({ navigate }: { navigate: (p: string) => void }) {
+  const { settings, updateZinsen } = useWidgetSettingsStore();
+  const zs = settings.zinsen;
+  const [showSettings, setShowSettings] = useState(false);
+
   const rates = (() => {
     try {
       const raw = localStorage.getItem('trading-journal-interest-rates-cache');
       if (!raw) return null;
       const cache = JSON.parse(raw);
-      return cache.data as Record<string, { rate: number; change: string; centralBank: string }> | null;
+      return cache.data as Record<string, { rate: number; change: string }> | null;
     } catch { return null; }
   })();
 
-  const TOP_CCY = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'NZD'];
+  const toggleCcy = (ccy: string) => {
+    const next = zs.currencies.includes(ccy)
+      ? zs.currencies.filter(c => c !== ccy)
+      : [...zs.currencies, ccy];
+    updateZinsen({ currencies: next });
+  };
 
   return (
-    <button onClick={() => navigate('/zinsen')} className="flex flex-col h-full w-full text-left group">
-      <div className="flex items-center gap-1.5 mb-2">
-        <div className="p-1.5 rounded-lg bg-accent-primary/10 group-hover:bg-accent-primary/15 transition-colors">
-          <Percent size={14} className="text-accent-primary" />
-        </div>
-        <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">Zinsen</span>
+    <div className="flex flex-col h-full w-full">
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={() => navigate('/zinsen')} className="flex items-center gap-1.5 flex-1 text-left group">
+          <div className="p-1.5 rounded-lg bg-accent-primary/10 group-hover:bg-accent-primary/15 transition-colors">
+            <Percent size={14} className="text-accent-primary" />
+          </div>
+          <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">Zinsen</span>
+        </button>
+        <button onClick={() => setShowSettings(p => !p)} className="p-1 rounded hover:bg-white/5 transition-colors flex-shrink-0">
+          <Settings2 size={11} className={showSettings ? 'text-accent-primary' : 'text-text-muted/50'} />
+        </button>
       </div>
+
+      {showSettings && (
+        <div className="mb-2 p-2 rounded-lg bg-white/[0.04] border border-white/[0.07] flex flex-wrap gap-1">
+          {ALL_ZINSEN_CCY.map(ccy => (
+            <button key={ccy} onClick={() => toggleCcy(ccy)}
+              className={clsx('text-[9px] px-1.5 py-0.5 rounded font-semibold transition-colors',
+                zs.currencies.includes(ccy) ? 'bg-accent-primary/20 text-accent-secondary' : 'bg-white/5 text-text-muted/50')}>
+              {ccy}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex-1 space-y-0.5 overflow-hidden">
         {!rates ? (
           <p className="text-[11px] text-text-muted/60 italic">Zinsdaten noch nicht geladen</p>
         ) : (
-          TOP_CCY.map(ccy => {
+          zs.currencies.map(ccy => {
             const r = rates[ccy];
             if (!r) return null;
             const changeColor = r.change === 'up' ? '#22C55E' : r.change === 'down' ? '#EF4444' : '#787B86';
@@ -388,62 +471,96 @@ function ZinsenWidget({ navigate }: { navigate: (p: string) => void }) {
           })
         )}
       </div>
-      <span className="text-[11px] text-accent-primary group-hover:text-accent-secondary transition-colors font-medium mt-1">
+      <button onClick={() => navigate('/zinsen')} className="text-[11px] text-accent-primary hover:text-accent-secondary transition-colors font-medium mt-1 text-left">
         Öffnen →
-      </span>
-    </button>
+      </button>
+    </div>
   );
 }
 
 // ── COT Mini-Widget ───────────────────────────────────────────────────
+const ALL_COT_CCY = ['DXY', 'EUR', 'GBP', 'JPY', 'AUD', 'NZD', 'CAD', 'CHF'];
+
 function COTWidget({ navigate }: { navigate: (p: string) => void }) {
-  const summary = (() => {
+  const { settings, updateCOT } = useWidgetSettingsStore();
+  const cs = settings.cot;
+  const [showSettings, setShowSettings] = useState(false);
+
+  // cotData is an array: [{ currency, commercialsNet, weeklyChange, ... }]
+  const allRows = (() => {
     try {
-      const raw = localStorage.getItem('trading-journal-cot-cache');
+      const raw = localStorage.getItem('cotData');
       if (!raw) return null;
-      const cache = JSON.parse(raw);
-      const data = cache.data as Record<string, { netPosition: number; change?: number }> | null;
-      if (!data) return null;
-      return Object.entries(data)
-        .map(([ccy, v]) => ({ ccy, net: v.netPosition, change: v.change ?? 0 }))
-        .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
-        .slice(0, 5);
+      const data = JSON.parse(raw);
+      if (!Array.isArray(data)) return null;
+      return data as Array<{ currency: string; commercialsNet: number; weeklyChange: number }>;
     } catch { return null; }
   })();
 
+  const rows = allRows
+    ? allRows.filter(r => cs.currencies.includes(r.currency))
+    : null;
+
+  const toggleCcy = (ccy: string) => {
+    const next = cs.currencies.includes(ccy)
+      ? cs.currencies.filter(c => c !== ccy)
+      : [...cs.currencies, ccy];
+    updateCOT({ currencies: next });
+  };
+
   return (
-    <button onClick={() => navigate('/cot')} className="flex flex-col h-full w-full text-left group">
-      <div className="flex items-center gap-1.5 mb-2">
-        <div className="p-1.5 rounded-lg bg-pnl-positive/10 group-hover:bg-pnl-positive/15 transition-colors">
-          <BarChart2 size={14} className="text-pnl-positive" />
-        </div>
-        <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">COT</span>
+    <div className="flex flex-col h-full w-full">
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={() => navigate('/cot')} className="flex items-center gap-1.5 flex-1 text-left group">
+          <div className="p-1.5 rounded-lg bg-pnl-positive/10 group-hover:bg-pnl-positive/15 transition-colors">
+            <BarChart2 size={14} className="text-pnl-positive" />
+          </div>
+          <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">COT</span>
+        </button>
+        <button onClick={() => setShowSettings(p => !p)} className="p-1 rounded hover:bg-white/5 transition-colors flex-shrink-0">
+          <Settings2 size={11} className={showSettings ? 'text-accent-primary' : 'text-text-muted/50'} />
+        </button>
       </div>
+
+      {showSettings && (
+        <div className="mb-2 p-2 rounded-lg bg-white/[0.04] border border-white/[0.07] flex flex-wrap gap-1">
+          {ALL_COT_CCY.map(ccy => (
+            <button key={ccy} onClick={() => toggleCcy(ccy)}
+              className={clsx('text-[9px] px-1.5 py-0.5 rounded font-semibold transition-colors',
+                cs.currencies.includes(ccy) ? 'bg-pnl-positive/20 text-pnl-positive' : 'bg-white/5 text-text-muted/50')}>
+              {ccy}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex-1 space-y-0.5 overflow-hidden">
-        {!summary ? (
-          <p className="text-[11px] text-text-muted/60 italic">COT-Daten noch nicht geladen</p>
+        {!rows ? (
+          <p className="text-[11px] text-text-muted/60 italic">COT-Daten noch nicht geladen — COT-Seite öffnen</p>
+        ) : rows.length === 0 ? (
+          <p className="text-[11px] text-text-muted/60 italic">Keine Währungen ausgewählt</p>
         ) : (
-          summary.map(({ ccy, net, change }) => {
-            const isLong = net > 0;
+          rows.map(({ currency, commercialsNet, weeklyChange }) => {
+            const isLong = commercialsNet > 0;
             const color  = isLong ? '#22C55E' : '#EF4444';
-            const label  = `${isLong ? '+' : ''}${(net / 1000).toFixed(0)}K`;
-            const chgColor = change > 0 ? '#22C55E' : change < 0 ? '#EF4444' : '#787B86';
+            const label  = `${isLong ? '+' : ''}${(commercialsNet / 1000).toFixed(0)}K`;
+            const chgColor = weeklyChange > 0 ? '#22C55E' : weeklyChange < 0 ? '#EF4444' : '#787B86';
             return (
-              <div key={ccy} className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-text-muted w-8 flex-shrink-0">{ccy}</span>
+              <div key={currency} className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-text-muted w-8 flex-shrink-0">{currency}</span>
                 <span className="flex-1 text-[10px] font-mono" style={{ color }}>{label}</span>
                 <span className="text-[9px] flex-shrink-0" style={{ color: chgColor }}>
-                  {change > 0 ? '+' : ''}{(change / 1000).toFixed(0)}K
+                  {weeklyChange > 0 ? '+' : ''}{(weeklyChange / 1000).toFixed(0)}K
                 </span>
               </div>
             );
           })
         )}
       </div>
-      <span className="text-[11px] text-accent-primary group-hover:text-accent-secondary transition-colors font-medium mt-1">
+      <button onClick={() => navigate('/cot')} className="text-[11px] text-accent-primary hover:text-accent-secondary transition-colors font-medium mt-1 text-left">
         Öffnen →
-      </span>
-    </button>
+      </button>
+    </div>
   );
 }
 
