@@ -246,61 +246,6 @@ function WatchlistWidget({ navigate }: { navigate: (p: string) => void }) {
     );
   }
 
-  const symbols = activeWatchlist.symbols.slice(0, 10);
-  const totalAlerts = activeWatchlist.symbols.reduce((n, s) => n + s.alerts.filter(a => a.active).length, 0);
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-2 px-1">
-        <div className="flex items-center gap-1.5">
-          <List size={12} className="text-accent-primary" />
-          <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">
-            {activeWatchlist.name}
-          </span>
-          {totalAlerts > 0 && (
-            <span className="flex items-center gap-0.5 text-[10px] text-accent-primary">
-              <Bell size={9} />{totalAlerts}
-            </span>
-          )}
-        </div>
-        <button onClick={() => navigate('/watchlist')} className="text-[10px] text-accent-primary hover:underline">Alle →</button>
-      </div>
-      <div className="flex-1 overflow-y-auto space-y-0.5">
-        {symbols.length === 0 ? (
-          <div className="flex items-center justify-center h-20 text-xs text-text-muted">Keine Symbole</div>
-        ) : (
-          symbols.map(sym => (
-            <div key={sym.id} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-white/[0.03] transition-colors">
-              <div
-                className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-white/10"
-                style={{ backgroundColor: sym.color ?? 'rgba(255,255,255,0.12)' }}
-              />
-              <span className="flex-1 text-xs font-mono font-semibold text-text-primary truncate">{sym.displayName}</span>
-              <span className="text-[9px] text-text-muted bg-background-elevated px-1 py-px rounded flex-shrink-0">
-                {CATEGORY_LABELS[sym.category] ?? sym.category}
-              </span>
-            </div>
-          ))
-        )}
-        {activeWatchlist.symbols.length > 10 && (
-          <p className="text-[10px] text-text-muted text-center pt-1">
-            +{activeWatchlist.symbols.length - 10} weitere
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-2">
-        <List size={20} className="text-text-muted" />
-        <p className="text-xs text-text-muted text-center">Keine Watchlist</p>
-        <button onClick={() => navigate('/watchlist')} className="text-[10px] text-accent-primary hover:underline">Erstellen →</button>
-      </div>
-    );
-  }
-
   // Filter by dashboard color if one is set
   const displaySymbols = dashboardColor
     ? activeWatchlist.symbols.filter(s => s.color === dashboardColor)
