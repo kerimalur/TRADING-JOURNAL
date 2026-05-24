@@ -989,6 +989,11 @@ function registerIPCHandlers(): void {
 
     } catch (error) {
       console.error('❌ Forex Factory fetch fehlgeschlagen:', error);
+      // Stale cache als Fallback verwenden
+      if (calendarCache) {
+        console.log('📅 Calendar: Returning stale cache as fallback');
+        return { success: true, data: calendarCache.data, cached: true, stale: true, source: 'cache' };
+      }
       return { success: false, error: String(error), data: [] };
     }
   });

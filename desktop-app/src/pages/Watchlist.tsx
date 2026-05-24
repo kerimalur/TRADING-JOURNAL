@@ -2,7 +2,7 @@
  * ========================================================================
  * Trading Journal - Watchlist (TradingView-Style, ohne Preise)
  * ========================================================================
- * Symbole verwalten, Farblabels vergeben, Intervallalarme einrichten.
+ * Symbole verwalten, Abschnitte anlegen, Farblabels vergeben, Alarme.
  * Keine Kursdaten – dient als persönliche Beobachtungsliste.
  */
 
@@ -10,8 +10,8 @@ import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus, Trash2, Search, X, Bell, BellOff, Edit2, Check,
-  GripVertical, List,
-  RotateCcw, Repeat, Repeat2,
+  GripVertical, List, ChevronRight, ChevronDown, Tag, Palette,
+  RotateCcw, Repeat, Repeat2, Folder, FolderOpen,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
@@ -21,6 +21,7 @@ import {
   WATCHLIST_COLORS,
   type WatchlistSymbol,
   type WatchlistAlert,
+  type WatchlistSection,
 } from '@/stores/watchlistStore';
 
 // ============================================================
@@ -211,6 +212,226 @@ function ColorPicker({ anchorRect, current, onChange, onClose }: ColorPickerProp
       </motion.div>
     </>,
     document.body
+  );
+}
+
+// ============================================================
+// COLOR LABEL SETTINGS MODAL
+// ============================================================
+
+interface ColorLabelModalProps {
+  onClose: () => void;
+}
+
+function ColorLabelModal({ onClose }: ColorLabelModalProps) {
+  const { colorLabels, dashboardColor, setColorLabel, setDashboardColor } = useWatchlistStore();
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <motion.div initial={{ opacity: 0, scale: 0.95, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.18 }}
+        className="bg-background-surface-solid border border-border rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-accent-primary/10 flex items-center justify-center">
+              <Palette size={14} className="text-accent-primary" />
+            </div>
+            <p className="text-sm font-semibold text-text-primary">Farb-Labels</p>
+          </div>
+          <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors"><X size={16} /></button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Dashboard color selector */}
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">
+              Dashboard-Farbe <span className="text-text-muted/60 font-normal normal-case">(Symbole mit dieser Farbe → Widget)</span>
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {WATCHLIST_COLORS.map((c, i) => (
+                <button key={i} onClick={() => setDashboardColor(c.value)}
+                  title={c.name}
+                  className={clsx(
+                    'w-7 h-7 rounded-full border-2 transition-all hover:scale-110',
+                    dashboardColor === c.value ? 'border-white scale-110' : 'border-transparent'
+                  )}
+                  style={c.value ? { backgroundColor: c.value } : { backgroundColor: 'rgba(255,255,255,0.12)' }}
+                >
+                  {!c.value && <X size={10} className="text-text-muted mx-auto" />}
+                </button>
+              ))}
+            </div>
+            {dashboardColor && (
+              <p className="mt-1.5 text-[11px] text-text-muted">
+                Aktiv: <span className="font-medium" style={{ color: dashboardColor }}>{dashboardColor}</span>
+                {' '}— Symbole mit dieser Farbe erscheinen im Dashboard-Widget.
+              </p>
+            )}
+          </div>
+
+          <div className="border-t border-border/50 pt-4">
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">
+              Farb-Beschriftungen
+            </p>
+            <div className="space-y-2">
+              {WATCHLIST_COLORS.filter(c => c.value !== undefined).map((c, i) => (
+                <div key={i} className="flex items-center gap-2.5">
+                  <div className="w-4 h-4 rounded-full flex-shrink-0 border border-white/20"
+                    style={{ backgroundColor: c.value }} />
+                  <input
+                    type="text"
+                    defaultValue={colorLabels[c.value!] ?? ''}
+                    onBlur={e => setColorLabel(c.value, e.target.value)}
+                    placeholder={`z.B. "Kein Setup", "Long Bias"...`}
+                    className="flex-1 px-2.5 py-1 bg-background border border-border rounded-lg text-xs text-text-primary placeholder:text-text-muted/60 outline-none focus:border-accent-primary/50 transition-colors"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 py-3 border-t border-border">
+          <button onClick={onClose}
+            className="w-full py-2 bg-accent-primary/10 border border-accent-primary/30 hover:bg-accent-primary/20 text-accent-secondary rounded-xl text-sm font-medium transition-colors">
+            Fertig
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ============================================================
+// SECTION ASSIGN DROPDOWN (portal)
+// ============================================================
+
+interface SectionAssignProps {
+  anchorRect: DOMRect;
+  watchlistId: string;
+  symbolId: string;
+  currentSectionId: string | undefined;
+  sections: WatchlistSection[];
+  onClose: () => void;
+}
+
+function SectionAssignDropdown({ anchorRect, watchlistId, symbolId, currentSectionId, sections, onClose }: SectionAssignProps) {
+  const { setSymbolSection } = useWatchlistStore();
+  const pickerWidth = 180;
+  const spaceRight  = window.innerWidth - anchorRect.left;
+  const left = spaceRight < pickerWidth ? Math.max(4, anchorRect.right - pickerWidth) : anchorRect.left;
+  const spaceBelow  = window.innerHeight - anchorRect.bottom;
+  const top  = spaceBelow < 180 ? anchorRect.top - 180 - 6 : anchorRect.bottom + 4;
+
+  const assign = (sectionId: string | undefined) => {
+    setSymbolSection(watchlistId, symbolId, sectionId);
+    onClose();
+  };
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-[9998]" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: -4 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ duration: 0.1 }}
+        style={{ position: 'fixed', top, left, zIndex: 9999, minWidth: pickerWidth }}
+        className="bg-background-surface-solid border border-border rounded-xl shadow-2xl py-1 overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="px-3 py-1.5 text-[10px] font-semibold text-text-muted uppercase tracking-wider">Abschnitt</p>
+        <button onClick={() => assign(undefined)}
+          className={clsx('w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors',
+            !currentSectionId ? 'text-accent-secondary bg-accent-primary/10' : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]')}>
+          <X size={11} />Kein Abschnitt
+        </button>
+        {sections.map(sec => (
+          <button key={sec.id} onClick={() => assign(sec.id)}
+            className={clsx('w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors',
+              currentSectionId === sec.id ? 'text-accent-secondary bg-accent-primary/10' : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]')}>
+            <Folder size={11} />
+            <span className="truncate">{sec.name}</span>
+          </button>
+        ))}
+        {sections.length === 0 && (
+          <p className="px-3 py-1.5 text-[11px] text-text-muted/60">Noch keine Abschnitte</p>
+        )}
+      </motion.div>
+    </>,
+    document.body
+  );
+}
+
+// ============================================================
+// SECTION HEADER
+// ============================================================
+
+interface SectionHeaderProps {
+  section: WatchlistSection;
+  watchlistId: string;
+  symbolCount: number;
+}
+
+function SectionHeader({ section, watchlistId, symbolCount }: SectionHeaderProps) {
+  const { toggleSection, renameSection, deleteSection } = useWatchlistStore();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(section.name);
+  const [hovered, setHovered] = useState(false);
+
+  const saveRename = () => {
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== section.name) renameSection(watchlistId, section.id, trimmed);
+    setEditing(false);
+  };
+
+  return (
+    <div
+      className="flex items-center gap-1.5 px-2 py-1.5 group/sec cursor-pointer select-none"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => { if (!editing) toggleSection(watchlistId, section.id); }}
+    >
+      <span className="text-text-muted flex-shrink-0 transition-transform">
+        {section.collapsed
+          ? <ChevronRight size={13} />
+          : <ChevronDown size={13} />}
+      </span>
+
+      {editing ? (
+        <input
+          autoFocus
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') setEditing(false); }}
+          onBlur={saveRename}
+          onClick={e => e.stopPropagation()}
+          className="flex-1 bg-background-elevated border border-accent-primary/50 rounded px-1.5 py-0.5 text-xs text-text-primary outline-none"
+        />
+      ) : (
+        <span className="flex-1 text-[11px] font-semibold text-text-muted uppercase tracking-wider">
+          {section.name}
+        </span>
+      )}
+
+      <span className="text-[10px] text-text-muted/60 flex-shrink-0">{symbolCount}</span>
+
+      {hovered && !editing && (
+        <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+          <button onClick={() => { setValue(section.name); setEditing(true); }}
+            className="p-0.5 text-text-muted hover:text-text-primary transition-colors">
+            <Edit2 size={10} />
+          </button>
+          <button onClick={() => deleteSection(watchlistId, section.id)}
+            className="p-0.5 text-text-muted hover:text-pnl-negative transition-colors">
+            <Trash2 size={10} />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -559,12 +780,13 @@ function AddSymbolModal({ watchlistId, existingSymbols, onClose }: AddSymbolModa
 interface SymbolRowProps {
   sym: WatchlistSymbol;
   watchlistId: string;
+  sections: WatchlistSection[];
   onDragStart: () => void;
   onDragOver: () => void;
   onDrop: () => void;
 }
 
-function SymbolRow({ sym, watchlistId, onDragStart, onDragOver, onDrop }: SymbolRowProps) {
+function SymbolRow({ sym, watchlistId, sections, onDragStart, onDragOver, onDrop }: SymbolRowProps) {
   const { removeSymbol, updateSymbolColor } = useWatchlistStore();
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [colorPickerAnchor, setColorPickerAnchor] = useState<DOMRect | null>(null);
@@ -572,6 +794,9 @@ function SymbolRow({ sym, watchlistId, onDragStart, onDragOver, onDrop }: Symbol
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [showSectionAssign, setShowSectionAssign] = useState(false);
+  const [sectionAnchor, setSectionAnchor] = useState<DOMRect | null>(null);
+  const sectionBtnRef = useRef<HTMLButtonElement>(null);
 
   const activeAlerts = sym.alerts.filter(a => a.active).length;
 
@@ -628,6 +853,38 @@ function SymbolRow({ sym, watchlistId, onDragStart, onDragOver, onDrop }: Symbol
             </span>
           </div>
         </div>
+
+        {/* Section assign button */}
+        <button
+          ref={sectionBtnRef}
+          onClick={() => {
+            const rect = sectionBtnRef.current?.getBoundingClientRect();
+            if (rect) setSectionAnchor(rect);
+            setShowSectionAssign(v => !v);
+          }}
+          className={clsx(
+            'flex-shrink-0 p-0.5 rounded transition-all',
+            sym.sectionId
+              ? 'text-accent-primary opacity-100'
+              : 'text-text-muted opacity-0 group-hover:opacity-100 hover:text-text-primary'
+          )}
+          title="Abschnitt zuweisen"
+        >
+          <Folder size={11} />
+        </button>
+
+        <AnimatePresence>
+          {showSectionAssign && sectionAnchor && (
+            <SectionAssignDropdown
+              anchorRect={sectionAnchor}
+              watchlistId={watchlistId}
+              symbolId={sym.id}
+              currentSectionId={sym.sectionId}
+              sections={sections}
+              onClose={() => setShowSectionAssign(false)}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Alert indicator */}
         <button
@@ -694,14 +951,17 @@ export function Watchlist() {
   const {
     watchlists, activeId, setActiveId,
     createWatchlist, deleteWatchlist, renameWatchlist,
-    reorderSymbols,
+    reorderSymbols, createSection,
   } = useWatchlistStore();
 
-  const [showAddSymbol, setShowAddSymbol]   = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newName, setNewName]               = useState('');
-  const [editingTabId, setEditingTabId]     = useState<string | null>(null);
-  const [searchFilter, setSearchFilter]     = useState('');
+  const [showAddSymbol, setShowAddSymbol]       = useState(false);
+  const [showCreateForm, setShowCreateForm]     = useState(false);
+  const [newName, setNewName]                   = useState('');
+  const [editingTabId, setEditingTabId]         = useState<string | null>(null);
+  const [searchFilter, setSearchFilter]         = useState('');
+  const [showColorLabels, setShowColorLabels]   = useState(false);
+  const [showAddSection, setShowAddSection]     = useState(false);
+  const [newSectionName, setNewSectionName]     = useState('');
 
   const dragItem     = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
@@ -758,13 +1018,20 @@ export function Watchlist() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-text-primary leading-tight">Watchlist</h1>
-                <p className="text-xs text-text-muted">Symbole beobachten · Farblabels · Alarme</p>
+                <p className="text-xs text-text-muted">Symbole beobachten · Abschnitte · Farblabels · Alarme</p>
               </div>
             </div>
-            <button onClick={() => setShowAddSymbol(true)}
-              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl bg-accent-primary/10 border border-accent-primary/30 text-accent-secondary hover:bg-accent-primary/20 transition-colors">
-              <Plus size={14} />Symbol hinzufuegen
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowColorLabels(true)}
+                className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl bg-background-surface border border-border text-text-muted hover:text-text-primary hover:border-white/20 transition-colors"
+                title="Farb-Labels konfigurieren">
+                <Palette size={14} />Labels
+              </button>
+              <button onClick={() => setShowAddSymbol(true)}
+                className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl bg-accent-primary/10 border border-accent-primary/30 text-accent-secondary hover:bg-accent-primary/20 transition-colors">
+                <Plus size={14} />Symbol hinzufuegen
+              </button>
+            </div>
           </div>
 
           {/* Watchlist Tabs */}
@@ -852,7 +1119,7 @@ export function Watchlist() {
           )}
         </div>
 
-        {/* Symbol list */}
+        {/* Symbol list with sections */}
         <div className="flex-1 overflow-y-auto px-3 pb-4">
           {filteredSymbols.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3">
@@ -868,26 +1135,112 @@ export function Watchlist() {
               )}
             </div>
           ) : (
-            <div className="space-y-0.5 pt-1">
-              <AnimatePresence mode="popLayout">
-                {filteredSymbols.map((sym, idx) => {
-                  const originalIdx = activeWatchlist?.symbols.findIndex(s => s.id === sym.id) ?? idx;
-                  return (
-                    <motion.div key={sym.id} layout
-                      initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 8, scale: 0.95 }}
-                      transition={{ duration: 0.15, delay: idx * 0.015 }}>
-                      <SymbolRow
-                        sym={sym}
-                        watchlistId={activeWatchlist!.id}
-                        onDragStart={() => { dragItem.current = originalIdx; }}
-                        onDragOver={() => { dragOverItem.current = originalIdx; }}
-                        onDrop={handleDrop}
-                      />
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
+            <div className="pt-1">
+              {/* Render sections */}
+              {(activeWatchlist?.sections ?? []).map(section => {
+                const sectionSymbols = filteredSymbols.filter(s => s.sectionId === section.id);
+                return (
+                  <div key={section.id} className="mb-1">
+                    <SectionHeader section={section} watchlistId={activeWatchlist!.id} symbolCount={sectionSymbols.length} />
+                    <AnimatePresence>
+                      {!section.collapsed && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.18 }}
+                          className="overflow-hidden pl-3 space-y-0.5"
+                        >
+                          {sectionSymbols.length === 0 ? (
+                            <p className="px-2 py-2 text-[11px] text-text-muted/60 italic">Leer – ziehe Symbole hierher oder weise sie zu</p>
+                          ) : (
+                            sectionSymbols.map(sym => {
+                              const originalIdx = activeWatchlist!.symbols.findIndex(s => s.id === sym.id);
+                              return (
+                                <motion.div key={sym.id} layout
+                                  initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                                  exit={{ opacity: 0, x: 8 }} transition={{ duration: 0.12 }}>
+                                  <SymbolRow
+                                    sym={sym}
+                                    watchlistId={activeWatchlist!.id}
+                                    sections={activeWatchlist?.sections ?? []}
+                                    onDragStart={() => { dragItem.current = originalIdx; }}
+                                    onDragOver={() => { dragOverItem.current = originalIdx; }}
+                                    onDrop={handleDrop}
+                                  />
+                                </motion.div>
+                              );
+                            })
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+
+              {/* Ungrouped symbols */}
+              {(() => {
+                const ungrouped = filteredSymbols.filter(s => !s.sectionId);
+                if (ungrouped.length === 0 && (activeWatchlist?.sections ?? []).length > 0) return null;
+                return (
+                  <div className="space-y-0.5">
+                    {(activeWatchlist?.sections ?? []).length > 0 && ungrouped.length > 0 && (
+                      <div className="px-2 py-1.5">
+                        <span className="text-[11px] font-semibold text-text-muted/60 uppercase tracking-wider">Ohne Abschnitt</span>
+                      </div>
+                    )}
+                    <AnimatePresence mode="popLayout">
+                      {ungrouped.map((sym, idx) => {
+                        const originalIdx = activeWatchlist!.symbols.findIndex(s => s.id === sym.id);
+                        return (
+                          <motion.div key={sym.id} layout
+                            initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 8, scale: 0.95 }}
+                            transition={{ duration: 0.15, delay: idx * 0.015 }}>
+                            <SymbolRow
+                              sym={sym}
+                              watchlistId={activeWatchlist!.id}
+                              sections={activeWatchlist?.sections ?? []}
+                              onDragStart={() => { dragItem.current = originalIdx; }}
+                              onDragOver={() => { dragOverItem.current = originalIdx; }}
+                              onDrop={handleDrop}
+                            />
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                );
+              })()}
+
+              {/* Add section row */}
+              <div className="mt-3 px-2">
+                {showAddSection ? (
+                  <div className="flex items-center gap-1.5">
+                    <Folder size={12} className="text-text-muted flex-shrink-0" />
+                    <input autoFocus value={newSectionName} onChange={e => setNewSectionName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          if (newSectionName.trim() && activeWatchlist) {
+                            createSection(activeWatchlist.id, newSectionName.trim());
+                          }
+                          setShowAddSection(false); setNewSectionName('');
+                        }
+                        if (e.key === 'Escape') { setShowAddSection(false); setNewSectionName(''); }
+                      }}
+                      onBlur={() => { setShowAddSection(false); setNewSectionName(''); }}
+                      placeholder="Abschnitt-Name..."
+                      className="flex-1 bg-background-elevated border border-accent-primary/50 rounded px-2 py-1 text-xs text-text-primary outline-none"
+                    />
+                  </div>
+                ) : (
+                  <button onClick={() => setShowAddSection(true)}
+                    className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-text-primary transition-colors py-1">
+                    <Folder size={11} /><span>Abschnitt hinzufügen</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -916,6 +1269,9 @@ export function Watchlist() {
             existingSymbols={activeWatchlist.symbols.map(s => s.symbol)}
             onClose={() => setShowAddSymbol(false)}
           />
+        )}
+        {showColorLabels && (
+          <ColorLabelModal onClose={() => setShowColorLabels(false)} />
         )}
       </AnimatePresence>
     </PageTransition>

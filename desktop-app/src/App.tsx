@@ -166,7 +166,7 @@ function LoginScreen({ onSkipLogin }: LoginScreenProps) {
 function AppContent() {
   const location = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
-  const { watchlists, markAlertTriggered } = useWatchlistStore();
+  const { watchlists, markAlertTriggered, loadFromSupabase } = useWatchlistStore();
   const { showToast } = useUIStore();
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -200,6 +200,7 @@ function AppContent() {
       if (session) {
         localStorage.removeItem('trading-journal-offline-mode');
         setOfflineMode(false);
+        loadFromSupabase();
       }
       setSession(session);
       setAuthLoading(false);

@@ -232,7 +232,7 @@ function WidgetCustomizer({
 
 // ── Watchlist Widget ───────────────────────────────────────────────────
 function WatchlistWidget({ navigate }: { navigate: (p: string) => void }) {
-  const { watchlists, activeId } = useWatchlistStore();
+  const { watchlists, activeId, dashboardColor } = useWatchlistStore();
   const activeWatchlist = watchlists.find(w => w.id === activeId) ?? watchlists[0];
   const CATEGORY_LABELS: Record<string, string> = { forex: 'FX', crypto: 'Crypto', futures: 'Fut', indices: 'Idx' };
 
@@ -289,6 +289,241 @@ function WatchlistWidget({ navigate }: { navigate: (p: string) => void }) {
         )}
       </div>
     </div>
+  );
+}
+
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-2">
+        <List size={20} className="text-text-muted" />
+        <p className="text-xs text-text-muted text-center">Keine Watchlist</p>
+        <button onClick={() => navigate('/watchlist')} className="text-[10px] text-accent-primary hover:underline">Erstellen →</button>
+      </div>
+    );
+  }
+
+  // Filter by dashboard color if one is set
+  const displaySymbols = dashboardColor
+    ? activeWatchlist.symbols.filter(s => s.color === dashboardColor)
+    : activeWatchlist.symbols;
+  const symbols = displaySymbols.slice(0, 12);
+  const totalAlerts = activeWatchlist.symbols.reduce((n, s) => n + s.alerts.filter(a => a.active).length, 0);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-2 px-1">
+        <div className="flex items-center gap-1.5">
+          <List size={12} className="text-accent-primary" />
+          <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">
+            {activeWatchlist.name}
+          </span>
+          {totalAlerts > 0 && (
+            <span className="flex items-center gap-0.5 text-[10px] text-accent-primary">
+              <Bell size={9} />{totalAlerts}
+            </span>
+          )}
+        </div>
+        <button onClick={() => navigate('/watchlist')} className="text-[10px] text-accent-primary hover:underline">Alle →</button>
+      </div>
+      {dashboardColor && displaySymbols.length === 0 && (
+        <p className="text-[10px] text-text-muted/60 italic px-1 mb-1">Keine Symbole mit Dashboard-Farbe</p>
+      )}
+      <div className="flex-1 overflow-y-auto space-y-0.5">
+        {symbols.length === 0 ? (
+          <div className="flex items-center justify-center h-20 text-xs text-text-muted">Keine Symbole</div>
+        ) : (
+          symbols.map(sym => (
+            <div key={sym.id} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-white/[0.03] transition-colors">
+              <div
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-white/10"
+                style={{ backgroundColor: sym.color ?? 'rgba(255,255,255,0.12)' }}
+              />
+              <span className="flex-1 text-xs font-mono font-semibold text-text-primary truncate">{sym.displayName}</span>
+              <span className="text-[9px] text-text-muted bg-background-elevated px-1 py-px rounded flex-shrink-0">
+                {CATEGORY_LABELS[sym.category] ?? sym.category}
+              </span>
+            </div>
+          ))
+        )}
+        {displaySymbols.length > 12 && (
+          <p className="text-[10px] text-text-muted text-center pt-1">
+            +{displaySymbols.length - 12} weitere
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── News Mini-Widget ──────────────────────────────────────────────────
+const IMPACT_COLORS = { high: '#EF4444', medium: '#FF9800', low: '#787B86' } as const;
+
+function NewsWidget({ navigate }: { navigate: (p: string) => void }) {
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })();
+
+  const events = (() => {
+    try {
+      const raw = localStorage.getItem('trading-journal-calendar-cache');
+      if (!raw) return [];
+      const cache = JSON.parse(raw);
+      const allEvents: any[] = cache.data ?? [];
+      return allEvents
+        .filter((e: any) => (e.date === today || e.date === tomorrow) && e.impact === 'high')
+        .sort((a: any, b: any) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
+        .slice(0, 4);
+    } catch { return []; }
+  })();
+
+  return (
+    <button onClick={() => navigate('/news')} className="flex flex-col h-full w-full text-left group">
+      <div className="flex items-center gap-1.5 mb-2">
+        <div className="p-1.5 rounded-lg bg-amber-500/10 group-hover:bg-amber-500/15 transition-colors">
+          <Newspaper size={14} className="text-amber-400" />
+        </div>
+        <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">News / Kalender</span>
+      </div>
+      <div className="flex-1 space-y-1 overflow-hidden">
+        {events.length === 0 ? (
+          <p className="text-[11px] text-text-muted/60 italic">Keine High-Impact Events heute/morgen geladen</p>
+        ) : (
+          events.map((e: any, i: number) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: IMPACT_COLORS[e.impact as keyof typeof IMPACT_COLORS] ?? '#787B86' }} />
+              <span className="text-[10px] font-mono text-text-muted w-10 flex-shrink-0">{e.time ?? '??:??'}</span>
+              <span className="text-[10px] font-semibold text-text-muted flex-shrink-0 w-7">{e.currency}</span>
+              <span className="text-[10px] text-text-primary truncate">{e.event}</span>
+            </div>
+          ))
+        )}
+      </div>
+      <span className="text-[11px] text-accent-primary group-hover:text-accent-secondary transition-colors font-medium mt-1">
+        Öffnen →
+      </span>
+    </button>
+  );
+}
+
+// ── Zinsen Mini-Widget ────────────────────────────────────────────────
+function ZinsenWidget({ navigate }: { navigate: (p: string) => void }) {
+  const rates = (() => {
+    try {
+      const raw = localStorage.getItem('trading-journal-interest-rates-cache');
+      if (!raw) return null;
+      const cache = JSON.parse(raw);
+      return cache.data as Record<string, { rate: number; change: string; centralBank: string }> | null;
+    } catch { return null; }
+  })();
+
+  const TOP_CCY = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'NZD'];
+
+  return (
+    <button onClick={() => navigate('/zinsen')} className="flex flex-col h-full w-full text-left group">
+      <div className="flex items-center gap-1.5 mb-2">
+        <div className="p-1.5 rounded-lg bg-accent-primary/10 group-hover:bg-accent-primary/15 transition-colors">
+          <Percent size={14} className="text-accent-primary" />
+        </div>
+        <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">Zinsen</span>
+      </div>
+      <div className="flex-1 space-y-0.5 overflow-hidden">
+        {!rates ? (
+          <p className="text-[11px] text-text-muted/60 italic">Zinsdaten noch nicht geladen</p>
+        ) : (
+          TOP_CCY.map(ccy => {
+            const r = rates[ccy];
+            if (!r) return null;
+            const changeColor = r.change === 'up' ? '#22C55E' : r.change === 'down' ? '#EF4444' : '#787B86';
+            const arrow = r.change === 'up' ? '↑' : r.change === 'down' ? '↓' : '→';
+            return (
+              <div key={ccy} className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-text-muted w-8 flex-shrink-0">{ccy}</span>
+                <span className="flex-1 text-[10px] font-mono text-text-primary">{r.rate.toFixed(2)}%</span>
+                <span className="text-[10px] font-bold flex-shrink-0" style={{ color: changeColor }}>{arrow}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
+      <span className="text-[11px] text-accent-primary group-hover:text-accent-secondary transition-colors font-medium mt-1">
+        Öffnen →
+      </span>
+    </button>
+  );
+}
+
+// ── COT Mini-Widget ───────────────────────────────────────────────────
+function COTWidget({ navigate }: { navigate: (p: string) => void }) {
+  const summary = (() => {
+    try {
+      const raw = localStorage.getItem('trading-journal-cot-cache');
+      if (!raw) return null;
+      const cache = JSON.parse(raw);
+      const data = cache.data as Record<string, { netPosition: number; change?: number }> | null;
+      if (!data) return null;
+      return Object.entries(data)
+        .map(([ccy, v]) => ({ ccy, net: v.netPosition, change: v.change ?? 0 }))
+        .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
+        .slice(0, 5);
+    } catch { return null; }
+  })();
+
+  return (
+    <button onClick={() => navigate('/cot')} className="flex flex-col h-full w-full text-left group">
+      <div className="flex items-center gap-1.5 mb-2">
+        <div className="p-1.5 rounded-lg bg-pnl-positive/10 group-hover:bg-pnl-positive/15 transition-colors">
+          <BarChart2 size={14} className="text-pnl-positive" />
+        </div>
+        <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">COT</span>
+      </div>
+      <div className="flex-1 space-y-0.5 overflow-hidden">
+        {!summary ? (
+          <p className="text-[11px] text-text-muted/60 italic">COT-Daten noch nicht geladen</p>
+        ) : (
+          summary.map(({ ccy, net, change }) => {
+            const isLong = net > 0;
+            const color  = isLong ? '#22C55E' : '#EF4444';
+            const label  = `${isLong ? '+' : ''}${(net / 1000).toFixed(0)}K`;
+            const chgColor = change > 0 ? '#22C55E' : change < 0 ? '#EF4444' : '#787B86';
+            return (
+              <div key={ccy} className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-text-muted w-8 flex-shrink-0">{ccy}</span>
+                <span className="flex-1 text-[10px] font-mono" style={{ color }}>{label}</span>
+                <span className="text-[9px] flex-shrink-0" style={{ color: chgColor }}>
+                  {change > 0 ? '+' : ''}{(change / 1000).toFixed(0)}K
+                </span>
+              </div>
+            );
+          })
+        )}
+      </div>
+      <span className="text-[11px] text-accent-primary group-hover:text-accent-secondary transition-colors font-medium mt-1">
+        Öffnen →
+      </span>
+    </button>
+  );
+}
+
+// ── Übersicht Mini-Widget ─────────────────────────────────────────────
+function UebersichtWidget({ navigate }: { navigate: (p: string) => void }) {
+  return (
+    <button onClick={() => navigate('/fundamentals')} className="flex flex-col h-full w-full text-left group">
+      <div className="flex items-center gap-1.5 mb-2">
+        <div className="p-1.5 rounded-lg bg-accent-cyan/10 group-hover:bg-accent-cyan/15 transition-colors">
+          <Globe2 size={14} className="text-accent-cyan" />
+        </div>
+        <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">Markt-Übersicht</span>
+      </div>
+      <div className="flex-1 flex flex-col justify-center gap-1.5">
+        {['Fundamentaldaten', 'Währungsstärke', 'Marktstruktur', 'Saisonalität'].map(item => (
+          <div key={item} className="flex items-center gap-1.5">
+            <div className="w-1 h-1 rounded-full bg-accent-cyan/60 flex-shrink-0" />
+            <span className="text-[11px] text-text-muted">{item}</span>
+          </div>
+        ))}
+      </div>
+      <span className="text-[11px] text-accent-primary group-hover:text-accent-secondary transition-colors font-medium mt-1">
+        Öffnen →
+      </span>
+    </button>
   );
 }
 
@@ -748,44 +983,28 @@ export function Dashboard() {
           {/* MARKT: ÜBERSICHT */}
           {prefs.showWidgetUebersicht && (
             <BentoCell delay={0.48}>
-              <DashNavWidget
-                navigate={navigate} path="/fundamentals" title="Übersicht"
-                description="Marktüberblick & Fundamentaldaten"
-                icon={<Globe2 size={16} className="text-accent-cyan" />}
-              />
+              <UebersichtWidget navigate={navigate} />
             </BentoCell>
           )}
 
           {/* MARKT: NEWS */}
           {prefs.showWidgetNews && (
             <BentoCell delay={0.49}>
-              <DashNavWidget
-                navigate={navigate} path="/news" title="News"
-                description="Wirtschaftsnews & Ereignisse"
-                icon={<Newspaper size={16} className="text-amber-400" />}
-              />
+              <NewsWidget navigate={navigate} />
             </BentoCell>
           )}
 
           {/* MARKT: COT */}
           {prefs.showWidgetCOT && (
             <BentoCell delay={0.50}>
-              <DashNavWidget
-                navigate={navigate} path="/cot" title="COT"
-                description="Commitments of Traders"
-                icon={<BarChart2 size={16} className="text-pnl-positive" />}
-              />
+              <COTWidget navigate={navigate} />
             </BentoCell>
           )}
 
           {/* MARKT: ZINSEN */}
           {prefs.showWidgetZinsen && (
             <BentoCell delay={0.51}>
-              <DashNavWidget
-                navigate={navigate} path="/zinsen" title="Zinsen"
-                description="Zinsdifferenzen & Zentralbanken"
-                icon={<Percent size={16} className="text-accent-primary" />}
-              />
+              <ZinsenWidget navigate={navigate} />
             </BentoCell>
           )}
 
