@@ -6,12 +6,13 @@
  * Keine Kursdaten – dient als persönliche Beobachtungsliste.
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus, Trash2, Search, X, Bell, BellOff, Edit2, Check,
   GripVertical, List, ChevronRight, ChevronDown, Tag, Palette,
-  RotateCcw, Repeat, Repeat2, Folder, FolderOpen,
+  RotateCcw, Repeat, Repeat2, Folder, FolderOpen, Image as ImageIcon,
+  MapPin, StickyNote, TrendingUp, TrendingDown, Minus,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
@@ -19,9 +20,14 @@ import { PageTransition } from '@/components/ui/PageTransition';
 import {
   useWatchlistStore,
   WATCHLIST_COLORS,
+  PAIR_STATUS_CONFIG,
+  LEVEL_TYPE_CONFIG,
   type WatchlistSymbol,
   type WatchlistAlert,
   type WatchlistSection,
+  type PairStatus,
+  type PairBias,
+  type LevelType,
 } from '@/stores/watchlistStore';
 
 // ============================================================
@@ -113,6 +119,35 @@ const CATEGORY_LABELS: Record<SymbolCategory, string> = {
 };
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+// ============================================================
+// IMAGE COMPRESSION
+// ============================================================
+
+async function compressImage(file: File, maxPx = 600, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = ev => {
+      img.src = ev.target?.result as string;
+      img.onload = () => {
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+        const w = Math.round(img.width  * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width  = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('canvas error')); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 // ============================================================
 // EMPTY STATE
@@ -775,7 +810,7 @@ function AddSymbolModal({ watchlistId, existingSymbols, onClose }: AddSymbolModa
 }
 
 // ============================================================
-// SYMBOL ROW
+// SYMBOL ROW  (compact + expandable detail panel)
 // ============================================================
 
 interface SymbolRowProps {
@@ -788,92 +823,438 @@ interface SymbolRowProps {
 }
 
 function SymbolRow({ sym, watchlistId, sections, onDragStart, onDragOver, onDrop }: SymbolRowProps) {
-  const { removeSymbol, updateSymbolColor } = useWatchlistStore();
+  const {
+    removeSymbol, updateSymbolColor,
+    updateSymbolDetail, addPairLevel, removePairLevel,
+    addPairImage, removePairImage,
+  } = useWatchlistStore();
+
+  const [expanded, setExpanded]               = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [colorPickerAnchor, setColorPickerAnchor] = useState<DOMRect | null>(null);
   const colorBtnRef = useRef<HTMLButtonElement>(null);
-  const [showAlertModal, setShowAlertModal] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState(false);
-  const [hovered, setHovered] = useState(false);
+  const [showAlertModal, setShowAlertModal]   = useState(false);
+  const [confirmRemove, setConfirmRemove]     = useState(false);
+  const [hovered, setHovered]                 = useState(false);
   const [showSectionAssign, setShowSectionAssign] = useState(false);
-  const [sectionAnchor, setSectionAnchor] = useState<DOMRect | null>(null);
+  const [sectionAnchor, setSectionAnchor]     = useState<DOMRect | null>(null);
   const sectionBtnRef = useRef<HTMLButtonElement>(null);
 
+  // Detail panel state
+  const [notesValue, setNotesValue]           = useState(sym.notes ?? '');
+  const [levelForm, setLevelForm]             = useState({ type: 'support' as LevelType, price: '', label: '' });
+  const [showLevelForm, setShowLevelForm]     = useState(false);
+  const [viewImageIdx, setViewImageIdx]       = useState<number | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setNotesValue(sym.notes ?? ''); }, [sym.notes]);
+
   const activeAlerts = sym.alerts.filter(a => a.active).length;
+  const statusCfg    = sym.status ? PAIR_STATUS_CONFIG[sym.status] : null;
+
+  const handleNotesBlur = () => {
+    updateSymbolDetail(watchlistId, sym.id, { notes: notesValue.trim() || undefined });
+  };
+
+  const handleAddLevel = () => {
+    const price = parseFloat(levelForm.price);
+    if (isNaN(price)) return;
+    addPairLevel(watchlistId, sym.id, {
+      type:  levelForm.type,
+      price,
+      label: levelForm.label.trim() || LEVEL_TYPE_CONFIG[levelForm.type].label,
+    });
+    setLevelForm(f => ({ ...f, price: '', label: '' }));
+    setShowLevelForm(false);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if ((sym.images?.length ?? 0) >= 5) return;
+    try {
+      const dataUrl = await compressImage(file, 600, 0.7);
+      addPairImage(watchlistId, sym.id, { dataUrl, caption: '', timeframe: '', createdAt: new Date().toISOString() });
+    } catch { /* ignore */ }
+    if (imageInputRef.current) imageInputRef.current.value = '';
+  };
 
   return (
     <>
       <div
-        draggable
-        onDragStart={onDragStart}
-        onDragOver={e => { e.preventDefault(); onDragOver(); }}
-        onDrop={e => { e.preventDefault(); onDrop(); }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => { setHovered(false); setConfirmRemove(false); }}
         className={clsx(
-          'group flex items-center gap-2 px-2 py-2 rounded-lg transition-colors border border-transparent',
-          'hover:border-border/40 hover:bg-background-surface-hover',
+          'rounded-lg border transition-colors overflow-hidden',
+          expanded ? 'border-border/60 bg-background-surface' : 'border-transparent hover:border-border/40 hover:bg-background-surface/60',
         )}
       >
-        {/* Drag handle */}
-        <span className={clsx('text-text-muted cursor-grab active:cursor-grabbing flex-shrink-0 transition-opacity', hovered ? 'opacity-100' : 'opacity-0')}>
-          <GripVertical size={13} />
-        </span>
+        {/* ── Compact row ──────────────────────────────────────── */}
+        <div
+          draggable
+          onDragStart={onDragStart}
+          onDragOver={e => { e.preventDefault(); onDragOver(); }}
+          onDrop={e => { e.preventDefault(); onDrop(); }}
+          className="flex items-center gap-2 px-2 py-2 cursor-pointer select-none"
+          onClick={e => {
+            if ((e.target as HTMLElement).closest('button,input,textarea')) return;
+            setExpanded(v => !v);
+          }}
+        >
+          {/* Drag handle */}
+          <span className={clsx('text-text-muted cursor-grab active:cursor-grabbing flex-shrink-0 transition-opacity', hovered ? 'opacity-100' : 'opacity-0')}>
+            <GripVertical size={13} />
+          </span>
 
-        {/* Color dot */}
-        <div className="flex-shrink-0">
-          <button
-            ref={colorBtnRef}
-            onClick={() => {
-              const rect = colorBtnRef.current?.getBoundingClientRect();
-              if (rect) setColorPickerAnchor(rect);
-              setShowColorPicker(v => !v);
-            }}
-            className="w-4 h-4 rounded-full border border-white/20 transition-transform hover:scale-125"
-            style={{ backgroundColor: sym.color ?? 'rgba(255,255,255,0.15)' }}
-            title="Farbe ändern"
-          />
-          <AnimatePresence>
-            {showColorPicker && colorPickerAnchor && (
-              <ColorPicker
-                anchorRect={colorPickerAnchor}
-                current={sym.color}
-                onChange={color => updateSymbolColor(watchlistId, sym.id, color)}
-                onClose={() => setShowColorPicker(false)}
-              />
+          {/* Color dot */}
+          <div className="flex-shrink-0">
+            <button
+              ref={colorBtnRef}
+              onClick={e => {
+                e.stopPropagation();
+                const rect = colorBtnRef.current?.getBoundingClientRect();
+                if (rect) setColorPickerAnchor(rect);
+                setShowColorPicker(v => !v);
+              }}
+              className="w-4 h-4 rounded-full border border-white/20 transition-transform hover:scale-125"
+              style={{ backgroundColor: sym.color ?? 'rgba(255,255,255,0.15)' }}
+              title="Farbe ändern"
+            />
+            <AnimatePresence>
+              {showColorPicker && colorPickerAnchor && (
+                <ColorPicker
+                  anchorRect={colorPickerAnchor}
+                  current={sym.color}
+                  onChange={color => updateSymbolColor(watchlistId, sym.id, color)}
+                  onClose={() => setShowColorPicker(false)}
+                />
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Symbol name */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[13px] font-semibold text-text-primary font-mono leading-tight">{sym.displayName}</span>
+              <span className="text-[9px] text-text-muted bg-background-elevated px-1 py-px rounded flex-shrink-0">
+                {CATEGORY_LABELS[sym.category]}
+              </span>
+            </div>
+            {sym.notes && !expanded && (
+              <p className="text-[10px] text-text-muted truncate mt-0.5 max-w-[200px]">{sym.notes}</p>
             )}
-          </AnimatePresence>
-        </div>
+          </div>
 
-        {/* Symbol info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[13px] font-semibold text-text-primary font-mono">{sym.displayName}</span>
-            <span className="text-[9px] text-text-muted bg-background-elevated px-1 py-px rounded flex-shrink-0">
-              {CATEGORY_LABELS[sym.category]}
+          {/* Right-side indicators */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Bias */}
+            {sym.bias && (
+              <span className={clsx(
+                'text-xs font-bold leading-none',
+                sym.bias === 'bullish' ? 'text-pnl-positive' :
+                sym.bias === 'bearish' ? 'text-pnl-negative' : 'text-text-muted'
+              )}>
+                {sym.bias === 'bullish' ? '↑' : sym.bias === 'bearish' ? '↓' : '→'}
+              </span>
+            )}
+
+            {/* Status badge */}
+            {statusCfg && (
+              <span
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                style={{ color: statusCfg.color, backgroundColor: statusCfg.bg }}
+              >
+                {statusCfg.label}
+              </span>
+            )}
+
+            {/* Level count */}
+            {(sym.levels?.length ?? 0) > 0 && (
+              <span className="text-[10px] text-accent-cyan bg-accent-cyan/10 px-1 py-px rounded font-medium">
+                {sym.levels!.length}L
+              </span>
+            )}
+
+            {/* Image count */}
+            {(sym.images?.length ?? 0) > 0 && (
+              <span className="text-[10px] text-text-muted bg-background-elevated px-1 py-px rounded">
+                {sym.images!.length}📷
+              </span>
+            )}
+
+            {/* Section assign */}
+            <button
+              ref={sectionBtnRef}
+              onClick={e => {
+                e.stopPropagation();
+                const rect = sectionBtnRef.current?.getBoundingClientRect();
+                if (rect) setSectionAnchor(rect);
+                setShowSectionAssign(v => !v);
+              }}
+              className={clsx(
+                'p-0.5 rounded transition-all flex-shrink-0',
+                sym.sectionId ? 'text-accent-primary' : 'text-text-muted opacity-0 group-hover:opacity-100 hover:text-text-primary',
+                hovered && 'opacity-100'
+              )}
+              title="Abschnitt"
+            >
+              <Folder size={11} />
+            </button>
+
+            {/* Alerts */}
+            <button
+              onClick={e => { e.stopPropagation(); setShowAlertModal(true); }}
+              className={clsx(
+                'flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[11px] transition-colors flex-shrink-0',
+                activeAlerts > 0
+                  ? 'text-accent-primary bg-accent-primary/10 hover:bg-accent-primary/20'
+                  : clsx('text-text-muted hover:text-accent-primary', hovered ? 'opacity-100' : 'opacity-0'),
+              )}
+            >
+              <Bell size={11} />
+              {activeAlerts > 0 && <span className="font-medium ml-0.5">{activeAlerts}</span>}
+            </button>
+
+            {/* Remove */}
+            <div className={clsx('flex-shrink-0 transition-opacity', hovered ? 'opacity-100' : 'opacity-0')}>
+              {confirmRemove ? (
+                <button onClick={e => { e.stopPropagation(); removeSymbol(watchlistId, sym.id); }}
+                  className="text-pnl-negative hover:text-red-400 transition-colors p-0.5">
+                  <Check size={13} />
+                </button>
+              ) : (
+                <button onClick={e => { e.stopPropagation(); setConfirmRemove(true); }}
+                  className="text-text-muted hover:text-pnl-negative transition-colors p-0.5">
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Expand chevron */}
+            <span className="text-text-muted/50 flex-shrink-0">
+              {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </span>
           </div>
         </div>
 
-        {/* Section assign button */}
-        <button
-          ref={sectionBtnRef}
-          onClick={() => {
-            const rect = sectionBtnRef.current?.getBoundingClientRect();
-            if (rect) setSectionAnchor(rect);
-            setShowSectionAssign(v => !v);
-          }}
-          className={clsx(
-            'flex-shrink-0 p-0.5 rounded transition-all',
-            sym.sectionId
-              ? 'text-accent-primary opacity-100'
-              : 'text-text-muted opacity-0 group-hover:opacity-100 hover:text-text-primary'
-          )}
-          title="Abschnitt zuweisen"
-        >
-          <Folder size={11} />
-        </button>
+        {/* ── Expanded detail panel ─────────────────────────────── */}
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="px-3 pb-3 pt-2 border-t border-border/40 space-y-3">
 
+                {/* Status */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Status</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {(Object.keys(PAIR_STATUS_CONFIG) as PairStatus[]).map(s => {
+                      const cfg = PAIR_STATUS_CONFIG[s];
+                      const active = sym.status === s;
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => updateSymbolDetail(watchlistId, sym.id, { status: active ? undefined : s })}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all"
+                          style={active
+                            ? { color: cfg.color, backgroundColor: cfg.bg, boxShadow: `0 0 0 1px ${cfg.color}60` }
+                            : { color: '#52525B', backgroundColor: 'rgba(255,255,255,0.05)' }}
+                        >
+                          {cfg.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Bias */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Bias</p>
+                  <div className="flex gap-2">
+                    {(['bullish', 'neutral', 'bearish'] as PairBias[]).map(b => {
+                      const active = sym.bias === b;
+                      return (
+                        <button
+                          key={b}
+                          onClick={() => updateSymbolDetail(watchlistId, sym.id, { bias: active ? undefined : b })}
+                          className={clsx(
+                            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border',
+                            active
+                              ? b === 'bullish' ? 'bg-pnl-positive/15 text-pnl-positive border-pnl-positive/40'
+                              : b === 'bearish' ? 'bg-pnl-negative/15 text-pnl-negative border-pnl-negative/40'
+                              : 'bg-white/10 text-text-primary border-white/20'
+                              : 'bg-transparent text-text-muted border-border/50 hover:border-white/20 hover:text-text-primary',
+                          )}
+                        >
+                          {b === 'bullish' ? <TrendingUp size={11} /> : b === 'bearish' ? <TrendingDown size={11} /> : <Minus size={11} />}
+                          {b === 'bullish' ? 'Bullish' : b === 'bearish' ? 'Bearish' : 'Neutral'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Notizen</p>
+                  <textarea
+                    value={notesValue}
+                    onChange={e => setNotesValue(e.target.value)}
+                    onBlur={handleNotesBlur}
+                    placeholder="Setup-Idee, Fundamentaldaten, Gründe..."
+                    rows={3}
+                    className="w-full px-2.5 py-2 bg-background border border-border/60 rounded-lg text-xs text-text-primary placeholder:text-text-muted/50 outline-none focus:border-accent-primary/50 transition-colors resize-none"
+                  />
+                </div>
+
+                {/* Key Levels */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1">
+                      <MapPin size={10} />Key Levels
+                    </p>
+                    <button
+                      onClick={() => setShowLevelForm(v => !v)}
+                      className="text-[10px] font-medium text-accent-primary hover:text-accent-secondary transition-colors flex items-center gap-1"
+                    >
+                      <Plus size={10} />Level
+                    </button>
+                  </div>
+
+                  {(sym.levels ?? []).length > 0 && (
+                    <div className="space-y-1">
+                      {(sym.levels ?? []).map(level => (
+                        <div key={level.id} className="flex items-center gap-2 px-2 py-1.5 bg-background rounded-lg border border-border/40 group/level">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: LEVEL_TYPE_CONFIG[level.type].color }} />
+                          <span className="text-[10px] font-medium flex-shrink-0" style={{ color: LEVEL_TYPE_CONFIG[level.type].color }}>
+                            {LEVEL_TYPE_CONFIG[level.type].label}
+                          </span>
+                          <span className="text-xs font-mono font-bold text-text-primary flex-shrink-0">{level.price}</span>
+                          {level.label !== LEVEL_TYPE_CONFIG[level.type].label && (
+                            <span className="text-[10px] text-text-muted truncate">{level.label}</span>
+                          )}
+                          <button
+                            onClick={() => removePairLevel(watchlistId, sym.id, level.id)}
+                            className="ml-auto text-text-muted hover:text-pnl-negative transition-colors opacity-0 group-hover/level:opacity-100 flex-shrink-0"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {showLevelForm && (
+                    <div className="bg-background rounded-lg p-2 border border-border/50 space-y-2">
+                      <div className="flex gap-1 flex-wrap">
+                        {(Object.keys(LEVEL_TYPE_CONFIG) as LevelType[]).map(t => {
+                          const cfg = LEVEL_TYPE_CONFIG[t];
+                          return (
+                            <button
+                              key={t}
+                              onClick={() => setLevelForm(f => ({ ...f, type: t }))}
+                              className="text-[10px] px-2 py-0.5 rounded-full transition-all"
+                              style={levelForm.type === t
+                                ? { color: cfg.color, backgroundColor: `${cfg.color}25` }
+                                : { color: '#52525B', backgroundColor: 'rgba(255,255,255,0.04)' }}
+                            >
+                              {cfg.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="number"
+                          value={levelForm.price}
+                          onChange={e => setLevelForm(f => ({ ...f, price: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') handleAddLevel(); }}
+                          placeholder="Preis"
+                          step="0.0001"
+                          className="w-28 px-2 py-1 bg-background-elevated border border-border rounded text-xs text-text-primary placeholder:text-text-muted outline-none focus:border-accent-primary/50"
+                        />
+                        <input
+                          type="text"
+                          value={levelForm.label}
+                          onChange={e => setLevelForm(f => ({ ...f, label: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') handleAddLevel(); }}
+                          placeholder="Label (optional)"
+                          className="flex-1 px-2 py-1 bg-background-elevated border border-border rounded text-xs text-text-primary placeholder:text-text-muted outline-none focus:border-accent-primary/50"
+                        />
+                        <button onClick={handleAddLevel}
+                          className="px-2 py-1 bg-accent-primary/15 text-accent-secondary rounded text-xs font-medium hover:bg-accent-primary/25 transition-colors">
+                          <Check size={11} />
+                        </button>
+                        <button onClick={() => setShowLevelForm(false)}
+                          className="px-2 py-1 text-text-muted hover:text-text-primary transition-colors">
+                          <X size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Images */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1">
+                      <ImageIcon size={10} />Bilder / Charts
+                    </p>
+                    {(sym.images?.length ?? 0) < 5 && (
+                      <button
+                        onClick={() => imageInputRef.current?.click()}
+                        className="text-[10px] font-medium text-accent-primary hover:text-accent-secondary transition-colors flex items-center gap-1"
+                      >
+                        <Plus size={10} />Bild
+                      </button>
+                    )}
+                  </div>
+                  <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+
+                  {(sym.images?.length ?? 0) > 0 ? (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(sym.images ?? []).map((img, idx) => (
+                        <div
+                          key={img.id}
+                          className="relative group/img aspect-video bg-background-elevated rounded-lg overflow-hidden border border-border/50 cursor-pointer"
+                          onClick={() => setViewImageIdx(idx)}
+                        >
+                          <img src={img.dataUrl} alt={img.caption || 'chart'} className="w-full h-full object-cover" />
+                          {img.timeframe && (
+                            <span className="absolute top-1 left-1 text-[9px] bg-black/70 text-white px-1 rounded">{img.timeframe}</span>
+                          )}
+                          {img.caption && (
+                            <span className="absolute bottom-0 left-0 right-0 text-[9px] bg-black/70 text-white px-1.5 py-1 truncate">{img.caption}</span>
+                          )}
+                          <button
+                            onClick={e => { e.stopPropagation(); removePairImage(watchlistId, sym.id, img.id); }}
+                            className="absolute top-1 right-1 w-4 h-4 bg-black/70 text-white rounded flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                          >
+                            <X size={8} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => imageInputRef.current?.click()}
+                      className="w-full h-14 border border-dashed border-border/40 rounded-lg text-[11px] text-text-muted hover:border-accent-primary/40 hover:text-accent-primary transition-colors flex items-center justify-center gap-2"
+                    >
+                      <ImageIcon size={13} />Chart-Screenshot hinzufügen
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Section assign portal */}
         <AnimatePresence>
           {showSectionAssign && sectionAnchor && (
             <SectionAssignDropdown
@@ -886,36 +1267,43 @@ function SymbolRow({ sym, watchlistId, sections, onDragStart, onDragOver, onDrop
             />
           )}
         </AnimatePresence>
-
-        {/* Alert indicator */}
-        <button
-          onClick={() => setShowAlertModal(true)}
-          className={clsx(
-            'flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] transition-colors flex-shrink-0',
-            activeAlerts > 0
-              ? 'text-accent-primary bg-accent-primary/10 hover:bg-accent-primary/20'
-              : 'text-text-muted opacity-0 group-hover:opacity-100 hover:text-accent-primary'
-          )}
-        >
-          <Bell size={11} />
-          {activeAlerts > 0 && <span className="font-medium">{activeAlerts}</span>}
-        </button>
-
-        {/* Remove */}
-        <div className={clsx('flex-shrink-0 transition-opacity', hovered ? 'opacity-100' : 'opacity-0')}>
-          {confirmRemove ? (
-            <button onClick={() => removeSymbol(watchlistId, sym.id)}
-              className="text-pnl-negative hover:text-red-400 transition-colors p-0.5">
-              <Check size={13} />
-            </button>
-          ) : (
-            <button onClick={() => setConfirmRemove(true)}
-              className="text-text-muted hover:text-pnl-negative transition-colors p-0.5">
-              <X size={13} />
-            </button>
-          )}
-        </div>
       </div>
+
+      {/* Image lightbox */}
+      <AnimatePresence>
+        {viewImageIdx !== null && sym.images?.[viewImageIdx] && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            onClick={() => setViewImageIdx(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="relative max-w-3xl max-h-[80vh] mx-4"
+              onClick={e => e.stopPropagation()}
+            >
+              <img
+                src={sym.images[viewImageIdx].dataUrl}
+                alt=""
+                className="rounded-xl max-h-[80vh] object-contain"
+              />
+              {sym.images[viewImageIdx].caption && (
+                <p className="text-center text-sm text-text-muted mt-2">{sym.images[viewImageIdx].caption}</p>
+              )}
+              <button
+                onClick={() => setViewImageIdx(null)}
+                className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full flex items-center justify-center"
+              >
+                <X size={14} />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showAlertModal && (
@@ -963,17 +1351,21 @@ export function Watchlist() {
   const [showColorLabels, setShowColorLabels]   = useState(false);
   const [showAddSection, setShowAddSection]     = useState(false);
   const [newSectionName, setNewSectionName]     = useState('');
+  const [statusFilter, setStatusFilter]         = useState<PairStatus | null>(null);
 
   const dragItem     = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
 
   const activeWatchlist = watchlists.find(w => w.id === activeId) ?? watchlists[0];
 
-  const filteredSymbols = (activeWatchlist?.symbols ?? []).filter(s =>
-    !searchFilter ||
-    s.displayName.toLowerCase().includes(searchFilter.toLowerCase()) ||
-    s.symbol.toLowerCase().includes(searchFilter.toLowerCase())
-  );
+  const filteredSymbols = (activeWatchlist?.symbols ?? []).filter(s => {
+    if (statusFilter && s.status !== statusFilter) return false;
+    if (searchFilter) {
+      const q = searchFilter.toLowerCase();
+      return s.displayName.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q);
+    }
+    return true;
+  });
 
   const handleCreateWatchlist = (name: string) => {
     createWatchlist(name);
@@ -1019,7 +1411,7 @@ export function Watchlist() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-text-primary leading-tight">Watchlist</h1>
-                <p className="text-xs text-text-muted">Symbole beobachten · Abschnitte · Farblabels · Alarme</p>
+                <p className="text-xs text-text-muted">Symbole · Status · Bias · Levels · Charts</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -1096,7 +1488,7 @@ export function Watchlist() {
           </div>
         </div>
 
-        {/* Search + Category chips */}
+        {/* Search + Status filter + Category chips */}
         <div className="flex-shrink-0 px-4 pt-3 pb-2 space-y-2">
           <div className="relative">
             <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
@@ -1109,6 +1501,40 @@ export function Watchlist() {
               </button>
             )}
           </div>
+
+          {/* Status filter pills */}
+          <div className="flex gap-1.5 flex-wrap">
+            <button
+              onClick={() => setStatusFilter(null)}
+              className={clsx(
+                'text-[10px] font-semibold px-2.5 py-1 rounded-full transition-all',
+                statusFilter === null
+                  ? 'bg-white/10 text-text-primary'
+                  : 'text-text-muted hover:text-text-primary',
+              )}
+            >
+              Alle
+            </button>
+            {(Object.keys(PAIR_STATUS_CONFIG) as PairStatus[]).map(s => {
+              const cfg = PAIR_STATUS_CONFIG[s];
+              const count = (activeWatchlist?.symbols ?? []).filter(sym => sym.status === s).length;
+              if (count === 0 && statusFilter !== s) return null;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(prev => prev === s ? null : s)}
+                  className="text-[10px] font-semibold px-2.5 py-1 rounded-full transition-all flex items-center gap-1"
+                  style={statusFilter === s
+                    ? { color: cfg.color, backgroundColor: cfg.bg, boxShadow: `0 0 0 1px ${cfg.color}50` }
+                    : { color: cfg.color, backgroundColor: `${cfg.bg}`.replace('0.14', '0.06') }}
+                >
+                  {cfg.label}
+                  {count > 0 && <span className="opacity-70">{count}</span>}
+                </button>
+              );
+            })}
+          </div>
+
           {Object.keys(cats).length > 0 && (
             <div className="flex gap-1.5 flex-wrap">
               {Object.entries(cats).map(([cat, count]) => (

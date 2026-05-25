@@ -45,6 +45,45 @@ export interface WatchlistAlert {
   lastTriggeredDate?: string; // "YYYY-MM-DD" – prevents double-firing per day
 }
 
+// ── Pair status & detail types ──────────────────────────────
+
+export type PairStatus = 'active' | 'watching' | 'waiting' | 'executed' | 'inactive';
+export type PairBias   = 'bullish' | 'bearish' | 'neutral';
+export type LevelType  = 'support' | 'resistance' | 'entry' | 'target' | 'stopLoss' | 'gva' | 'custom';
+
+export const PAIR_STATUS_CONFIG: Record<PairStatus, { label: string; color: string; bg: string }> = {
+  active:   { label: 'Aktiv',      color: '#22C55E', bg: 'rgba(34,197,94,0.14)' },
+  watching: { label: 'Beobachten', color: '#06B6D4', bg: 'rgba(6,182,212,0.14)' },
+  waiting:  { label: 'Wartend',    color: '#F59E0B', bg: 'rgba(245,158,11,0.14)' },
+  executed: { label: 'Ausgeführt', color: '#8B5CF6', bg: 'rgba(139,92,246,0.14)' },
+  inactive: { label: 'Inaktiv',    color: '#52525B', bg: 'rgba(82,82,91,0.10)' },
+};
+
+export const LEVEL_TYPE_CONFIG: Record<LevelType, { label: string; color: string }> = {
+  support:    { label: 'Support',    color: '#22C55E' },
+  resistance: { label: 'Resistance', color: '#EF4444' },
+  entry:      { label: 'Entry',      color: '#8B5CF6' },
+  target:     { label: 'Target',     color: '#06B6D4' },
+  stopLoss:   { label: 'Stop Loss',  color: '#FF5722' },
+  gva:        { label: 'GVA',        color: '#FFD700' },
+  custom:     { label: 'Custom',     color: '#787B86' },
+};
+
+export interface PairLevel {
+  id: string;
+  price: number;
+  label: string;
+  type: LevelType;
+}
+
+export interface PairImage {
+  id: string;
+  dataUrl: string;    // base64 JPEG thumbnail
+  caption: string;
+  timeframe?: string; // e.g. 'H4', 'D1'
+  createdAt: string;
+}
+
 export interface WatchlistSymbol {
   id: string;
   symbol: string;        // e.g. "EURUSD"
@@ -54,6 +93,12 @@ export interface WatchlistSymbol {
   alerts: WatchlistAlert[];
   addedAt: number;
   sectionId?: string;    // which section this symbol belongs to
+  // ── Outlook / Detail fields ──
+  status?: PairStatus;
+  bias?: PairBias;
+  notes?: string;
+  levels?: PairLevel[];
+  images?: PairImage[];
 }
 
 export interface WatchlistSection {
@@ -197,6 +242,14 @@ interface WatchlistState {
   updateAlert:        (watchlistId: string, symbolId: string, alertId: string, updates: Partial<WatchlistAlert>) => void;
   removeAlert:        (watchlistId: string, symbolId: string, alertId: string) => void;
   markAlertTriggered: (watchlistId: string, symbolId: string, alertId: string, date: string) => void;
+
+  // Symbol detail (status / bias / notes / levels / images)
+  updateSymbolDetail: (watchlistId: string, symbolId: string, patch: Partial<Pick<WatchlistSymbol, 'status' | 'bias' | 'notes'>>) => void;
+  addPairLevel:       (watchlistId: string, symbolId: string, level: Omit<PairLevel, 'id'>) => void;
+  removePairLevel:    (watchlistId: string, symbolId: string, levelId: string) => void;
+  updatePairLevel:    (watchlistId: string, symbolId: string, levelId: string, patch: Partial<Omit<PairLevel, 'id'>>) => void;
+  addPairImage:       (watchlistId: string, symbolId: string, image: Omit<PairImage, 'id'>) => void;
+  removePairImage:    (watchlistId: string, symbolId: string, imageId: string) => void;
 
   // Color label management
   setColorLabel:      (colorValue: string | undefined, label: string) => void;
@@ -426,6 +479,85 @@ export const useWatchlistStore = create<WatchlistState>((set, get) => {
                 ),
               }
             : w
+        ),
+      }));
+    },
+
+    // ── Symbol detail management ───────────────────────────────
+
+    updateSymbolDetail: (watchlistId, symbolId, patch) => {
+      withPersist(s => ({
+        watchlists: s.watchlists.map(w =>
+          w.id !== watchlistId ? w : {
+            ...w, symbols: w.symbols.map(sym =>
+              sym.id === symbolId ? { ...sym, ...patch } : sym
+            ),
+          }
+        ),
+      }));
+    },
+
+    addPairLevel: (watchlistId, symbolId, level) => {
+      const newLevel: PairLevel = { ...level, id: genId() };
+      withPersist(s => ({
+        watchlists: s.watchlists.map(w =>
+          w.id !== watchlistId ? w : {
+            ...w, symbols: w.symbols.map(sym =>
+              sym.id !== symbolId ? sym : { ...sym, levels: [...(sym.levels ?? []), newLevel] }
+            ),
+          }
+        ),
+      }));
+    },
+
+    removePairLevel: (watchlistId, symbolId, levelId) => {
+      withPersist(s => ({
+        watchlists: s.watchlists.map(w =>
+          w.id !== watchlistId ? w : {
+            ...w, symbols: w.symbols.map(sym =>
+              sym.id !== symbolId ? sym : { ...sym, levels: (sym.levels ?? []).filter(l => l.id !== levelId) }
+            ),
+          }
+        ),
+      }));
+    },
+
+    updatePairLevel: (watchlistId, symbolId, levelId, patch) => {
+      withPersist(s => ({
+        watchlists: s.watchlists.map(w =>
+          w.id !== watchlistId ? w : {
+            ...w, symbols: w.symbols.map(sym =>
+              sym.id !== symbolId ? sym : {
+                ...sym,
+                levels: (sym.levels ?? []).map(l => l.id === levelId ? { ...l, ...patch } : l),
+              }
+            ),
+          }
+        ),
+      }));
+    },
+
+    addPairImage: (watchlistId, symbolId, image) => {
+      const newImage: PairImage = { ...image, id: genId() };
+      withPersist(s => ({
+        watchlists: s.watchlists.map(w =>
+          w.id !== watchlistId ? w : {
+            ...w, symbols: w.symbols.map(sym =>
+              sym.id !== symbolId ? sym : { ...sym, images: [...(sym.images ?? []), newImage] }
+            ),
+          }
+        ),
+      }));
+    },
+
+    removePairImage: (watchlistId, symbolId, imageId) => {
+      withPersist(s => ({
+        watchlists: s.watchlists.map(w =>
+          w.id !== watchlistId ? w : {
+            ...w, symbols: w.symbols.map(sym =>
+              sym.id !== symbolId ? sym : { ...sym, images: (sym.images ?? []).filter(i => i.id !== imageId) }
+            ),
+          }
         ),
       }));
     },
