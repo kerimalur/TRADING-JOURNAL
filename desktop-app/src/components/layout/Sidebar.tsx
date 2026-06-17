@@ -38,7 +38,6 @@ const BASE_ITEMS: NavItem[] = [
   { path: '/ek',          label: 'Eigenkapital',   icon: <Wallet size={18} />,          group: 'Trading'   },
   { path: '/strategy',    label: 'Strategie',      icon: <Lightbulb size={18} />,       group: 'Tools'     },
   { path: '/backtest',    label: 'Backtest',       icon: <Zap size={18} />,             group: 'Tools'     },
-  { path: '/watchlist',   label: 'Watchlist',      icon: <List size={18} />,            group: 'Tools'     },
   { path: '/settings',    label: 'Einstellungen',  icon: <Settings size={18} />,        group: 'System'    },
 ];
 
