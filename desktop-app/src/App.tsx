@@ -29,23 +29,14 @@ import { Settings } from '@/pages/Settings';
 import { EquityCurve } from '@/pages/EquityCurve';
 import { Backtest } from '@/pages/Backtest';
 import { Calendar } from '@/pages/Calendar';
-import { Outlook } from '@/pages/Outlook';
 import { StrategyBuilder } from '@/pages/StrategyBuilder';
-import { Fundamentals } from '@/pages/Fundamentals';
-import { News } from '@/pages/News';
-import { COTData } from '@/pages/COTData';
-import { CurrencyAnalysis } from '@/pages/CurrencyAnalysis';
-import { Watchlist } from '@/pages/Watchlist';
 
 // Debug removed - AuthDebug no longer needed
 
 // Utils
 import { isElectron } from '@/services/webApi';
 
-// Watchlist alert checker
-import { useWatchlistStore, checkAndFireAlerts } from '@/stores/watchlistStore';
 import { useWidgetSettingsStore } from '@/stores/widgetSettingsStore';
-import { useUIStore } from '@/stores/uiStore';
 
 // i18n
 import '@/i18n';
@@ -167,9 +158,7 @@ function LoginScreen({ onSkipLogin }: LoginScreenProps) {
 function AppContent() {
   const location = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
-  const { watchlists, markAlertTriggered, loadFromSupabase } = useWatchlistStore();
   const { loadFromSupabase: loadWidgetSettings } = useWidgetSettingsStore();
-  const { showToast } = useUIStore();
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [offlineMode, setOfflineMode] = useState(() => {
@@ -202,7 +191,6 @@ function AppContent() {
       if (session) {
         localStorage.removeItem('trading-journal-offline-mode');
         setOfflineMode(false);
-        loadFromSupabase();
         loadWidgetSettings();
       }
       setSession(session);
@@ -211,18 +199,6 @@ function AppContent() {
 
     return () => subscription.unsubscribe();
   }, [inElectron]); // offlineMode NICHT als Dep – Auth immer überwachen
-
-  // Global alert checker (every 30s)
-  useEffect(() => {
-    // Request notification permission on first run
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-    const tick = () => checkAndFireAlerts(watchlists, markAlertTriggered, showToast);
-    tick();
-    const timer = setInterval(tick, 30_000);
-    return () => clearInterval(timer);
-  }, [watchlists, markAlertTriggered]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -284,13 +260,7 @@ function AppContent() {
                 <Route path="/equity" element={<EquityCurve />} />
                 <Route path="/backtest" element={<Backtest />} />
                 <Route path="/calendar" element={<Calendar />} />
-                <Route path="/outlook" element={<Outlook />} />
-                <Route path="/fundamentals" element={<Fundamentals />} />
-                <Route path="/news"         element={<News />} />
-                <Route path="/cot"          element={<COTData />} />
-                <Route path="/zinsen"       element={<CurrencyAnalysis />} />
                 <Route path="/strategy" element={<StrategyBuilder />} />
-                <Route path="/watchlist" element={<Watchlist />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </AnimatePresence>
