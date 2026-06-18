@@ -69,6 +69,46 @@ export interface CurrencyAnalysis {
 
   oiTrend: OITrend;
   oiDivergence: boolean;
+
+  // v2: Spec Crowding
+  specNet: number;
+  specPercentile: number;
+  specCrowdingExtreme: boolean;
+  specCrowdingType: 'crowded_long' | 'crowded_short' | null;
+
+  // v2: Saisonalität
+  seasonalBias: 'bullish' | 'bearish' | 'neutral';
+  seasonalStrength: number;
+
+  // v2: Zinsdifferenz
+  rateDifferential: number;
+  rateTrend: 'hawkish' | 'dovish' | 'neutral';
+  rateCotConfluence: boolean;
+
+  // v2: Regime
+  regime: 'trending_bullish' | 'trending_bearish' | 'ranging' | 'transitioning';
+  regimeConfidence: number;
+
+  // v2: Historical Performance
+  historicalWinRate: number | null;
+  historicalAvgWeeks: number | null;
+  historicalSampleSize: number;
+
+  // v2: ML / KNN
+  similarSetups: SimilarSetup[];
+  mlDirection: 'bullish' | 'bearish' | 'neutral';
+  mlConfidence: number;
+
+  // v2: Final Conviction
+  finalConviction: number;
+}
+
+export interface SimilarSetup {
+  date: string;
+  percentile: number;
+  momentum: number;
+  outcome4w: number;
+  outcome8w: number;
 }
 
 export interface PairSignal {
@@ -107,6 +147,20 @@ const FOREX_PAIRS = [
   'CAD/JPY', 'CAD/CHF',
   'CHF/JPY',
 ];
+
+// Saisonale Bias-Daten pro Währung pro Monat (1=Jan, 12=Dez)
+// Basierend auf 20-Jahres-Saisonalitäts-Studien von Kathy Lien, BK Asset Management
+// Werte: -2=stark bearish, -1=bearish, 0=neutral, 1=bullish, 2=stark bullish
+const SEASONAL_PATTERNS: Record<string, number[]> = {
+  DXY: [ 1,  1,  0, -1, -1,  0,  1,  1,  0, -1,  0,  1],  // Jan-Dez
+  EUR: [-1, -1,  0,  1,  1,  0, -1, -1,  0,  1,  0, -1],
+  GBP: [ 1,  0, -1,  1,  0, -1,  0,  0,  1,  0, -1,  0],
+  JPY: [ 1,  0, -1, -1,  0,  1,  1,  0, -1,  0,  1,  2],
+  CAD: [ 0,  0,  1,  1,  0, -1, -1,  0,  0,  1,  0,  0],
+  AUD: [ 1,  0,  0,  1,  0, -1, -1,  0,  0,  1,  1,  0],
+  NZD: [ 1,  0,  0,  1,  0, -1, -1,  0,  0,  1,  1,  0],
+  CHF: [ 0,  0,  0,  0,  1,  1,  0,  0, -1, -1,  0,  0],
+};
 
 // ============================================================
 // PERSISTENCE — Snapshots speichern & laden
@@ -226,7 +280,7 @@ export function analyzeCurrency(
   const oiTrend = computeOITrend(sorted);
   const oiDivergence = detectOIDivergence(sorted);
 
-  // --- Smart Score ---
+  // --- Smart Score (v1) ---
   const smartScore = computeSmartScore({
     percentile,
     momentum4w,
@@ -241,6 +295,35 @@ export function analyzeCurrency(
     specDivergence: specDiv.divergence,
     oiDivergence,
     nets,
+  });
+
+  // --- v2: Spec Crowding ---
+  const specCrowding = analyzeSpecCrowding(sorted);
+
+  // --- v2: Saisonalität ---
+  const seasonal = analyzeSeasonal(currency, latest.date);
+
+  // --- v2: Zinsdifferenz ---
+  const rateDiff = analyzeRateDifferential(currency);
+
+  // --- v2: Regime ---
+  const regime = detectRegime(sorted, percentile, momentumSignal);
+
+  // --- v2: Historical Win Rate ---
+  const historical = computeHistoricalPerformance(sorted, percentile, momentum4w);
+
+  // --- v2: KNN Pattern Matching ---
+  const knn = knnPatternMatch(sorted, percentile, momentum4w, momentum8w);
+
+  // --- v2: Final Conviction ---
+  const finalConviction = computeFinalConviction({
+    smartScore,
+    specCrowding,
+    seasonal,
+    rateDiff,
+    regime,
+    historical,
+    knn,
   });
 
   return {
@@ -266,6 +349,25 @@ export function analyzeCurrency(
     smartScore,
     oiTrend,
     oiDivergence,
+    // v2
+    specNet: specCrowding.specNet,
+    specPercentile: specCrowding.specPercentile,
+    specCrowdingExtreme: specCrowding.extreme,
+    specCrowdingType: specCrowding.type,
+    seasonalBias: seasonal.bias,
+    seasonalStrength: seasonal.strength,
+    rateDifferential: rateDiff.differential,
+    rateTrend: rateDiff.trend,
+    rateCotConfluence: rateDiff.cotConfluence,
+    regime: regime.type,
+    regimeConfidence: regime.confidence,
+    historicalWinRate: historical.winRate,
+    historicalAvgWeeks: historical.avgWeeks,
+    historicalSampleSize: historical.sampleSize,
+    similarSetups: knn.setups,
+    mlDirection: knn.direction,
+    mlConfidence: knn.confidence,
+    finalConviction,
   };
 }
 
@@ -370,6 +472,25 @@ async function persistAnalyses(analyses: CurrencyAnalysis[]): Promise<void> {
       smart_score: a.smartScore,
       oi_trend: a.oiTrend,
       oi_divergence: a.oiDivergence,
+      // v2
+      spec_net: a.specNet,
+      spec_percentile: a.specPercentile,
+      spec_crowding_extreme: a.specCrowdingExtreme,
+      spec_crowding_type: a.specCrowdingType,
+      seasonal_bias: a.seasonalBias,
+      seasonal_strength: a.seasonalStrength,
+      rate_differential: a.rateDifferential,
+      rate_trend: a.rateTrend,
+      rate_cot_confluence: a.rateCotConfluence,
+      regime: a.regime,
+      regime_confidence: a.regimeConfidence,
+      historical_win_rate: a.historicalWinRate,
+      historical_avg_weeks: a.historicalAvgWeeks,
+      historical_sample_size: a.historicalSampleSize,
+      similar_setups: a.similarSetups,
+      ml_direction: a.mlDirection,
+      ml_confidence: a.mlConfidence,
+      final_conviction: a.finalConviction,
     }));
 
   if (payloads.length === 0) return;
@@ -441,6 +562,25 @@ export async function loadCachedAnalyses(): Promise<CurrencyAnalysis[]> {
     smartScore: row.smart_score,
     oiTrend: row.oi_trend,
     oiDivergence: row.oi_divergence,
+    // v2
+    specNet: Number(row.spec_net ?? 0),
+    specPercentile: Number(row.spec_percentile ?? 50),
+    specCrowdingExtreme: row.spec_crowding_extreme ?? false,
+    specCrowdingType: row.spec_crowding_type ?? null,
+    seasonalBias: row.seasonal_bias ?? 'neutral',
+    seasonalStrength: row.seasonal_strength ?? 0,
+    rateDifferential: Number(row.rate_differential ?? 0),
+    rateTrend: row.rate_trend ?? 'neutral',
+    rateCotConfluence: row.rate_cot_confluence ?? false,
+    regime: row.regime ?? 'ranging',
+    regimeConfidence: row.regime_confidence ?? 0,
+    historicalWinRate: row.historical_win_rate != null ? Number(row.historical_win_rate) : null,
+    historicalAvgWeeks: row.historical_avg_weeks,
+    historicalSampleSize: row.historical_sample_size ?? 0,
+    similarSetups: row.similar_setups ?? [],
+    mlDirection: row.ml_direction ?? 'neutral',
+    mlConfidence: Number(row.ml_confidence ?? 0),
+    finalConviction: row.final_conviction ?? 0,
   }));
 }
 
@@ -498,6 +638,24 @@ function emptyAnalysis(currency: string): CurrencyAnalysis {
     smartScore: 0,
     oiTrend: 'flat',
     oiDivergence: false,
+    specNet: 0,
+    specPercentile: 50,
+    specCrowdingExtreme: false,
+    specCrowdingType: null,
+    seasonalBias: 'neutral',
+    seasonalStrength: 0,
+    rateDifferential: 0,
+    rateTrend: 'neutral',
+    rateCotConfluence: false,
+    regime: 'ranging',
+    regimeConfidence: 0,
+    historicalWinRate: null,
+    historicalAvgWeeks: null,
+    historicalSampleSize: 0,
+    similarSetups: [],
+    mlDirection: 'neutral',
+    mlConfidence: 0,
+    finalConviction: 0,
   };
 }
 
@@ -789,5 +947,437 @@ function buildReasons(
     });
   }
 
+  // v2: Spec Crowding
+  if (base.specCrowdingExtreme || quote.specCrowdingExtreme) {
+    const parts: string[] = [];
+    if (base.specCrowdingExtreme) parts.push(`${base.currency} Specs ${base.specCrowdingType === 'crowded_long' ? 'überfüllt long' : 'überfüllt short'}`);
+    if (quote.specCrowdingExtreme) parts.push(`${quote.currency} Specs ${quote.specCrowdingType === 'crowded_long' ? 'überfüllt long' : 'überfüllt short'}`);
+    reasons.push({ factor: 'spec_crowding', description: parts.join(', '), impact: 'positive' });
+  }
+
+  // v2: Seasonality
+  if (base.seasonalBias !== 'neutral' || quote.seasonalBias !== 'neutral') {
+    const parts: string[] = [];
+    if (base.seasonalBias !== 'neutral') parts.push(`${base.currency} saisonal ${base.seasonalBias}`);
+    if (quote.seasonalBias !== 'neutral') parts.push(`${quote.currency} saisonal ${quote.seasonalBias}`);
+    const aligned = (direction === 'long' && base.seasonalBias === 'bullish') ||
+                    (direction === 'short' && base.seasonalBias === 'bearish');
+    reasons.push({ factor: 'seasonal', description: parts.join(', '), impact: aligned ? 'positive' : 'negative' });
+  }
+
+  // v2: ML
+  if (base.mlConfidence >= 60 || quote.mlConfidence >= 60) {
+    reasons.push({
+      factor: 'ml',
+      description: `KNN: ${base.currency} ${base.mlDirection} (${base.mlConfidence}%) | ${quote.currency} ${quote.mlDirection} (${quote.mlConfidence}%)`,
+      impact: 'positive',
+    });
+  }
+
   return reasons;
+}
+
+
+// ============================================================
+// v2: SPEC CROWDING ANALYSIS
+// ============================================================
+
+function analyzeSpecCrowding(sorted: COTSnapshot[]): {
+  specNet: number;
+  specPercentile: number;
+  extreme: boolean;
+  type: 'crowded_long' | 'crowded_short' | null;
+} {
+  if (sorted.length === 0) {
+    return { specNet: 0, specPercentile: 50, extreme: false, type: null };
+  }
+
+  const latest = sorted[sorted.length - 1];
+  const specNets = sorted.map(s => s.nonCommercialsNet);
+
+  const min = Math.min(...specNets);
+  const max = Math.max(...specNets);
+  const range = max - min;
+  const specPercentile = range > 0
+    ? Math.round(((latest.nonCommercialsNet - min) / range) * 100)
+    : 50;
+
+  const extreme = specPercentile >= 85 || specPercentile <= 15;
+  const type = specPercentile >= 85 ? 'crowded_long' as const
+    : specPercentile <= 15 ? 'crowded_short' as const
+    : null;
+
+  return {
+    specNet: latest.nonCommercialsNet,
+    specPercentile,
+    extreme,
+    type,
+  };
+}
+
+// ============================================================
+// v2: SEASONAL ANALYSIS
+// ============================================================
+
+function analyzeSeasonal(currency: string, dateStr: string): {
+  bias: 'bullish' | 'bearish' | 'neutral';
+  strength: number;
+} {
+  const pattern = SEASONAL_PATTERNS[currency];
+  if (!pattern || !dateStr) return { bias: 'neutral', strength: 0 };
+
+  const month = new Date(dateStr).getMonth(); // 0-11
+  const value = pattern[month];
+
+  const bias = value > 0 ? 'bullish' as const
+    : value < 0 ? 'bearish' as const
+    : 'neutral' as const;
+
+  const strength = Math.abs(value) * 50; // 0, 50, 100
+
+  return { bias, strength };
+}
+
+// ============================================================
+// v2: INTEREST RATE DIFFERENTIAL
+// ============================================================
+
+function analyzeRateDifferential(currency: string): {
+  differential: number;
+  trend: 'hawkish' | 'dovish' | 'neutral';
+  cotConfluence: boolean;
+} {
+  try {
+    const raw = localStorage.getItem('interestRatesData');
+    if (!raw) return { differential: 0, trend: 'neutral', cotConfluence: false };
+
+    const rates = JSON.parse(raw);
+    if (!rates || typeof rates !== 'object') return { differential: 0, trend: 'neutral', cotConfluence: false };
+
+    const currencyToBank: Record<string, string> = {
+      DXY: 'fed', EUR: 'ecb', GBP: 'boe', JPY: 'boj',
+      CAD: 'boc', AUD: 'rba', NZD: 'rbnz', CHF: 'snb',
+    };
+
+    const bankKey = currencyToBank[currency];
+    const fedKey = 'fed';
+
+    if (!bankKey) return { differential: 0, trend: 'neutral', cotConfluence: false };
+
+    const bankRate = parseFloat(rates[bankKey]?.rate ?? rates[bankKey] ?? '0');
+    const fedRate = parseFloat(rates[fedKey]?.rate ?? rates[fedKey] ?? '0');
+
+    const differential = currency === 'DXY' ? fedRate : bankRate - fedRate;
+
+    const trend: 'hawkish' | 'dovish' | 'neutral' =
+      differential > 1 ? 'hawkish' :
+      differential < -1 ? 'dovish' :
+      'neutral';
+
+    const cotConfluence = (differential > 0 && currency !== 'DXY') || (differential < 0 && currency === 'DXY');
+
+    return { differential, trend, cotConfluence };
+  } catch {
+    return { differential: 0, trend: 'neutral', cotConfluence: false };
+  }
+}
+
+// ============================================================
+// v2: REGIME DETECTION
+// ============================================================
+
+function detectRegime(
+  sorted: COTSnapshot[],
+  _percentile: number,
+  _momentumSignal: MomentumSignal,
+): { type: 'trending_bullish' | 'trending_bearish' | 'ranging' | 'transitioning'; confidence: number } {
+  if (sorted.length < 12) return { type: 'ranging', confidence: 0 };
+
+  const recent12 = sorted.slice(-12);
+  const nets = recent12.map(s => s.commercialsNet);
+
+  // Lineare Regression auf Nets → Steigung bestimmt Trend
+  const n = nets.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += i;
+    sumY += nets[i];
+    sumXY += i * nets[i];
+    sumXX += i * i;
+  }
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+
+  // Standardabweichung der Nets (Volatilität)
+  const mean = sumY / n;
+  const variance = nets.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+  const stdDev = Math.sqrt(variance);
+
+  // Slope normalisieren relativ zur Standardabweichung
+  const normalizedSlope = stdDev > 0 ? slope / stdDev : 0;
+
+  if (Math.abs(normalizedSlope) > 0.3) {
+    const type = normalizedSlope > 0 ? 'trending_bullish' as const : 'trending_bearish' as const;
+    const confidence = Math.min(100, Math.round(Math.abs(normalizedSlope) * 100));
+    return { type, confidence };
+  }
+
+  // Check for transitioning: war gerade noch trending, jetzt flach oder umgedreht
+  const first6Slope = computeSubSlope(nets.slice(0, 6));
+  const last6Slope = computeSubSlope(nets.slice(-6));
+
+  if (Math.sign(first6Slope) !== Math.sign(last6Slope) && Math.abs(first6Slope) > 0.15) {
+    return { type: 'transitioning', confidence: 60 };
+  }
+
+  return { type: 'ranging', confidence: Math.max(0, 100 - Math.round(Math.abs(normalizedSlope) * 200)) };
+}
+
+function computeSubSlope(vals: number[]): number {
+  const n = vals.length;
+  if (n < 2) return 0;
+  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += i; sumY += vals[i]; sumXY += i * vals[i]; sumXX += i * i;
+  }
+  const mean = sumY / n;
+  const variance = vals.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+  const stdDev = Math.sqrt(variance);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  return stdDev > 0 ? slope / stdDev : 0;
+}
+
+// ============================================================
+// v2: HISTORICAL PERFORMANCE
+// ============================================================
+
+function computeHistoricalPerformance(
+  sorted: COTSnapshot[],
+  currentPercentile: number,
+  currentMomentum4w: number,
+): { winRate: number | null; avgWeeks: number | null; sampleSize: number } {
+  if (sorted.length < 20) return { winRate: null, avgWeeks: null, sampleSize: 0 };
+
+  const nets = sorted.map(s => s.commercialsNet);
+  const min = Math.min(...nets);
+  const max = Math.max(...nets);
+  const range = max - min;
+  if (range === 0) return { winRate: null, avgWeeks: null, sampleSize: 0 };
+
+  const isBullish = currentPercentile >= 60;
+  const isBearish = currentPercentile <= 40;
+  if (!isBullish && !isBearish) return { winRate: null, avgWeeks: null, sampleSize: 0 };
+
+  let wins = 0;
+  let total = 0;
+  let totalWeeks = 0;
+
+  // Scan history for similar setups
+  for (let i = 8; i < sorted.length - 4; i++) {
+    const p = Math.round(((sorted[i].commercialsNet - min) / range) * 100);
+    const m4w = i >= 4 ? sorted[i].commercialsNet - sorted[i - 4].commercialsNet : 0;
+
+    // Match: ähnliches Perzentil (±15) und gleiches Momentum-Vorzeichen
+    const percentileMatch = Math.abs(p - currentPercentile) <= 15;
+    const momentumMatch = Math.sign(m4w) === Math.sign(currentMomentum4w);
+
+    if (!percentileMatch || !momentumMatch) continue;
+
+    // Check outcome 4 weeks later
+    const futureIdx = Math.min(i + 4, sorted.length - 1);
+    const futureNet = sorted[futureIdx].commercialsNet;
+    const moved = futureNet - sorted[i].commercialsNet;
+
+    const isWin = (isBullish && moved > 0) || (isBearish && moved < 0);
+    if (isWin) wins++;
+    total++;
+
+    // Wie viele Wochen bis Auflösung (Position-Reversal)
+    for (let j = i + 1; j < Math.min(i + 12, sorted.length); j++) {
+      if (Math.sign(sorted[j].commercialsNet - sorted[i].commercialsNet) !== Math.sign(moved)) {
+        totalWeeks += j - i;
+        break;
+      }
+      if (j === Math.min(i + 11, sorted.length - 1)) {
+        totalWeeks += j - i;
+      }
+    }
+  }
+
+  if (total < 3) return { winRate: null, avgWeeks: null, sampleSize: total };
+
+  return {
+    winRate: Math.round((wins / total) * 100),
+    avgWeeks: Math.round(totalWeeks / total),
+    sampleSize: total,
+  };
+}
+
+// ============================================================
+// v2: KNN PATTERN MATCHING
+// ============================================================
+
+function knnPatternMatch(
+  sorted: COTSnapshot[],
+  currentPercentile: number,
+  currentM4w: number,
+  currentM8w: number,
+): { setups: SimilarSetup[]; direction: 'bullish' | 'bearish' | 'neutral'; confidence: number } {
+  if (sorted.length < 20) return { setups: [], direction: 'neutral', confidence: 0 };
+
+  const nets = sorted.map(s => s.commercialsNet);
+  const min = Math.min(...nets);
+  const max = Math.max(...nets);
+  const range = max - min;
+  if (range === 0) return { setups: [], direction: 'neutral', confidence: 0 };
+
+  // Feature-Vektor des aktuellen Zustands
+  const currentFeatures = [currentPercentile / 100, normalizeM(currentM4w, nets), normalizeM(currentM8w, nets)];
+
+  interface Candidate {
+    index: number;
+    distance: number;
+    date: string;
+    percentile: number;
+    momentum: number;
+    outcome4w: number;
+    outcome8w: number;
+  }
+
+  const candidates: Candidate[] = [];
+
+  for (let i = 8; i < sorted.length - 8; i++) {
+    const p = ((sorted[i].commercialsNet - min) / range);
+    const m4 = normalizeM(sorted[i].commercialsNet - (i >= 4 ? sorted[i - 4].commercialsNet : 0), nets);
+    const m8 = normalizeM(sorted[i].commercialsNet - (i >= 8 ? sorted[i - 8].commercialsNet : 0), nets);
+
+    // Euklidische Distanz
+    const dist = Math.sqrt(
+      (currentFeatures[0] - p) ** 2 +
+      (currentFeatures[1] - m4) ** 2 +
+      (currentFeatures[2] - m8) ** 2
+    );
+
+    // Outcome: Netto-Positionsänderung nach 4 und 8 Wochen
+    const future4 = Math.min(i + 4, sorted.length - 1);
+    const future8 = Math.min(i + 8, sorted.length - 1);
+    const o4w = sorted[future4].commercialsNet - sorted[i].commercialsNet;
+    const o8w = sorted[future8].commercialsNet - sorted[i].commercialsNet;
+
+    candidates.push({
+      index: i,
+      distance: dist,
+      date: sorted[i].date,
+      percentile: Math.round(p * 100),
+      momentum: Math.round(m4 * 100),
+      outcome4w: o4w,
+      outcome8w: o8w,
+    });
+  }
+
+  // K = 5 nächste Nachbarn
+  candidates.sort((a, b) => a.distance - b.distance);
+  const k = Math.min(5, candidates.length);
+  const neighbors = candidates.slice(0, k);
+
+  if (neighbors.length === 0) return { setups: [], direction: 'neutral', confidence: 0 };
+
+  // Outcomes aggregieren
+  let bullish4w = 0, bearish4w = 0;
+  let bullish8w = 0, bearish8w = 0;
+
+  for (const n of neighbors) {
+    if (n.outcome4w > 0) bullish4w++;
+    else if (n.outcome4w < 0) bearish4w++;
+    if (n.outcome8w > 0) bullish8w++;
+    else if (n.outcome8w < 0) bearish8w++;
+  }
+
+  const totalBullish = bullish4w + bullish8w;
+  const totalBearish = bearish4w + bearish8w;
+  const totalVotes = totalBullish + totalBearish;
+
+  const direction: 'bullish' | 'bearish' | 'neutral' =
+    totalVotes === 0 ? 'neutral' :
+    totalBullish > totalBearish ? 'bullish' :
+    totalBearish > totalBullish ? 'bearish' : 'neutral';
+
+  const confidence = totalVotes > 0
+    ? Math.round((Math.max(totalBullish, totalBearish) / totalVotes) * 100)
+    : 0;
+
+  const setups: SimilarSetup[] = neighbors.map(n => ({
+    date: n.date,
+    percentile: n.percentile,
+    momentum: n.momentum,
+    outcome4w: n.outcome4w,
+    outcome8w: n.outcome8w,
+  }));
+
+  return { setups, direction, confidence };
+}
+
+function normalizeM(momentum: number, nets: number[]): number {
+  const maxAbs = Math.max(...nets.map(Math.abs));
+  return maxAbs > 0 ? momentum / maxAbs : 0;
+}
+
+// ============================================================
+// v2: FINAL CONVICTION SCORE
+// ============================================================
+
+function computeFinalConviction(params: {
+  smartScore: number;
+  specCrowding: ReturnType<typeof analyzeSpecCrowding>;
+  seasonal: ReturnType<typeof analyzeSeasonal>;
+  rateDiff: ReturnType<typeof analyzeRateDifferential>;
+  regime: ReturnType<typeof detectRegime>;
+  historical: ReturnType<typeof computeHistoricalPerformance>;
+  knn: ReturnType<typeof knnPatternMatch>;
+}): number {
+  let score = params.smartScore;
+
+  // Spec Crowding: Contrarian-Boost wenn Specs extrem positioniert (gegen uns = gut)
+  if (params.specCrowding.extreme) {
+    const isContrarian = (score > 0 && params.specCrowding.type === 'crowded_short') ||
+                          (score < 0 && params.specCrowding.type === 'crowded_long');
+    score += isContrarian ? 8 : -5;
+  }
+
+  // Seasonal Confluence
+  if (params.seasonal.bias !== 'neutral') {
+    const aligned = (score > 0 && params.seasonal.bias === 'bullish') ||
+                    (score < 0 && params.seasonal.bias === 'bearish');
+    score += aligned ? Math.round(params.seasonal.strength * 0.08) : -3;
+  }
+
+  // Rate Differential
+  if (params.rateDiff.cotConfluence) {
+    score += score > 0 ? 5 : -5;
+  }
+  if (params.rateDiff.trend === 'hawkish' && score > 0) score += 3;
+  if (params.rateDiff.trend === 'dovish' && score < 0) score += -3;
+
+  // Regime: Trending = höhere Conviction, Ranging = niedrigere
+  if (params.regime.type === 'trending_bullish' && score > 0) {
+    score += Math.round(params.regime.confidence * 0.08);
+  } else if (params.regime.type === 'trending_bearish' && score < 0) {
+    score -= Math.round(params.regime.confidence * 0.08);
+  } else if (params.regime.type === 'ranging') {
+    score = Math.round(score * 0.85);
+  }
+
+  // Historical Win Rate
+  if (params.historical.winRate !== null && params.historical.sampleSize >= 3) {
+    if (params.historical.winRate >= 70) score += 5;
+    else if (params.historical.winRate <= 30) score -= 5;
+  }
+
+  // ML/KNN
+  if (params.knn.confidence >= 60) {
+    const aligned = (score > 0 && params.knn.direction === 'bullish') ||
+                    (score < 0 && params.knn.direction === 'bearish');
+    score += aligned ? Math.round(params.knn.confidence * 0.06) : -3;
+  }
+
+  return Math.max(-100, Math.min(100, Math.round(score)));
 }

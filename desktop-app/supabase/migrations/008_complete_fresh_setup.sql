@@ -421,9 +421,49 @@ CREATE TABLE IF NOT EXISTS cot_currency_analysis (
   -- Open Interest Analyse
   oi_trend            TEXT        NOT NULL DEFAULT 'flat'
                       CHECK (oi_trend IN ('rising', 'falling', 'flat')),
-  oi_divergence       BOOLEAN     NOT NULL DEFAULT false,     -- OI fällt während Net steigt
+  oi_divergence       BOOLEAN     NOT NULL DEFAULT false,
 
-  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- ══════════════════════════════════════════════════════════
+  -- SMART COT v2 — Erweiterte Analyse
+  -- ══════════════════════════════════════════════════════════
+
+  -- Spec Crowding (Non-Commercials Extrempositionierung)
+  spec_net             NUMERIC    NOT NULL DEFAULT 0,
+  spec_percentile      NUMERIC(5,2) NOT NULL DEFAULT 50,
+  spec_crowding_extreme BOOLEAN   NOT NULL DEFAULT false,
+  spec_crowding_type   TEXT       CHECK (spec_crowding_type IN ('crowded_long', 'crowded_short')),
+
+  -- Saisonalität
+  seasonal_bias        TEXT       NOT NULL DEFAULT 'neutral'
+                       CHECK (seasonal_bias IN ('bullish', 'bearish', 'neutral')),
+  seasonal_strength    INTEGER    NOT NULL DEFAULT 0,  -- 0-100
+
+  -- Zinsdifferenz
+  rate_differential    NUMERIC    NOT NULL DEFAULT 0,
+  rate_trend           TEXT       NOT NULL DEFAULT 'neutral'
+                       CHECK (rate_trend IN ('hawkish', 'dovish', 'neutral')),
+  rate_cot_confluence  BOOLEAN    NOT NULL DEFAULT false,
+
+  -- Regime-Erkennung
+  regime               TEXT       NOT NULL DEFAULT 'ranging'
+                       CHECK (regime IN ('trending_bullish', 'trending_bearish', 'ranging', 'transitioning')),
+  regime_confidence    INTEGER    NOT NULL DEFAULT 0,
+
+  -- Historische Performance ähnlicher Setups
+  historical_win_rate  NUMERIC(5,2),
+  historical_avg_weeks INTEGER,  -- durchschnittliche Wochen bis Auflösung
+  historical_sample_size INTEGER NOT NULL DEFAULT 0,
+
+  -- ML / KNN Pattern Matching
+  similar_setups       JSONB     NOT NULL DEFAULT '[]',
+  -- [{date, percentile, momentum, outcome_4w, outcome_8w}]
+  ml_direction         TEXT      CHECK (ml_direction IN ('bullish', 'bearish', 'neutral')),
+  ml_confidence        NUMERIC(5,2) NOT NULL DEFAULT 0,
+
+  -- Final Conviction Score (alles kombiniert, -100 bis +100)
+  final_conviction     INTEGER   NOT NULL DEFAULT 0,
+
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
 
   UNIQUE(user_id, currency)
 );

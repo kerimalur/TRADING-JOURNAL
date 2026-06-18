@@ -552,70 +552,104 @@ export function COTData() {
                         </div>
                       </div>
 
-                      {/* Row 2: Key Metrics */}
-                      <div className="grid grid-cols-3 gap-2 mb-2">
-                        {/* Momentum */}
-                        <div className="bg-white/[0.02] rounded px-2 py-1.5">
-                          <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-0.5">Momentum</div>
-                          <div className="flex items-center gap-1">
+                      {/* Row 2: Key Metrics (2 rows) */}
+                      <div className="grid grid-cols-4 gap-1.5 mb-2">
+                        <div className="bg-white/[0.02] rounded px-2 py-1">
+                          <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Momentum</div>
+                          <div className="flex items-center gap-0.5">
                             {getMomentumIcon(analysis.momentumSignal)}
-                            <span className="text-[10px] text-text-secondary font-medium">
+                            <span className="text-[9px] text-text-secondary font-medium truncate">
                               {getMomentumLabel(analysis.momentumSignal)}
                             </span>
                           </div>
                         </div>
-
-                        {/* Trend */}
-                        <div className="bg-white/[0.02] rounded px-2 py-1.5">
-                          <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-0.5">Trend</div>
-                          <div className="text-[10px] text-text-secondary font-medium">
-                            {analysis.trendDirection === 'accumulating' ? `Aufbau ${analysis.trendWeeks}W` :
-                             analysis.trendDirection === 'distributing' ? `Abbau ${analysis.trendWeeks}W` :
-                             'Flat'}
+                        <div className="bg-white/[0.02] rounded px-2 py-1">
+                          <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Regime</div>
+                          <div className="text-[9px] text-text-secondary font-medium truncate">
+                            {analysis.regime === 'trending_bullish' ? '↑ Trend' :
+                             analysis.regime === 'trending_bearish' ? '↓ Trend' :
+                             analysis.regime === 'transitioning' ? '⟳ Wechsel' : '↔ Range'}
                           </div>
                         </div>
-
-                        {/* Percentile */}
-                        <div className="bg-white/[0.02] rounded px-2 py-1.5">
-                          <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-0.5">Perzentil</div>
-                          <div className="flex items-center gap-1">
-                            <div className="flex-1 h-1 bg-white/[0.06] rounded-full overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all"
-                                style={{
-                                  width: `${analysis.currentPercentile}%`,
-                                  backgroundColor: getScoreColor(analysis.smartScore),
-                                }}
-                              />
-                            </div>
-                            <span className="font-mono tabular-nums text-[10px] text-text-muted">{analysis.currentPercentile}%</span>
+                        <div className="bg-white/[0.02] rounded px-2 py-1">
+                          <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Saison</div>
+                          <div className={clsx('text-[9px] font-medium',
+                            analysis.seasonalBias === 'bullish' ? 'text-pnl-positive' :
+                            analysis.seasonalBias === 'bearish' ? 'text-pnl-negative' : 'text-text-muted'
+                          )}>
+                            {analysis.seasonalBias === 'bullish' ? '↑ Bullish' :
+                             analysis.seasonalBias === 'bearish' ? '↓ Bearish' : '— Neutral'}
+                          </div>
+                        </div>
+                        <div className="bg-white/[0.02] rounded px-2 py-1">
+                          <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">KNN</div>
+                          <div className={clsx('text-[9px] font-medium',
+                            analysis.mlDirection === 'bullish' ? 'text-pnl-positive' :
+                            analysis.mlDirection === 'bearish' ? 'text-pnl-negative' : 'text-text-muted'
+                          )}>
+                            {analysis.mlDirection !== 'neutral'
+                              ? `${analysis.mlDirection === 'bullish' ? '↑' : '↓'} ${analysis.mlConfidence}%`
+                              : '— n/a'}
                           </div>
                         </div>
                       </div>
 
-                      {/* Row 3: Alerts / Badges */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* Conviction Bar */}
+                      <div className="mb-2">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Conviction</span>
+                          <span className="font-mono tabular-nums text-[9px]" style={{ color: getScoreColor(analysis.finalConviction) }}>
+                            {analysis.finalConviction > 0 ? '+' : ''}{analysis.finalConviction}
+                          </span>
+                        </div>
+                        <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden relative">
+                          <div
+                            className="absolute top-0 h-full rounded-full transition-all"
+                            style={{
+                              left: analysis.finalConviction >= 0 ? '50%' : `${50 + analysis.finalConviction / 2}%`,
+                              width: `${Math.abs(analysis.finalConviction) / 2}%`,
+                              backgroundColor: getScoreColor(analysis.finalConviction),
+                            }}
+                          />
+                          <div className="absolute left-1/2 top-0 w-px h-full bg-white/20" />
+                        </div>
+                      </div>
+
+                      {/* Row 3: Badges */}
+                      <div className="flex items-center gap-1 flex-wrap">
                         {analysis.isExtreme && (
                           <span className={clsx(
-                            'text-[8px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded font-semibold flex items-center gap-0.5',
+                            'text-[7px] uppercase tracking-[0.08em] px-1 py-0.5 rounded font-semibold',
                             analysis.extremeType === 'overbought' ? 'bg-pnl-positive/15 text-pnl-positive' : 'bg-pnl-negative/15 text-pnl-negative'
                           )}>
-                            <AlertTriangle size={8} />
-                            {analysis.extremeType === 'overbought' ? 'Überkauft' : 'Überverkauft'} ({analysis.weeksAtExtreme}W)
+                            {analysis.extremeType === 'overbought' ? 'Überkauft' : 'Überverkauft'} {analysis.weeksAtExtreme}W
                           </span>
                         )}
-                        {analysis.specCommercialDivergence && (
-                          <span className="text-[8px] uppercase tracking-[0.1em] bg-accent-primary/15 text-accent-primary px-1.5 py-0.5 rounded font-semibold">
-                            Spec-Divergenz
+                        {analysis.specCrowdingExtreme && (
+                          <span className="text-[7px] uppercase tracking-[0.08em] bg-pnl-negative/15 text-pnl-negative px-1 py-0.5 rounded font-semibold">
+                            Spec {analysis.specCrowdingType === 'crowded_long' ? '↑' : '↓'}
                           </span>
                         )}
-                        {analysis.oiDivergence && (
-                          <span className="text-[8px] uppercase tracking-[0.1em] bg-accent-gold/15 text-accent-gold px-1.5 py-0.5 rounded font-semibold">
-                            OI-Divergenz
+                        {analysis.cocDetected && (
+                          <span className="text-[7px] uppercase tracking-[0.08em] bg-accent-gold/15 text-accent-gold px-1 py-0.5 rounded font-semibold">
+                            CoC
                           </span>
                         )}
-                        <span className="text-[9px] font-mono tabular-nums text-text-muted ml-auto">
-                          Net: {analysis.currentNet >= 0 ? '+' : ''}{analysis.currentNet.toLocaleString('de-DE')}
+                        {analysis.rateCotConfluence && (
+                          <span className="text-[7px] uppercase tracking-[0.08em] bg-accent-primary/15 text-accent-primary px-1 py-0.5 rounded font-semibold">
+                            Zins ✓
+                          </span>
+                        )}
+                        {analysis.historicalWinRate !== null && analysis.historicalSampleSize >= 3 && (
+                          <span className={clsx(
+                            'text-[7px] uppercase tracking-[0.08em] px-1 py-0.5 rounded font-semibold',
+                            analysis.historicalWinRate >= 60 ? 'bg-pnl-positive/15 text-pnl-positive' : 'bg-white/[0.06] text-text-muted'
+                          )}>
+                            Win {analysis.historicalWinRate}%
+                          </span>
+                        )}
+                        <span className="text-[8px] font-mono tabular-nums text-text-muted ml-auto">
+                          {analysis.currentNet >= 0 ? '+' : ''}{(analysis.currentNet / 1000).toFixed(0)}K
                         </span>
                       </div>
                     </button>
@@ -647,7 +681,7 @@ export function COTData() {
                   </button>
                 </div>
 
-                {/* Analysis Detail Grid */}
+                {/* Analysis Detail Grid — Row 1: Momentum + OI */}
                 <div className="grid grid-cols-4 gap-3 px-4 py-3 border-b border-white/[0.04]">
                   <div>
                     <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Momentum 1W</div>
@@ -676,8 +710,112 @@ export function COTData() {
                   </div>
                 </div>
 
+                {/* Row 2: v2 Analytics */}
+                <div className="grid grid-cols-4 gap-3 px-4 py-3 border-b border-white/[0.04]">
+                  <div>
+                    <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Spec Crowding</div>
+                    <div className={clsx('text-xs font-medium',
+                      selectedAnalysis.specCrowdingExtreme ? 'text-pnl-negative' : 'text-text-secondary'
+                    )}>
+                      {selectedAnalysis.specCrowdingExtreme
+                        ? `⚠ ${selectedAnalysis.specCrowdingType === 'crowded_long' ? 'Überfüllt Long' : 'Überfüllt Short'}`
+                        : `P${selectedAnalysis.specPercentile}%`}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Saisonalität</div>
+                    <div className={clsx('text-xs font-medium',
+                      selectedAnalysis.seasonalBias === 'bullish' ? 'text-pnl-positive' :
+                      selectedAnalysis.seasonalBias === 'bearish' ? 'text-pnl-negative' : 'text-text-muted'
+                    )}>
+                      {selectedAnalysis.seasonalBias === 'bullish' ? `↑ Bullish (${selectedAnalysis.seasonalStrength}%)` :
+                       selectedAnalysis.seasonalBias === 'bearish' ? `↓ Bearish (${selectedAnalysis.seasonalStrength}%)` : '— Neutral'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Regime</div>
+                    <div className="text-xs text-text-secondary font-medium">
+                      {selectedAnalysis.regime === 'trending_bullish' ? `↑ Bullish Trend (${selectedAnalysis.regimeConfidence}%)` :
+                       selectedAnalysis.regime === 'trending_bearish' ? `↓ Bearish Trend (${selectedAnalysis.regimeConfidence}%)` :
+                       selectedAnalysis.regime === 'transitioning' ? '⟳ Übergang' : '↔ Ranging'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Zinsen</div>
+                    <div className={clsx('text-xs font-medium',
+                      selectedAnalysis.rateTrend === 'hawkish' ? 'text-pnl-positive' :
+                      selectedAnalysis.rateTrend === 'dovish' ? 'text-pnl-negative' : 'text-text-muted'
+                    )}>
+                      {selectedAnalysis.rateTrend === 'hawkish' ? '↑ Hawkish' :
+                       selectedAnalysis.rateTrend === 'dovish' ? '↓ Dovish' : '— Neutral'}
+                      {selectedAnalysis.rateCotConfluence && ' ✓'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: Historical + ML */}
+                <div className="grid grid-cols-3 gap-3 px-4 py-3 border-b border-white/[0.04]">
+                  <div>
+                    <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Historische Win Rate</div>
+                    <div className="text-xs text-text-secondary font-medium">
+                      {selectedAnalysis.historicalWinRate !== null && selectedAnalysis.historicalSampleSize >= 3
+                        ? <><span className={selectedAnalysis.historicalWinRate >= 60 ? 'text-pnl-positive font-bold' : ''}>{selectedAnalysis.historicalWinRate}%</span> <span className="text-text-muted">({selectedAnalysis.historicalSampleSize} Setups, ~{selectedAnalysis.historicalAvgWeeks}W)</span></>
+                        : <span className="text-text-muted">Nicht genug Daten</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">KNN Prognose</div>
+                    <div className={clsx('text-xs font-medium',
+                      selectedAnalysis.mlDirection === 'bullish' ? 'text-pnl-positive' :
+                      selectedAnalysis.mlDirection === 'bearish' ? 'text-pnl-negative' : 'text-text-muted'
+                    )}>
+                      {selectedAnalysis.mlDirection !== 'neutral'
+                        ? `${selectedAnalysis.mlDirection === 'bullish' ? '↑ Bullish' : '↓ Bearish'} (${selectedAnalysis.mlConfidence}% Konfidenz)`
+                        : 'Keine klare Richtung'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Final Conviction</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono tabular-nums text-sm font-bold" style={{ color: getScoreColor(selectedAnalysis.finalConviction) }}>
+                        {selectedAnalysis.finalConviction > 0 ? '+' : ''}{selectedAnalysis.finalConviction}
+                      </span>
+                      <span className="text-[9px] uppercase tracking-[0.1em] font-semibold px-1.5 py-0.5 rounded"
+                        style={{
+                          backgroundColor: `${getScoreColor(selectedAnalysis.finalConviction)}15`,
+                          color: getScoreColor(selectedAnalysis.finalConviction),
+                        }}>
+                        {getScoreLabel(selectedAnalysis.finalConviction)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* KNN Similar Setups */}
+                {selectedAnalysis.similarSetups.length > 0 && (
+                  <div className="px-4 py-2 border-b border-white/[0.04]">
+                    <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1.5">Ähnliche historische Setups (KNN)</div>
+                    <div className="grid grid-cols-5 gap-1 text-[8px] text-text-muted uppercase tracking-[0.05em] mb-1">
+                      <span>Datum</span><span>Perz.</span><span>Mom.</span><span>4W Ergebnis</span><span>8W Ergebnis</span>
+                    </div>
+                    {selectedAnalysis.similarSetups.map((s, i) => (
+                      <div key={i} className="grid grid-cols-5 gap-1 text-[10px] font-mono tabular-nums py-0.5">
+                        <span className="text-text-muted">{s.date}</span>
+                        <span className="text-text-secondary">{s.percentile}%</span>
+                        <span className="text-text-secondary">{s.momentum > 0 ? '+' : ''}{s.momentum}%</span>
+                        <span className={s.outcome4w >= 0 ? 'text-pnl-positive' : 'text-pnl-negative'}>
+                          {s.outcome4w >= 0 ? '+' : ''}{(s.outcome4w / 1000).toFixed(1)}K
+                        </span>
+                        <span className={s.outcome8w >= 0 ? 'text-pnl-positive' : 'text-pnl-negative'}>
+                          {s.outcome8w >= 0 ? '+' : ''}{(s.outcome8w / 1000).toFixed(1)}K
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Insights */}
-                {(selectedAnalysis.cocDetected || selectedAnalysis.specCommercialDivergence || selectedAnalysis.isExtreme) && (
+                {(selectedAnalysis.cocDetected || selectedAnalysis.specCommercialDivergence || selectedAnalysis.isExtreme || selectedAnalysis.specCrowdingExtreme) && (
                   <div className="px-4 py-2 border-b border-white/[0.04] space-y-1">
                     {selectedAnalysis.cocDetected && (
                       <div className="flex items-center gap-2 text-[10px]">
@@ -693,6 +831,15 @@ export function COTData() {
                         <AlertTriangle size={10} className="text-accent-primary" />
                         <span className="text-accent-primary font-semibold">Spec-Divergenz</span>
                         <span className="text-text-muted">{selectedAnalysis.specCommercialDetail}</span>
+                      </div>
+                    )}
+                    {selectedAnalysis.specCrowdingExtreme && (
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <AlertTriangle size={10} className="text-pnl-negative" />
+                        <span className="text-pnl-negative font-semibold">Spec Crowding</span>
+                        <span className="text-text-muted">
+                          Spekulanten {selectedAnalysis.specCrowdingType === 'crowded_long' ? 'extrem long' : 'extrem short'} (P{selectedAnalysis.specPercentile}%) — Contrarian-Signal
+                        </span>
                       </div>
                     )}
                     {selectedAnalysis.isExtreme && (
