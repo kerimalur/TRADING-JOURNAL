@@ -10,18 +10,12 @@ import {
   Wallet,
   DollarSign,
   TrendingUp,
-  Globe2,
   Settings,
   ChevronLeft,
   ChevronRight,
   Zap,
   Calendar,
   Lightbulb,
-  Target,
-  Newspaper,
-  BarChart2,
-  Percent,
-  List,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -42,18 +36,12 @@ const BASE_ITEMS: NavItem[] = [
   { path: '/equity',      label: 'Equity Curve',  icon: <TrendingUp size={18} />,      group: 'Übersicht' },
   { path: '/calendar',    label: 'Kalender',       icon: <Calendar size={18} />,        group: 'Übersicht' },
   { path: '/ek',          label: 'Eigenkapital',   icon: <Wallet size={18} />,          group: 'Trading'   },
-  { path: '/outlook',     label: 'Outlook',        icon: <Target size={18} />,          group: 'Trading'   },
-  { path: '/fundamentals',label: 'Übersicht',      icon: <Globe2 size={18} />,          group: 'Markt'     },
-  { path: '/news',        label: 'News',           icon: <Newspaper size={18} />,       group: 'Markt'     },
-  { path: '/cot',         label: 'COT',            icon: <BarChart2 size={18} />,       group: 'Markt'     },
-  { path: '/zinsen',      label: 'Zinsen',         icon: <Percent size={18} />,         group: 'Markt'     },
   { path: '/strategy',    label: 'Strategie',      icon: <Lightbulb size={18} />,       group: 'Tools'     },
   { path: '/backtest',    label: 'Backtest',       icon: <Zap size={18} />,             group: 'Tools'     },
-  { path: '/watchlist',   label: 'Watchlist',      icon: <List size={18} />,            group: 'Tools'     },
   { path: '/settings',    label: 'Einstellungen',  icon: <Settings size={18} />,        group: 'System'    },
 ];
 
-const GROUP_ORDER = ['Übersicht', 'Trading', 'Markt', 'Tools', 'System'];
+const GROUP_ORDER = ['Übersicht', 'Trading', 'Tools', 'System'];
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
@@ -74,11 +62,10 @@ export function Sidebar() {
       }))
     : [{ path: '/funded', label: 'Funded', icon: <DollarSign size={18} />, group: 'Trading' }];
 
-  // Alle Items zusammenführen: Trading-Reihenfolge EK → Funded → Outlook
-  const tradingEk      = BASE_ITEMS.filter(i => i.group === 'Trading' && i.path === '/ek');
-  const tradingOutlook = BASE_ITEMS.filter(i => i.group === 'Trading' && i.path === '/outlook');
-  const nonTrading     = BASE_ITEMS.filter(i => i.group !== 'Trading');
-  const allItems = [...nonTrading, ...tradingEk, ...fundedItems, ...tradingOutlook];
+  // Alle Items zusammenführen: Trading-Reihenfolge EK → Funded
+  const tradingEk  = BASE_ITEMS.filter(i => i.group === 'Trading' && i.path === '/ek');
+  const nonTrading = BASE_ITEMS.filter(i => i.group !== 'Trading');
+  const allItems = [...nonTrading, ...tradingEk, ...fundedItems];
   const groupedItems = GROUP_ORDER.reduce((acc, group) => {
     acc[group] = allItems.filter(i => i.group === group);
     return acc;
