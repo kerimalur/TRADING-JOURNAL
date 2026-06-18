@@ -30,6 +30,8 @@ import { EquityCurve } from '@/pages/EquityCurve';
 import { Backtest } from '@/pages/Backtest';
 import { Calendar } from '@/pages/Calendar';
 import { StrategyBuilder } from '@/pages/StrategyBuilder';
+import { Outlook } from '@/pages/Outlook';
+import { COTData } from '@/pages/COTData';
 
 // Debug removed - AuthDebug no longer needed
 
@@ -261,6 +263,8 @@ function AppContent() {
                 <Route path="/backtest" element={<Backtest />} />
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/strategy" element={<StrategyBuilder />} />
+                <Route path="/outlook" element={<Outlook />} />
+                <Route path="/cot" element={<COTData />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </AnimatePresence>

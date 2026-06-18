@@ -10,7 +10,7 @@
  * - Alle Daten (database.json + screenshots/) werden im gewählten Ordner gespeichert
  */
 
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, clipboard, nativeImage } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 

@@ -16,6 +16,8 @@ import {
   Zap,
   Calendar,
   Lightbulb,
+  Crosshair,
+  Brain,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -36,12 +38,14 @@ const BASE_ITEMS: NavItem[] = [
   { path: '/equity',      label: 'Equity Curve',  icon: <TrendingUp size={18} />,      group: 'Übersicht' },
   { path: '/calendar',    label: 'Kalender',       icon: <Calendar size={18} />,        group: 'Übersicht' },
   { path: '/ek',          label: 'Eigenkapital',   icon: <Wallet size={18} />,          group: 'Trading'   },
+  { path: '/outlook',     label: 'Outlook',         icon: <Crosshair size={18} />,       group: 'Trading'   },
+  { path: '/cot',         label: 'Smart COT',      icon: <Brain size={18} />,           group: 'Markt'     },
   { path: '/strategy',    label: 'Strategie',      icon: <Lightbulb size={18} />,       group: 'Tools'     },
   { path: '/backtest',    label: 'Backtest',       icon: <Zap size={18} />,             group: 'Tools'     },
   { path: '/settings',    label: 'Einstellungen',  icon: <Settings size={18} />,        group: 'System'    },
 ];
 
-const GROUP_ORDER = ['Übersicht', 'Trading', 'Tools', 'System'];
+const GROUP_ORDER = ['Übersicht', 'Trading', 'Markt', 'Tools', 'System'];
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
