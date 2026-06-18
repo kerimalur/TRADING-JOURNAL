@@ -802,7 +802,7 @@ function registerIPCHandlers(): void {
           const url = `https://publicreporting.cftc.gov/resource/6dca-aqww.json?` +
             `cftc_contract_market_code=${currency.cftcCode}` +
             `&$order=report_date_as_yyyy_mm_dd DESC` +
-            `&$limit=52`;
+            `&$limit=260`;
           
           console.log(`📊 Fetching COT for ${currency.id} (${currency.name})...`);
           
@@ -906,6 +906,100 @@ function registerIPCHandlers(): void {
     } catch (error) {
       console.error('❌ COT fetch failed:', error);
       return { success: false, error: String(error), data: [], history: {} };
+    }
+  });
+
+  /**
+   * Historische Forex-Kurse von frankfurter.app (ECB-Daten, kostenlos, kein API-Key)
+   * Holt wöchentliche Close-Preise für COT-Korrelation
+   */
+  ipcMain.handle('fetchForexPrices', async (_, startDate?: string) => {
+    try {
+      const start = startDate || '2020-01-01';
+      const end = new Date().toISOString().split('T')[0];
+      const currencies = 'USD,GBP,JPY,CAD,AUD,NZD,CHF';
+
+      console.log(`💱 Fetching forex prices ${start}..${end}...`);
+
+      // frankfurter.app gibt ECB-Tageskurse, EUR-basiert
+      const url = `https://api.frankfurter.app/${start}..${end}?from=EUR&to=${currencies}`;
+
+      const response = await fetch(url, {
+        headers: { 'Accept': 'application/json', 'User-Agent': 'TradingJournal/1.0' },
+      });
+
+      if (!response.ok) {
+        return { success: false, error: `HTTP ${response.status}` };
+      }
+
+      const data = await response.json() as any;
+      const rates = data.rates as Record<string, Record<string, number>>;
+
+      if (!rates || Object.keys(rates).length === 0) {
+        return { success: false, error: 'No price data received' };
+      }
+
+      // Konvertiere zu USD-basierten Kursen und berechne Pair-Preise
+      const dates = Object.keys(rates).sort();
+      const priceMap: Record<string, Array<{ date: string; price: number }>> = {
+        EUR: [], GBP: [], JPY: [], CAD: [], AUD: [], NZD: [], CHF: [], DXY: [],
+      };
+
+      for (const date of dates) {
+        const r = rates[date];
+        if (!r || !r.USD) continue;
+
+        const eurUsd = r.USD; // EUR/USD rate
+
+        // Major pairs als "Preis der Währung in USD"
+        priceMap['EUR'].push({ date, price: eurUsd });
+        priceMap['GBP'].push({ date, price: r.GBP ? eurUsd / r.GBP : 0 }); // GBP/USD
+        priceMap['JPY'].push({ date, price: r.JPY ? eurUsd / r.JPY : 0 }); // 1/USD/JPY → inverse
+        priceMap['CAD'].push({ date, price: r.CAD ? eurUsd / r.CAD : 0 });
+        priceMap['AUD'].push({ date, price: r.AUD ? eurUsd / r.AUD : 0 });
+        priceMap['NZD'].push({ date, price: r.NZD ? eurUsd / r.NZD : 0 });
+        priceMap['CHF'].push({ date, price: r.CHF ? eurUsd / r.CHF : 0 });
+
+        // DXY approximation (inverted USD strength)
+        // Simple: 1/EUR*USD weighted average
+        const dxyApprox = 1 / eurUsd; // Simplified — higher = stronger USD
+        priceMap['DXY'].push({ date, price: dxyApprox });
+      }
+
+      // Auf Wochenende-Freitag (COT-Daten) heruntersamplen
+      const weeklyPrices: Record<string, Array<{ date: string; price: number }>> = {};
+      for (const [ccy, daily] of Object.entries(priceMap)) {
+        const weekly: Array<{ date: string; price: number }> = [];
+        let lastFriday: { date: string; price: number } | null = null;
+
+        for (const d of daily) {
+          const dow = new Date(d.date).getDay();
+          if (dow === 5) { // Freitag
+            lastFriday = d;
+          } else if (dow === 1 && lastFriday) { // Montag → letzten Freitag speichern
+            weekly.push(lastFriday);
+            lastFriday = null;
+          }
+        }
+        // Letzten Punkt nicht vergessen
+        if (daily.length > 0) {
+          weekly.push(daily[daily.length - 1]);
+        }
+
+        weeklyPrices[ccy] = weekly;
+      }
+
+      console.log(`✅ Forex prices loaded: ${dates.length} daily → ${Object.values(weeklyPrices)[0]?.length || 0} weekly points`);
+
+      return {
+        success: true,
+        data: weeklyPrices,
+        dailyCount: dates.length,
+        weeklyCount: Object.values(weeklyPrices)[0]?.length || 0,
+      };
+    } catch (error) {
+      console.error('❌ Forex price fetch failed:', error);
+      return { success: false, error: String(error) };
     }
   });
 

@@ -536,6 +536,7 @@ export const webAPI = {
   
   // External Data
   fetchCOTData: webExternalApi.fetchCOTData,
+  fetchForexPrices: async (_startDate?: string) => ({ success: false as const, error: 'Only available in desktop app' }),
   fetchEconomicCalendar: webExternalApi.fetchEconomicCalendar,
   fetchInterestRates: webExternalApi.fetchInterestRates,
   

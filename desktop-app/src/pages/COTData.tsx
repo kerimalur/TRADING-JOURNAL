@@ -30,6 +30,10 @@ import {
   saveSnapshots, runSmartCOTAnalysis,
   loadCachedAnalyses, loadCachedPairSignals,
 } from '@/services/smartCotService';
+import {
+  type MLPrediction,
+  runMLPipeline, FEATURE_LABELS,
+} from '@/services/smartCotML';
 
 const CURRENCIES = [
   { id: 'DXY', name: 'DXY', flag: '🇺🇸' },
@@ -56,7 +60,9 @@ export function COTData() {
   const [dataSource, setDataSource] = useState<'live' | 'cache' | 'manual' | 'none'>('none');
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualInputData, setManualInputData] = useState<Record<string, { long: string; short: string }>>({});
-  const [activeTab, setActiveTab] = useState<'overview' | 'pairs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'pairs' | 'ml'>('overview');
+  const [mlPredictions, setMlPredictions] = useState<Record<string, MLPrediction>>({});
+  const [mlLoading, setMlLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -190,11 +196,64 @@ export function COTData() {
       localStorage.setItem('cotHistory', JSON.stringify(result.history || {}));
       localStorage.setItem('cotLastUpdate', new Date().toISOString());
       localStorage.removeItem('cotDataSource');
+
+      // ML: Preise laden und Pipeline starten (async, blockiert UI nicht)
+      loadPricesAndRunML(deduped).catch(console.error);
     } catch (err) {
       console.error('COT fetch error:', err);
       setError('Fehler beim Laden der COT-Daten.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadPricesAndRunML = async (allSnapshots: COTSnapshot[]) => {
+    setMlLoading(true);
+    try {
+      // Prüfe localStorage-Cache
+      let priceData: Record<string, PricePoint[]> = {};
+      const cachedPrices = localStorage.getItem('smartCotPrices');
+      const cachedPricesDate = localStorage.getItem('smartCotPricesDate');
+      const daysSincePrices = cachedPricesDate
+        ? Math.floor((Date.now() - new Date(cachedPricesDate).getTime()) / (1000 * 60 * 60 * 24))
+        : 999;
+
+      if (cachedPrices && daysSincePrices < 7) {
+        priceData = JSON.parse(cachedPrices);
+      } else {
+        const api = getApi() as any;
+        if (api.fetchForexPrices) {
+          const result = await api.fetchForexPrices('2020-01-01');
+          if (result.success && result.data) {
+            priceData = result.data;
+            localStorage.setItem('smartCotPrices', JSON.stringify(priceData));
+            localStorage.setItem('smartCotPricesDate', new Date().toISOString());
+          }
+        }
+      }
+
+      if (Object.keys(priceData).length === 0) {
+        setMlLoading(false);
+        return;
+      }
+
+      // ML für jede Währung laufen lassen
+      const predictions: Record<string, MLPrediction> = {};
+      for (const ccy of CURRENCIES.map(c => c.id)) {
+        const ccyPrices = priceData[ccy] || [];
+        if (ccyPrices.length < 20) continue;
+
+        const result = runMLPipeline(allSnapshots, ccyPrices, ccy);
+        if (result && result.dataPoints >= 30) {
+          predictions[ccy] = result;
+        }
+      }
+
+      setMlPredictions(predictions);
+    } catch (err) {
+      console.error('ML pipeline error:', err);
+    } finally {
+      setMlLoading(false);
     }
   };
 
@@ -460,6 +519,16 @@ export function COTData() {
             {pairSignals.length > 0 && (
               <span className="ml-1 bg-accent-primary/30 text-accent-primary px-1 py-0 rounded text-[8px]">{pairSignals.length}</span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab('ml')}
+            className={clsx(
+              'text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
+              activeTab === 'ml' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary'
+            )}
+          >
+            <Brain size={10} className="inline mr-1" /> ML Analyse
+            {mlLoading && <RefreshCw size={8} className="inline ml-1 animate-spin" />}
           </button>
         </div>
 
@@ -999,6 +1068,191 @@ export function COTData() {
                       </div>
                     </motion.div>
                   ))}
+                </div>
+              </>
+            )}
+
+          </motion.div>
+        )}
+
+        {activeTab === 'ml' && (
+          <motion.div key="ml" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+
+            {mlLoading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <RefreshCw size={24} className="animate-spin text-accent-primary mb-3" />
+                <p className="text-[10px] uppercase tracking-[0.15em] text-text-muted">Trainiere Logistic Regression + Backtester...</p>
+              </div>
+            ) : Object.keys(mlPredictions).length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Brain size={24} className="text-text-muted mb-3" />
+                <p className="text-xs text-text-primary font-medium mb-1">ML-Modell noch nicht trainiert</p>
+                <p className="text-[10px] text-text-muted mb-3">Klicke "Refresh & Analyse" um COT + Preisdaten zu laden und das Modell zu trainieren.</p>
+                <p className="text-[9px] text-text-muted">Benötigt: 260 Wochen COT-Daten + historische Forex-Preise (frankfurter.app)</p>
+              </div>
+            ) : (
+              <>
+                {/* ML Overview */}
+                <div className="mb-3 flex items-center gap-2">
+                  <Brain size={12} className="text-accent-primary" />
+                  <span className="text-[10px] uppercase tracking-[0.15em] font-semibold text-text-muted">
+                    Logistic Regression — {Object.keys(mlPredictions).length} Modelle trainiert
+                  </span>
+                </div>
+
+                {/* ML Cards per Currency */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  {CURRENCIES.map((currency) => {
+                    const ml = mlPredictions[currency.id];
+                    if (!ml || ml.dataPoints < 30) return null;
+
+                    return (
+                      <motion.div
+                        key={currency.id}
+                        initial={{ opacity: 0, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="rounded-xl border border-border bg-background-card p-4"
+                      >
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{currency.flag}</span>
+                            <span className="text-xs font-bold text-text-primary">{currency.id}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={clsx(
+                              'text-[9px] uppercase tracking-[0.1em] font-bold px-1.5 py-0.5 rounded',
+                              ml.direction === 'bullish' ? 'bg-pnl-positive/15 text-pnl-positive' :
+                              ml.direction === 'bearish' ? 'bg-pnl-negative/15 text-pnl-negative' :
+                              'bg-white/[0.06] text-text-muted'
+                            )}>
+                              {ml.direction === 'bullish' ? '↑ BULLISH' : ml.direction === 'bearish' ? '↓ BEARISH' : '— NEUTRAL'}
+                            </span>
+                            <span className="font-mono tabular-nums text-xs font-bold text-text-secondary">
+                              {Math.round(ml.probability * 100)}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Model Stats */}
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                          <div className="bg-white/[0.02] rounded px-2 py-1">
+                            <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Accuracy</div>
+                            <div className={clsx('text-[10px] font-bold',
+                              ml.modelAccuracy >= 55 ? 'text-pnl-positive' : 'text-text-muted'
+                            )}>
+                              {ml.modelAccuracy}%
+                            </div>
+                          </div>
+                          <div className="bg-white/[0.02] rounded px-2 py-1">
+                            <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Win Rate</div>
+                            <div className={clsx('text-[10px] font-bold',
+                              ml.backtest.winRate >= 55 ? 'text-pnl-positive' : 'text-text-muted'
+                            )}>
+                              {ml.backtest.winRate}%
+                            </div>
+                          </div>
+                          <div className="bg-white/[0.02] rounded px-2 py-1">
+                            <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Signale</div>
+                            <div className="text-[10px] font-bold text-text-secondary">
+                              {ml.backtest.totalSignals}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Backtest Stats */}
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          <div className="bg-white/[0.02] rounded px-2 py-1">
+                            <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Avg Win</div>
+                            <div className="text-[10px] font-bold text-pnl-positive">+{ml.backtest.avgWinPct}%</div>
+                          </div>
+                          <div className="bg-white/[0.02] rounded px-2 py-1">
+                            <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Avg Loss</div>
+                            <div className="text-[10px] font-bold text-pnl-negative">-{ml.backtest.avgLossPct}%</div>
+                          </div>
+                        </div>
+
+                        {/* Feature Importance (Top 5) */}
+                        <div className="mb-2">
+                          <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted mb-1">Top-Faktoren</div>
+                          {ml.featureImportance.slice(0, 5).map((fi, j) => (
+                            <div key={j} className="flex items-center justify-between py-0.5">
+                              <span className="text-[9px] text-text-muted truncate flex-1">
+                                {FEATURE_LABELS[fi.name] || fi.name}
+                              </span>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <div className="w-12 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                      width: `${Math.min(100, Math.abs(fi.contribution) * 200)}%`,
+                                      backgroundColor: fi.contribution > 0 ? '#22c55e' : '#ef4444',
+                                    }}
+                                  />
+                                </div>
+                                <span className={clsx('text-[8px] font-mono tabular-nums w-8 text-right',
+                                  fi.contribution > 0 ? 'text-pnl-positive' : 'text-pnl-negative'
+                                )}>
+                                  {fi.contribution > 0 ? '+' : ''}{fi.contribution.toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Score Distribution */}
+                        {ml.backtest.byScore.length > 0 && (
+                          <div>
+                            <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted mb-1">Score-Verteilung (Win Rate / Avg Return)</div>
+                            <div className="flex gap-1">
+                              {ml.backtest.byScore.map((b, j) => (
+                                <div key={j} className="flex-1 bg-white/[0.02] rounded px-1 py-0.5 text-center">
+                                  <div className="text-[7px] text-text-muted">{b.range}%</div>
+                                  <div className={clsx('text-[8px] font-bold',
+                                    b.winRate >= 55 ? 'text-pnl-positive' : b.winRate <= 45 ? 'text-pnl-negative' : 'text-text-muted'
+                                  )}>
+                                    {b.signals > 0 ? `${b.winRate}%` : '—'}
+                                  </div>
+                                  <div className={clsx('text-[7px] font-mono',
+                                    b.avgReturn > 0 ? 'text-pnl-positive' : 'text-pnl-negative'
+                                  )}>
+                                    {b.signals > 0 ? `${b.avgReturn > 0 ? '+' : ''}${b.avgReturn}%` : ''}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Data Points */}
+                        <div className="mt-2 text-[8px] text-text-muted text-right">
+                          {ml.dataPoints} Datenpunkte trainiert
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+
+                {/* ML Methodology */}
+                <div className="px-4 py-3 bg-white/[0.02] rounded-xl border border-white/[0.04]">
+                  <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Methodik</h4>
+                  <div className="space-y-1.5 text-[10px] text-text-muted leading-relaxed">
+                    <p>
+                      <strong className="text-text-secondary">Modell:</strong> Logistic Regression mit L2-Regularisierung, trainiert auf {Object.values(mlPredictions)[0]?.dataPoints || '260'}+ Wochen historischer COT-Daten + Forex-Preisen.
+                    </p>
+                    <p>
+                      <strong className="text-text-secondary">15 Features:</strong> Commercial-Perzentil, Momentum (4W/8W), Momentum-Beschleunigung, Spec-Perzentil, Spec-Commercial-Divergenz, OI-Änderung, OI/Comm-Ratio, Net-Null-Distanz, Volatilität, Trend-Konsistenz, Extremdauer, Short-Ratio, Spec/OI-Ratio, Mean Reversion.
+                    </p>
+                    <p>
+                      <strong className="text-text-secondary">Label:</strong> 1 = Preis stieg 4 Wochen nach dem COT-Report. 0 = Preis fiel. Preisdaten von ECB/frankfurter.app.
+                    </p>
+                    <p>
+                      <strong className="text-text-secondary">Backtest:</strong> Signal-Threshold 55%. Win Rate, Avg Win/Loss und Profit Factor basieren auf allen historischen Signalen über dem Threshold.
+                    </p>
+                    <p>
+                      <strong className="text-text-secondary">Feature Importance:</strong> Zeigt welche Faktoren bei dieser Währung den größten Einfluss auf die aktuelle Prediction haben (Gewicht × Feature-Wert).
+                    </p>
+                  </div>
                 </div>
               </>
             )}

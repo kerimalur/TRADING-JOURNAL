@@ -194,12 +194,18 @@ const electronAPI = {
   /**
    * COT-Daten von CFTC laden (über Main Process)
    */
-  fetchCOTData: (): Promise<{ 
-    success: boolean; 
-    data: any[]; 
+  fetchCOTData: (): Promise<{
+    success: boolean;
+    data: any[];
     history: Record<string, any[]>;
     error?: string;
   }> => ipcRenderer.invoke('fetchCOTData'),
+
+  fetchForexPrices: (startDate?: string): Promise<{
+    success: boolean;
+    data?: Record<string, Array<{ date: string; price: number }>>;
+    error?: string;
+  }> => ipcRenderer.invoke('fetchForexPrices', startDate),
 
   /**
    * Wirtschaftskalender laden
