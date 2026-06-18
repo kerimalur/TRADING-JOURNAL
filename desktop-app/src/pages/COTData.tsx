@@ -862,18 +862,122 @@ export function COTData() {
       </>
       )}
 
-      {/* ── Info Footer ── */}
-      <div className="mt-4 px-3 py-2.5 bg-white/[0.02] rounded-lg border border-white/[0.04]">
-        <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-text-muted mb-1">Über Smart COT</h4>
-        <p className="text-[10px] text-text-muted leading-relaxed">
-          Smart COT analysiert CFTC-Daten über simple Percentile hinaus:{' '}
-          <strong className="text-text-secondary">Momentum</strong> (1W/4W/8W Positionsänderung),{' '}
-          <strong className="text-text-secondary">Extremzonen</strong> (inkl. Dauer),{' '}
-          <strong className="text-text-secondary">Change of Character</strong> (Richtungswechsel),{' '}
-          <strong className="text-text-secondary">Spec-Divergenz</strong> (Smart Money vs. Spekulanten) und{' '}
-          <strong className="text-text-secondary">OI-Analyse</strong>.
-          Pair-Signale basieren auf Smart Score Divergenz + Momentum-Alignment.
-        </p>
+      {/* ── Erklärung: Datenquelle & Bedeutung ── */}
+      <div className="mt-4 space-y-3">
+
+        {/* Datenquelle */}
+        <div className="px-4 py-3 bg-white/[0.02] rounded-xl border border-white/[0.04]">
+          <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Woher kommen die Daten?</h4>
+          <p className="text-[10px] text-text-muted leading-relaxed mb-2">
+            Die Daten stammen direkt von der{' '}
+            <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">
+              CFTC (Commodity Futures Trading Commission)
+            </a>
+            {' '}— der US-Behörde, die alle Futures-Positionen überwacht.
+            Jeden <strong className="text-text-secondary">Freitag um 21:30 CET</strong> veröffentlicht die CFTC den "Commitment of Traders" Report
+            mit Positionsdaten vom <strong className="text-text-secondary">Dienstag</strong> derselben Woche (3 Tage Verzögerung).
+          </p>
+          <p className="text-[10px] text-text-muted leading-relaxed">
+            Smart COT lädt automatisch die letzten <strong className="text-text-secondary">52 Wochen</strong> Daten für 8 Währungs-Futures
+            (DXY, EUR, GBP, JPY, CAD, AUD, NZD, CHF) von der CFTC-API.
+            Die Daten werden lokal gecacht und in Supabase persistiert, damit die History wächst und
+            die Analyse mit jeder Woche präziser wird.
+          </p>
+        </div>
+
+        {/* Was sind Commercials? */}
+        <div className="px-4 py-3 bg-white/[0.02] rounded-xl border border-white/[0.04]">
+          <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Was bedeuten die Positionen?</h4>
+          <div className="space-y-2 text-[10px] text-text-muted leading-relaxed">
+            <p>
+              <strong className="text-pnl-positive">Commercials (Smart Money)</strong> — Banken, große Institutionen und Hedger.
+              Sie nutzen Futures zur Absicherung ihres echten Geschäfts. Wenn Commercials <em>stark long</em> sind,
+              positionieren sie sich für eine Aufwertung der Währung. Ihre Positionen gelten als verlässlichster Indikator,
+              weil sie am besten informiert sind.
+            </p>
+            <p>
+              <strong className="text-pnl-negative">Non-Commercials (Spekulanten)</strong> — Hedge Funds und große Trader.
+              Sie spekulieren auf Preisbewegungen. Wenn Spekulanten und Commercials in <em>entgegengesetzte Richtungen</em> positioniert sind
+              ("Spec-Divergenz"), ist das ein starkes Signal — denn historisch liegen die Commercials häufiger richtig.
+            </p>
+            <p>
+              <strong className="text-text-secondary">Open Interest</strong> — Gesamtzahl offener Kontrakte.
+              Steigendes OI + steigende Net-Position = <em>überzeugte Positionierung</em>.
+              Fallendes OI bei steigender Net-Position = <em>OI-Divergenz</em> = weniger Überzeugung.
+            </p>
+          </div>
+        </div>
+
+        {/* Smart Score Erklärung */}
+        <div className="px-4 py-3 bg-white/[0.02] rounded-xl border border-white/[0.04]">
+          <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Wie berechnet Smart COT den Score?</h4>
+          <div className="space-y-2 text-[10px] text-text-muted leading-relaxed">
+            <p>
+              Der <strong className="text-text-secondary">Smart Score (-100 bis +100)</strong> kombiniert mehrere Faktoren
+              zu einem einzigen Wert pro Währung:
+            </p>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
+                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Perzentil (Basis)</div>
+                <p>Wo steht die aktuelle Net-Position im Vergleich zur 52-Wochen-Range?
+                  80%+ = überkauft (bullish), 20%- = überverkauft (bearish).</p>
+              </div>
+              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
+                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Momentum (1W/4W/8W)</div>
+                <p>Wie schnell ändern Commercials ihre Positionen?
+                  4W beschleunigend = starkes Signal. Misst Geschwindigkeit UND Richtung der Positionsänderung.</p>
+              </div>
+              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
+                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Trend</div>
+                <p>"Aufbau" = Commercials erhöhen Positionen seit X Wochen.
+                  "Abbau" = sie reduzieren. Je länger der Trend, desto mehr Gewicht.</p>
+              </div>
+              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
+                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Extremzonen</div>
+                <p>Wenn Commercials &gt;4 Wochen am Extrem stehen, steigt das Reversionrisiko.
+                  Score wird leicht abgeschwächt — übertriebene Positionierung = Vorsicht.</p>
+              </div>
+              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
+                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Change of Character</div>
+                <p>Wenn die Net-Position das Vorzeichen wechselt (Long→Short oder umgekehrt)
+                  oder das Perzentil innerhalb von 4 Wochen von &gt;75% auf &lt;25% flippt — starkes Umkehr-Signal.</p>
+              </div>
+              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
+                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Spec-Divergenz & OI</div>
+                <p>Wenn Smart Money ≠ Spekulanten → Score wird verstärkt (Commercials "wissen es besser").
+                  OI-Divergenz (OI fällt, Net steigt) → Score wird abgeschwächt.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Pair Signale Erklärung */}
+        <div className="px-4 py-3 bg-white/[0.02] rounded-xl border border-white/[0.04]">
+          <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Pair-Signale</h4>
+          <p className="text-[10px] text-text-muted leading-relaxed mb-2">
+            Pair-Empfehlungen entstehen aus der <strong className="text-text-secondary">Smart Score Divergenz</strong> zwischen zwei Währungen.
+            Beispiel: EUR Smart Score +45 und USD Smart Score -30 → EUR/USD LONG mit Score +75.
+          </p>
+          <p className="text-[10px] text-text-muted leading-relaxed mb-2">
+            <strong className="text-text-secondary">Momentum-Alignment ✓</strong> erscheint, wenn beide Währungen
+            ein Momentum in die gleiche Trade-Richtung haben (Base-Momentum bullish + Quote-Momentum bearish für LONG).
+            Pairs mit Momentum-Alignment haben historisch eine höhere Trefferquote.
+          </p>
+          <p className="text-[10px] text-text-muted leading-relaxed">
+            <strong className="text-text-secondary">Stärke (1-5 Punkte)</strong> basiert auf der absoluten Score-Differenz:
+            20+ = 1 Punkt, 40+ = 2, 60+ = 3, 80+ = 4, 100+ = 5. Nur Pairs mit Divergenz ≥15 werden angezeigt.
+          </p>
+        </div>
+
+        {/* Disclaimer */}
+        <div className="px-4 py-2 bg-accent-gold/5 rounded-xl border border-accent-gold/10">
+          <p className="text-[9px] text-text-muted leading-relaxed">
+            <strong className="text-accent-gold">Hinweis:</strong> COT-Daten sind ein langfristiger Indikator (Wochen bis Monate).
+            Sie ersetzen keine technische Analyse und kein Risikomanagement.
+            Commercials können über Wochen "falsch" liegen, bevor sich ihre Position auszahlt.
+            Nutze Smart COT als einen von mehreren Confluences in deiner Analyse.
+          </p>
+        </div>
       </div>
 
       {/* ── Manual Input Modal ── */}
