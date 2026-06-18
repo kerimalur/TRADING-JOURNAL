@@ -478,7 +478,7 @@ function ZinsenWidget({ navigate }: { navigate: (p: string) => void }) {
   );
 }
 
-// ── COT Mini-Widget ───────────────────────────────────────────────────
+// ── Smart COT Mini-Widget ─────────────────────────────────────────────
 const ALL_COT_CCY = ['DXY', 'EUR', 'GBP', 'JPY', 'AUD', 'NZD', 'CAD', 'CHF'];
 
 function COTWidget({ navigate }: { navigate: (p: string) => void }) {
@@ -486,14 +486,13 @@ function COTWidget({ navigate }: { navigate: (p: string) => void }) {
   const cs = settings.cot;
   const [showSettings, setShowSettings] = useState(false);
 
-  // cotData is an array: [{ currency, commercialsNet, weeklyChange, ... }]
   const allRows = (() => {
     try {
       const raw = localStorage.getItem('cotData');
       if (!raw) return null;
       const data = JSON.parse(raw);
       if (!Array.isArray(data)) return null;
-      return data as Array<{ currency: string; commercialsNet: number; weeklyChange: number }>;
+      return data as Array<{ currency: string; commercialsNet: number; weeklyChange: number; percentileRank?: number; signal?: string }>;
     } catch { return null; }
   })();
 
@@ -508,6 +507,16 @@ function COTWidget({ navigate }: { navigate: (p: string) => void }) {
     updateCOT({ currencies: next });
   };
 
+  const getScoreColor = (net: number, signal?: string) => {
+    if (signal === 'strong_long') return '#22C55E';
+    if (signal === 'long') return '#86efac';
+    if (signal === 'strong_short') return '#EF4444';
+    if (signal === 'short') return '#fca5a5';
+    if (net > 0) return '#22C55E';
+    if (net < 0) return '#EF4444';
+    return '#787B86';
+  };
+
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex items-center justify-between mb-2">
@@ -515,7 +524,7 @@ function COTWidget({ navigate }: { navigate: (p: string) => void }) {
           <div className="p-1.5 rounded-lg bg-pnl-positive/10 group-hover:bg-pnl-positive/15 transition-colors">
             <BarChart2 size={14} className="text-pnl-positive" />
           </div>
-          <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">COT</span>
+          <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">Smart COT</span>
         </button>
         <button onClick={() => setShowSettings(p => !p)} className="p-1 rounded hover:bg-white/5 transition-colors flex-shrink-0">
           <Settings2 size={11} className={showSettings ? 'text-accent-primary' : 'text-text-muted/50'} />
@@ -540,10 +549,9 @@ function COTWidget({ navigate }: { navigate: (p: string) => void }) {
         ) : rows.length === 0 ? (
           <p className="text-[11px] text-text-muted/60 italic">Keine Währungen ausgewählt</p>
         ) : (
-          rows.map(({ currency, commercialsNet, weeklyChange }) => {
-            const isLong = commercialsNet > 0;
-            const color  = isLong ? '#22C55E' : '#EF4444';
-            const label  = `${isLong ? '+' : ''}${(commercialsNet / 1000).toFixed(0)}K`;
+          rows.map(({ currency, commercialsNet, weeklyChange, signal }) => {
+            const color = getScoreColor(commercialsNet, signal);
+            const label = `${commercialsNet > 0 ? '+' : ''}${(commercialsNet / 1000).toFixed(0)}K`;
             const chgColor = weeklyChange > 0 ? '#22C55E' : weeklyChange < 0 ? '#EF4444' : '#787B86';
             return (
               <div key={currency} className="flex items-center justify-between">
@@ -558,7 +566,7 @@ function COTWidget({ navigate }: { navigate: (p: string) => void }) {
         )}
       </div>
       <button onClick={() => navigate('/cot')} className="text-[11px] text-accent-primary hover:text-accent-secondary transition-colors font-medium mt-1 text-left">
-        Öffnen →
+        Smart COT →
       </button>
     </div>
   );
