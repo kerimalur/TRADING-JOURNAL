@@ -1042,44 +1042,75 @@ function analyzeSeasonal(currency: string, dateStr: string): {
 // v2: INTEREST RATE DIFFERENTIAL
 // ============================================================
 
+// Liest die Zinssätze, die webApi.fetchInterestRates() bzw. die Electron-App
+// unter 'trading-journal-interest-rates-cache' ablegen.
+// Struktur: { data: { USD: { rate, change }, EUR: {...}, ... }, timestamp }
+// Rückgabe: Carry-Differenz dieser Währung vs. Durchschnitt aller anderen G10.
 function analyzeRateDifferential(currency: string): {
   differential: number;
   trend: 'hawkish' | 'dovish' | 'neutral';
   cotConfluence: boolean;
 } {
   try {
-    const raw = localStorage.getItem('interestRatesData');
-    if (!raw) return { differential: 0, trend: 'neutral', cotConfluence: false };
+    const rates = readInterestRates();
+    if (!rates) return { differential: 0, trend: 'neutral', cotConfluence: false };
 
-    const rates = JSON.parse(raw);
-    if (!rates || typeof rates !== 'object') return { differential: 0, trend: 'neutral', cotConfluence: false };
+    // DXY repräsentiert USD
+    const code = currency === 'DXY' ? 'USD' : currency;
+    const self = rates[code];
+    if (!self) return { differential: 0, trend: 'neutral', cotConfluence: false };
 
-    const currencyToBank: Record<string, string> = {
-      DXY: 'fed', EUR: 'ecb', GBP: 'boe', JPY: 'boj',
-      CAD: 'boc', AUD: 'rba', NZD: 'rbnz', CHF: 'snb',
-    };
+    const selfRate = self.rate;
 
-    const bankKey = currencyToBank[currency];
-    const fedKey = 'fed';
+    // Durchschnitt der ÜBRIGEN Währungen (Carry-Vergleich)
+    const others = Object.entries(rates)
+      .filter(([c]) => c !== code)
+      .map(([, r]) => r.rate);
+    const avgOthers = others.length > 0
+      ? others.reduce((s, v) => s + v, 0) / others.length
+      : 0;
 
-    if (!bankKey) return { differential: 0, trend: 'neutral', cotConfluence: false };
+    // Positiv = höherer Zins als der Rest → attraktiver Carry → bullish-Bias
+    const differential = Math.round((selfRate - avgOthers) * 100) / 100;
 
-    const bankRate = parseFloat(rates[bankKey]?.rate ?? rates[bankKey] ?? '0');
-    const fedRate = parseFloat(rates[fedKey]?.rate ?? rates[fedKey] ?? '0');
-
-    const differential = currency === 'DXY' ? fedRate : bankRate - fedRate;
-
+    // Trend kommt aus der Richtung der letzten Zinsentscheidung (change-Feld)
     const trend: 'hawkish' | 'dovish' | 'neutral' =
-      differential > 1 ? 'hawkish' :
-      differential < -1 ? 'dovish' :
+      self.change === 'up' ? 'hawkish' :
+      self.change === 'down' ? 'dovish' :
       'neutral';
 
-    const cotConfluence = (differential > 0 && currency !== 'DXY') || (differential < 0 && currency === 'DXY');
+    // Carry positiv = Rückenwind für Long-Bias dieser Währung
+    const cotConfluence = differential > 0.25;
 
     return { differential, trend, cotConfluence };
   } catch {
     return { differential: 0, trend: 'neutral', cotConfluence: false };
   }
+}
+
+// Robustes Einlesen der Zinssätze aus localStorage (mehrere mögliche Keys/Formate)
+function readInterestRates(): Record<string, { rate: number; change?: string }> | null {
+  const KEYS = ['trading-journal-interest-rates-cache', 'interestRatesData'];
+  for (const key of KEYS) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      // Format A: { data: { USD: {rate}, ... }, timestamp }
+      const obj = parsed?.data && typeof parsed.data === 'object' ? parsed.data : parsed;
+      if (!obj || typeof obj !== 'object') continue;
+
+      const out: Record<string, { rate: number; change?: string }> = {};
+      for (const [c, v] of Object.entries(obj as Record<string, any>)) {
+        const rate = typeof v === 'object' ? parseFloat(v.rate) : parseFloat(v as any);
+        if (!isNaN(rate)) out[c.toUpperCase()] = { rate, change: (v as any)?.change };
+      }
+      if (Object.keys(out).length > 0) return out;
+    } catch {
+      /* try next key */
+    }
+  }
+  return null;
 }
 
 // ============================================================
@@ -1350,12 +1381,15 @@ function computeFinalConviction(params: {
     score += aligned ? Math.round(params.seasonal.strength * 0.08) : -3;
   }
 
-  // Rate Differential
-  if (params.rateDiff.cotConfluence) {
-    score += score > 0 ? 5 : -5;
-  }
-  if (params.rateDiff.trend === 'hawkish' && score > 0) score += 3;
-  if (params.rateDiff.trend === 'dovish' && score < 0) score += -3;
+  // Rate Differential (Carry): positiver Carry stützt Long, negativer stützt Short.
+  const carry = params.rateDiff.differential;
+  if (carry > 0.25 && score > 0) score += 6;        // Carry bestätigt Bullish
+  else if (carry < -0.25 && score < 0) score -= 6;  // Carry bestätigt Bearish
+  else if (carry > 0.25 && score < 0) score += 4;   // Carry arbeitet gegen den Short
+  else if (carry < -0.25 && score > 0) score -= 4;  // Carry arbeitet gegen den Long
+  // Zinstrend (letzte Entscheidung) als kleiner Zusatz
+  if (params.rateDiff.trend === 'hawkish' && score > 0) score += 2;
+  if (params.rateDiff.trend === 'dovish' && score < 0) score -= 2;
 
   // Regime: Trending = höhere Conviction, Ranging = niedrigere
   if (params.regime.type === 'trending_bullish' && score > 0) {

@@ -832,16 +832,27 @@ export function Dashboard() {
 
   return (
     <PageTransition>
-      <div
-        className="page-container space-y-4 relative"
-        style={dashboardBg ? {
-          backgroundImage: `url(${dashboardBg})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundAttachment: 'fixed',
-        } : undefined}
-      >
-        {dashboardBg && <div className="absolute inset-0 bg-background/80 pointer-events-none" />}
+      <div className="page-container space-y-4 relative">
+        {/* Dezenter Hintergrund: eigene Ebene hinter dem Inhalt.
+            Bild leicht gedimmt + weich, sodass die vorderen Karten
+            (opake bg-background-card) nie beeinflusst werden. */}
+        {dashboardBg && (
+          <>
+            <div
+              className="fixed inset-0 pointer-events-none z-0"
+              style={{
+                backgroundImage: `url(${dashboardBg})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundAttachment: 'fixed',
+                opacity: 0.28,
+                filter: 'blur(1px)',
+              }}
+            />
+            {/* Sanfter Verlauf für Lesbarkeit an Rändern */}
+            <div className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-background/70 via-background/40 to-background/80" />
+          </>
+        )}
 
         {/* ── Header ── */}
         <motion.div

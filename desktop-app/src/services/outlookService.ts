@@ -4,7 +4,7 @@
  * ========================================================================
  */
 
-import { fetchAll, insertOne, updateOne, deleteOne } from './supabaseService';
+import { fetchAll, deleteOne, upsertOne } from './supabaseService';
 
 const TABLE = 'outlooks';
 
@@ -31,10 +31,9 @@ export async function loadOutlooks(): Promise<OutlookRecord[]> {
 }
 
 export async function saveOutlook(data: OutlookRecord): Promise<OutlookRecord> {
-  if (data.id) {
-    return updateOne(TABLE, data.id, data);
-  }
-  return insertOne(TABLE, data);
+  // Upsert: fügt neue Outlooks ein ODER aktualisiert bestehende.
+  // Vermeidet "PATCH 400", wenn die Zeile in Supabase noch nicht existiert.
+  return upsertOne(TABLE, data, ['id']);
 }
 
 export async function removeOutlook(id: string): Promise<boolean> {

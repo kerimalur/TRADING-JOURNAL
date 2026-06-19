@@ -138,8 +138,23 @@ const isOfflineMode = (): boolean => {
 // Helper Functions
 // ============================================================
 
+// WICHTIG: Supabase-Spalte outlooks.id ist Typ uuid.
+// Daher echte UUIDs erzeugen, sonst schlägt der Sync mit
+// "invalid input syntax for type uuid" fehl.
 const generateId = (): string => {
-  return `outlook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    /* fall through to manual uuid */
+  }
+  // Fallback: RFC4122 v4 UUID manuell
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 };
 
 const loadFromStorage = (): Outlook[] => {
@@ -238,8 +253,17 @@ export const useOutlookStore = create<OutlookState>((set, get) => ({
     }
 
     outlookService.loadOutlooks()
-      .then(outlooks => {
-        set({ outlooks: outlooks as unknown as Outlook[], isLoading: false, error: null });
+      .then(remote => {
+        // Merge: lokale Outlooks dürfen NIE verschwinden, nur weil
+        // Supabase (noch) leer ist oder ein Sync fehlschlug.
+        const local = loadFromStorage();
+        const byId = new Map<string, Outlook>();
+        // Erst lokal, dann remote drüber (remote = source of truth, falls vorhanden)
+        for (const o of local) byId.set(o.id, o);
+        for (const o of (remote as unknown as Outlook[])) byId.set(o.id, o);
+        const merged = Array.from(byId.values());
+        saveToStorage(merged);
+        set({ outlooks: merged, isLoading: false, error: null });
       })
       .catch(() => {
         // Fallback to localStorage

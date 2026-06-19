@@ -109,7 +109,7 @@ export function COTData() {
     }
   };
 
-  const fetchCOTData = async () => {
+  const fetchCOTData = async (force = false) => {
     setIsLoading(true);
     setError(null);
 
@@ -118,6 +118,22 @@ export function COTData() {
       if (!api.fetchCOTData) {
         setError('COT-Daten sind nur in der Desktop-App verfügbar.');
         return;
+      }
+
+      // Zinssätze IMMER zuerst laden — die Smart-COT-Analyse liest sie aus
+      // localStorage. Ohne diesen Schritt ist die Zinsdifferenz 0.
+      try {
+        const anyApi = api as any;
+        if (anyApi.fetchInterestRates) await anyApi.fetchInterestRates();
+      } catch { /* Zinsen optional */ }
+
+      if (force) {
+        // Echter Refresh: alle COT/Preis-Caches verwerfen
+        localStorage.removeItem('smartCotPrices');
+        localStorage.removeItem('smartCotPricesDate');
+        localStorage.removeItem('cotData');
+        localStorage.removeItem('cotHistory');
+        localStorage.removeItem('cotLastUpdate');
       }
 
       const result = await api.fetchCOTData();
@@ -199,7 +215,7 @@ export function COTData() {
       localStorage.removeItem('cotDataSource');
 
       // ML: Preise laden und Pipeline starten (async, blockiert UI nicht)
-      loadPricesAndRunML(deduped).catch(console.error);
+      loadPricesAndRunML(deduped, force).catch(console.error);
     } catch (err) {
       console.error('COT fetch error:', err);
       setError('Fehler beim Laden der COT-Daten.');
@@ -208,7 +224,7 @@ export function COTData() {
     }
   };
 
-  const loadPricesAndRunML = async (allSnapshots: COTSnapshot[]) => {
+  const loadPricesAndRunML = async (allSnapshots: COTSnapshot[], force = false) => {
     setMlLoading(true);
     try {
       // Prüfe localStorage-Cache
@@ -219,7 +235,7 @@ export function COTData() {
         ? Math.floor((Date.now() - new Date(cachedPricesDate).getTime()) / (1000 * 60 * 60 * 24))
         : 999;
 
-      if (cachedPrices && daysSincePrices < 7) {
+      if (!force && cachedPrices && daysSincePrices < 7) {
         priceData = JSON.parse(cachedPrices);
       } else {
         const api = getApi() as any;
@@ -323,6 +339,15 @@ export function COTData() {
       .filter(s => s.currency === selectedCurrency)
       .sort((a, b) => a.date.localeCompare(b.date))
       .map(s => ({ date: s.date, net: s.commercialsNet, oi: s.openInterest }));
+  }, [snapshots, selectedCurrency]);
+
+  // Aktuellster Roh-Snapshot der gewählten Währung (echte CFTC-Zahlen)
+  const selectedRaw = useMemo(() => {
+    if (!selectedCurrency) return null;
+    const rows = snapshots
+      .filter(s => s.currency === selectedCurrency && (s.commercialsLong || s.commercialsShort))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    return rows.length > 0 ? rows[rows.length - 1] : null;
   }, [snapshots, selectedCurrency]);
 
   const sortedAnalyses = useMemo(() => {
@@ -434,9 +459,10 @@ export function COTData() {
           </button>
 
           <button
-            onClick={fetchCOTData}
+            onClick={() => fetchCOTData(true)}
             disabled={isLoading}
             className="text-[10px] uppercase tracking-[0.1em] text-text-primary flex items-center gap-1.5 px-3 py-1.5 rounded bg-accent-primary/20 hover:bg-accent-primary/30 transition-colors disabled:opacity-40"
+            title="Lädt CFTC-Daten, Forex-Preise und Zinssätze komplett neu (ignoriert Cache)"
           >
             <RefreshCw size={10} className={clsx(isLoading && 'animate-spin')} />
             {isLoading ? 'Analysiere...' : 'Refresh & Analyse'}
@@ -471,7 +497,7 @@ export function COTData() {
             <div>
               <p className="text-xs text-pnl-negative font-medium">{error}</p>
               <button
-                onClick={fetchCOTData}
+                onClick={() => fetchCOTData(true)}
                 disabled={isLoading}
                 className="mt-2 text-[10px] uppercase text-text-muted hover:text-text-primary flex items-center gap-1 px-2 py-1 rounded bg-white/[0.03]"
               >
@@ -497,7 +523,7 @@ export function COTData() {
           <Brain size={24} className="text-text-muted mb-3" />
           <p className="text-xs text-text-primary font-medium mb-1">Keine Smart COT Daten</p>
           <p className="text-[10px] text-text-muted mb-3">Klicke "Refresh & Analyse" um CFTC-Daten zu laden und analysieren.</p>
-          <button onClick={fetchCOTData} className="text-[10px] uppercase text-text-primary flex items-center gap-1.5 px-3 py-1.5 rounded bg-accent-primary/20 hover:bg-accent-primary/30">
+          <button onClick={() => fetchCOTData(true)} className="text-[10px] uppercase text-text-primary flex items-center gap-1.5 px-3 py-1.5 rounded bg-accent-primary/20 hover:bg-accent-primary/30">
             <RefreshCw size={10} /> Daten laden
           </button>
         </div>
@@ -634,7 +660,7 @@ export function COTData() {
 
                       {/* Row 2: Key Metrics (2 rows) */}
                       <div className="grid grid-cols-4 gap-1.5 mb-2">
-                        <div className="bg-white/[0.02] rounded px-2 py-1">
+                        <div className="bg-white/[0.02] rounded px-2 py-1" title="Richtung & Beschleunigung der Commercial-Position (4W vs 8W). 'Beschleunigt' = Trend nimmt Fahrt auf.">
                           <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Momentum</div>
                           <div className="flex items-center gap-0.5">
                             {getMomentumIcon(analysis.momentumSignal)}
@@ -643,7 +669,7 @@ export function COTData() {
                             </span>
                           </div>
                         </div>
-                        <div className="bg-white/[0.02] rounded px-2 py-1">
+                        <div className="bg-white/[0.02] rounded px-2 py-1" title="Trend (klarer Auf-/Abbau über 12W) vs Range (seitwärts). Trending macht Signale verlässlicher.">
                           <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Regime</div>
                           <div className="text-[9px] text-text-secondary font-medium truncate">
                             {analysis.regime === 'trending_bullish' ? '↑ Trend' :
@@ -651,7 +677,7 @@ export function COTData() {
                              analysis.regime === 'transitioning' ? '⟳ Wechsel' : '↔ Range'}
                           </div>
                         </div>
-                        <div className="bg-white/[0.02] rounded px-2 py-1">
+                        <div className="bg-white/[0.02] rounded px-2 py-1" title="Statistischer Monats-Bias aus historischen Saisonalitäts-Daten. Nur Zusatzfilter.">
                           <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Saison</div>
                           <div className={clsx('text-[9px] font-medium',
                             analysis.seasonalBias === 'bullish' ? 'text-pnl-positive' :
@@ -661,7 +687,7 @@ export function COTData() {
                              analysis.seasonalBias === 'bearish' ? '↓ Bearish' : '— Neutral'}
                           </div>
                         </div>
-                        <div className="bg-white/[0.02] rounded px-2 py-1">
+                        <div className="bg-white/[0.02] rounded px-2 py-1" title="KNN-Mustervergleich mit den 5 ähnlichsten historischen Wochen. Misst Positionierungs-Tendenz, nicht Preis.">
                           <div className="text-[7px] uppercase tracking-[0.1em] text-text-muted">KNN</div>
                           <div className={clsx('text-[9px] font-medium',
                             analysis.mlDirection === 'bullish' ? 'text-pnl-positive' :
@@ -675,7 +701,7 @@ export function COTData() {
                       </div>
 
                       {/* Conviction Bar */}
-                      <div className="mb-2">
+                      <div className="mb-2" title="Final Conviction (−100…+100): Smart Score + Spec Crowding + Saison + Zins-Carry + Regime + Win Rate + KNN kombiniert.">
                         <div className="flex items-center justify-between mb-0.5">
                           <span className="text-[7px] uppercase tracking-[0.1em] text-text-muted">Conviction</span>
                           <span className="font-mono tabular-nums text-[9px]" style={{ color: getScoreColor(analysis.finalConviction) }}>
@@ -761,27 +787,75 @@ export function COTData() {
                   </button>
                 </div>
 
+                {/* Row 0: ROHE CFTC-ZAHLEN (echte Commercials/Non-Commercials/OI) */}
+                {selectedRaw && (
+                  <div className="px-4 py-3 border-b border-white/[0.04] bg-white/[0.015]">
+                    <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-2">
+                      Rohe CFTC-Positionen · Stand {selectedRaw.date}
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* Commercials */}
+                      <div className="bg-white/[0.02] rounded-lg px-3 py-2">
+                        <div className="text-[8px] uppercase tracking-[0.1em] text-pnl-positive font-semibold mb-1.5">Commercials (Smart Money)</div>
+                        <div className="space-y-0.5 text-[10px] font-mono tabular-nums">
+                          <div className="flex justify-between"><span className="text-text-muted">Long</span><span className="text-text-secondary">{selectedRaw.commercialsLong.toLocaleString('de-DE')}</span></div>
+                          <div className="flex justify-between"><span className="text-text-muted">Short</span><span className="text-text-secondary">{selectedRaw.commercialsShort.toLocaleString('de-DE')}</span></div>
+                          <div className="flex justify-between border-t border-white/[0.06] pt-0.5 mt-0.5">
+                            <span className="text-text-muted font-semibold">Net</span>
+                            <span className={clsx('font-bold', selectedRaw.commercialsNet >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
+                              {selectedRaw.commercialsNet >= 0 ? '+' : ''}{selectedRaw.commercialsNet.toLocaleString('de-DE')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Non-Commercials */}
+                      <div className="bg-white/[0.02] rounded-lg px-3 py-2">
+                        <div className="text-[8px] uppercase tracking-[0.1em] text-pnl-negative font-semibold mb-1.5">Non-Comm. (Spekulanten)</div>
+                        <div className="space-y-0.5 text-[10px] font-mono tabular-nums">
+                          <div className="flex justify-between"><span className="text-text-muted">Long</span><span className="text-text-secondary">{selectedRaw.nonCommercialsLong.toLocaleString('de-DE')}</span></div>
+                          <div className="flex justify-between"><span className="text-text-muted">Short</span><span className="text-text-secondary">{selectedRaw.nonCommercialsShort.toLocaleString('de-DE')}</span></div>
+                          <div className="flex justify-between border-t border-white/[0.06] pt-0.5 mt-0.5">
+                            <span className="text-text-muted font-semibold">Net</span>
+                            <span className={clsx('font-bold', selectedRaw.nonCommercialsNet >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
+                              {selectedRaw.nonCommercialsNet >= 0 ? '+' : ''}{selectedRaw.nonCommercialsNet.toLocaleString('de-DE')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Open Interest + Percentile */}
+                      <div className="bg-white/[0.02] rounded-lg px-3 py-2">
+                        <div className="text-[8px] uppercase tracking-[0.1em] text-text-secondary font-semibold mb-1.5">Open Interest & Perzentil</div>
+                        <div className="space-y-0.5 text-[10px] font-mono tabular-nums">
+                          <div className="flex justify-between"><span className="text-text-muted">OI</span><span className="text-text-secondary">{selectedRaw.openInterest.toLocaleString('de-DE')}</span></div>
+                          <div className="flex justify-between"><span className="text-text-muted">Comm. Perzentil</span><span className="text-text-secondary">{selectedAnalysis.currentPercentile}%</span></div>
+                          <div className="flex justify-between border-t border-white/[0.06] pt-0.5 mt-0.5"><span className="text-text-muted">Spec Perzentil</span><span className="text-text-secondary">{selectedAnalysis.specPercentile}%</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Analysis Detail Grid — Row 1: Momentum + OI */}
                 <div className="grid grid-cols-4 gap-3 px-4 py-3 border-b border-white/[0.04]">
-                  <div>
+                  <div title="Veränderung der Commercial-Netto-Position über die letzte 1 Woche. Positiv = Smart Money kauft.">
                     <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Momentum 1W</div>
                     <div className={clsx('font-mono tabular-nums text-xs font-semibold', selectedAnalysis.momentum1w >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
                       {selectedAnalysis.momentum1w >= 0 ? '+' : ''}{selectedAnalysis.momentum1w.toLocaleString('de-DE')}
                     </div>
                   </div>
-                  <div>
+                  <div title="Veränderung der Commercial-Netto-Position über 4 Wochen. Zeigt den mittelfristigen Trend des Smart Money.">
                     <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Momentum 4W</div>
                     <div className={clsx('font-mono tabular-nums text-xs font-semibold', selectedAnalysis.momentum4w >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
                       {selectedAnalysis.momentum4w >= 0 ? '+' : ''}{selectedAnalysis.momentum4w.toLocaleString('de-DE')}
                     </div>
                   </div>
-                  <div>
+                  <div title="Veränderung über 8 Wochen. Ist 4W stärker als 8W, beschleunigt der Trend (acceleration).">
                     <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Momentum 8W</div>
                     <div className={clsx('font-mono tabular-nums text-xs font-semibold', selectedAnalysis.momentum8w >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
                       {selectedAnalysis.momentum8w >= 0 ? '+' : ''}{selectedAnalysis.momentum8w.toLocaleString('de-DE')}
                     </div>
                   </div>
-                  <div>
+                  <div title="Open Interest = Summe aller offenen Kontrakte. Steigend bei steigendem Net = Überzeugung. Fallend = Trend verliert Kraft.">
                     <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">OI Trend</div>
                     <div className="text-xs text-text-secondary font-medium">
                       {selectedAnalysis.oiTrend === 'rising' ? '↑ Steigend' :
@@ -792,7 +866,7 @@ export function COTData() {
 
                 {/* Row 2: v2 Analytics */}
                 <div className="grid grid-cols-4 gap-3 px-4 py-3 border-b border-white/[0.04]">
-                  <div>
+                  <div title="Wie überfüllt die Spekulanten (Hedge Funds) positioniert sind, gemessen am Perzentil ihrer Netto-Position über 52 Wochen. ≥85% = überfüllt long (Contrarian-Warnung: oft kurz vor Umkehr).">
                     <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Spec Crowding</div>
                     <div className={clsx('text-xs font-medium',
                       selectedAnalysis.specCrowdingExtreme ? 'text-pnl-negative' : 'text-text-secondary'
@@ -802,7 +876,7 @@ export function COTData() {
                         : `P${selectedAnalysis.specPercentile}%`}
                     </div>
                   </div>
-                  <div>
+                  <div title="Statistischer Monats-Bias dieser Währung aus historischen Saisonalitäts-Studien. Z.B. USD oft stark im Jahresanfang. Nur ein Zusatzfilter, kein Hauptsignal.">
                     <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Saisonalität</div>
                     <div className={clsx('text-xs font-medium',
                       selectedAnalysis.seasonalBias === 'bullish' ? 'text-pnl-positive' :
@@ -812,7 +886,7 @@ export function COTData() {
                        selectedAnalysis.seasonalBias === 'bearish' ? `↓ Bearish (${selectedAnalysis.seasonalStrength}%)` : '— Neutral'}
                     </div>
                   </div>
-                  <div>
+                  <div title="Lineare Regression über die letzten 12 Wochen Netto-Position. Trending = klarer Auf-/Abbau (Signal zuverlässiger). Ranging = seitwärts (Conviction wird gedämpft).">
                     <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Regime</div>
                     <div className="text-xs text-text-secondary font-medium">
                       {selectedAnalysis.regime === 'trending_bullish' ? `↑ Bullish Trend (${selectedAnalysis.regimeConfidence}%)` :
@@ -820,22 +894,27 @@ export function COTData() {
                        selectedAnalysis.regime === 'transitioning' ? '⟳ Übergang' : '↔ Ranging'}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Zinsen</div>
-                    <div className={clsx('text-xs font-medium',
+                  <div title="Zins-Carry: Differenz zwischen dem Leitzins dieser Währung und dem Durchschnitt der anderen G10-Währungen. Positiv = höherer Zins = attraktiver für Käufer (Rückenwind für Long). ↑Hawkish/↓Dovish = Richtung der letzten Zinsentscheidung. ✓ = Carry stützt die COT-Richtung.">
+                    <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Zins-Carry</div>
+                    <div className={clsx('text-xs font-medium flex items-center gap-1.5',
                       selectedAnalysis.rateTrend === 'hawkish' ? 'text-pnl-positive' :
                       selectedAnalysis.rateTrend === 'dovish' ? 'text-pnl-negative' : 'text-text-muted'
                     )}>
-                      {selectedAnalysis.rateTrend === 'hawkish' ? '↑ Hawkish' :
-                       selectedAnalysis.rateTrend === 'dovish' ? '↓ Dovish' : '— Neutral'}
-                      {selectedAnalysis.rateCotConfluence && ' ✓'}
+                      <span className="font-mono tabular-nums text-text-secondary">
+                        {selectedAnalysis.rateDifferential >= 0 ? '+' : ''}{selectedAnalysis.rateDifferential.toFixed(2)}%
+                      </span>
+                      <span>
+                        {selectedAnalysis.rateTrend === 'hawkish' ? '↑' :
+                         selectedAnalysis.rateTrend === 'dovish' ? '↓' : '—'}
+                        {selectedAnalysis.rateCotConfluence && ' ✓'}
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Row 3: Historical + ML */}
                 <div className="grid grid-cols-3 gap-3 px-4 py-3 border-b border-white/[0.04]">
-                  <div>
+                  <div title="WICHTIG: misst die COT-POSITION, nicht den Preis. Sucht in der eigenen 5-Jahres-Historie ähnliche Setups (gleiches Perzentil ±15 + gleiches Momentum-Vorzeichen) und zählt, wie oft die Commercials 4 Wochen später WEITER in dieselbe Richtung liefen. Kein Kursprognose-Wert.">
                     <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Historische Win Rate</div>
                     <div className="text-xs text-text-secondary font-medium">
                       {selectedAnalysis.historicalWinRate !== null && selectedAnalysis.historicalSampleSize >= 3
@@ -843,7 +922,7 @@ export function COTData() {
                         : <span className="text-text-muted">Nicht genug Daten</span>}
                     </div>
                   </div>
-                  <div>
+                  <div title="K-Nearest-Neighbors: sucht die 5 historisch ähnlichsten Wochen (über Perzentil + Momentum) und schaut, wie sich die Commercial-Position danach entwickelte. Mehrheits-Voting → Richtung. Konfidenz = Anteil der übereinstimmenden Nachbarn. Misst Positionierung, nicht Preis.">
                     <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">KNN Prognose</div>
                     <div className={clsx('text-xs font-medium',
                       selectedAnalysis.mlDirection === 'bullish' ? 'text-pnl-positive' :
@@ -854,7 +933,7 @@ export function COTData() {
                         : 'Keine klare Richtung'}
                     </div>
                   </div>
-                  <div>
+                  <div title="Gesamtwertung (−100…+100): startet beim Smart Score und wird durch Spec Crowding, Saisonalität, Zins-Carry, Regime, historische Win Rate und KNN angepasst. Das ist die finale Richtungs-Einschätzung der Engine für diese Währung.">
                     <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted mb-1">Final Conviction</div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono tabular-nums text-sm font-bold" style={{ color: getScoreColor(selectedAnalysis.finalConviction) }}>
@@ -1066,7 +1145,7 @@ export function COTData() {
 
                       {/* Reasons */}
                       <div className="space-y-1 mt-2 pt-2 border-t border-white/[0.04]">
-                        {signal.reasons.slice(0, 4).map((reason, j) => (
+                        {signal.reasons.slice(0, 6).map((reason, j) => (
                           <div key={j} className="flex items-start gap-1.5 text-[9px] text-text-muted leading-relaxed">
                             <span className={clsx(
                               'mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0',
@@ -1365,6 +1444,26 @@ export function COTData() {
                   15 Features pro Währung. Backtest zeigt historische Win Rate, Avg Win/Loss, Profit Factor.
                   Feature Importance zeigt welche Faktoren bei welcher Währung am meisten zählen.
                 </p>
+              </div>
+
+              {/* Zins-Carry */}
+              <div>
+                <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Zins-Carry</h4>
+                <p className="text-[10px] text-text-muted leading-relaxed">
+                  Differenz zwischen dem Leitzins einer Währung und dem Durchschnitt der anderen G10-Währungen.
+                  Positiver Carry (höherer Zins) zieht Käufer an → Rückenwind für Long. Fließt direkt in die <strong className="text-text-secondary">Final Conviction</strong> ein:
+                  Carry in Score-Richtung verstärkt, Carry gegen den Score schwächt ab. Zinssätze werden bei jedem Refresh mitgeladen.
+                </p>
+              </div>
+
+              {/* Was es NICHT ist — Ehrlichkeit */}
+              <div className="px-3 py-2 bg-pnl-negative/5 rounded-lg border border-pnl-negative/15">
+                <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-pnl-negative mb-1.5">Was Smart COT NICHT ist</h4>
+                <div className="space-y-1 text-[10px] text-text-muted leading-relaxed">
+                  <p>• <strong className="text-text-secondary">Kein Chart-Setup-Finder.</strong> Es liefert einen Wochen-Bias (welche Währung stark/schwach), nicht den konkreten Entry. Zone & Timing machst du im Chart.</p>
+                  <p>• <strong className="text-text-secondary">Win Rate & KNN messen die COT-Position, nicht den Preis.</strong> „70% Win Rate" heißt: in 70% ähnlicher Fälle bauten die Commercials ihre Position weiter aus — keine Kurs-Trefferquote.</p>
+                  <p>• <strong className="text-text-secondary">Wöchentlich.</strong> CFTC liefert Freitag 21:30 CET. Gleiche Zahlen Mo–Do sind korrekt. Zwischen-Dynamik kommt über Zinsen.</p>
+                </div>
               </div>
 
               {/* Disclaimer */}
