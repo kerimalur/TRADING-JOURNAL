@@ -281,7 +281,7 @@ export const webOutlookApi = {
 // ============================================================
 
 export const webExternalApi = {
-  // COT Data from CFTC
+  // COT Data from CFTC — 260 Wochen (5 Jahre), volle Commercials + Non-Commercials + OI
   async fetchCOTData(): Promise<any> {
     // Reihenfolge: Dollar Index, Euro FX, CHF, GBP, JPY, CAD, AUD, NZD
     // 098662 = aktueller ICE USD INDEX Kontrakt (aktiv)
@@ -293,59 +293,74 @@ export const webExternalApi = {
     try {
       const results: any[] = [];
       const historyMap: Record<string, any[]> = {};
-      
+
       for (const [currency, code] of Object.entries(CFTC_CODES)) {
         const response = await fetch(
-          `https://publicreporting.cftc.gov/resource/6dca-aqww.json?cftc_contract_market_code=${code}&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=52`
+          `https://publicreporting.cftc.gov/resource/6dca-aqww.json?cftc_contract_market_code=${code}&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=260`
         );
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data && data.length > 0) {
             const latest = data[0];
             const previous = data[1];
-            
+
             // Commercial positions
             const commercialsLong = parseInt(latest.comm_positions_long_all || 0);
             const commercialsShort = parseInt(latest.comm_positions_short_all || 0);
             const commercialsNet = commercialsLong - commercialsShort;
-            
+
+            // Non-Commercial positions (Spekulanten)
+            const nonCommercialsLong = parseInt(latest.noncomm_positions_long_all || 0);
+            const nonCommercialsShort = parseInt(latest.noncomm_positions_short_all || 0);
+            const nonCommercialsNet = nonCommercialsLong - nonCommercialsShort;
+
             // Previous week for change calculation
             const prevCommercialsNet = previous
               ? parseInt(previous.comm_positions_long_all || 0) - parseInt(previous.comm_positions_short_all || 0)
               : 0;
             const weeklyChange = commercialsNet - prevCommercialsNet;
-            
-            // Build history for charts
+
+            // Build full history for charts + ML (with nonComm + OI)
             const historicalData = data.map((row: any) => ({
-              date: row.report_date_as_yyyy_mm_dd,
+              date: (row.report_date_as_yyyy_mm_dd || '').substring(0, 10),
               commercialsLong: parseInt(row.comm_positions_long_all) || 0,
               commercialsShort: parseInt(row.comm_positions_short_all) || 0,
+              nonCommercialsLong: parseInt(row.noncomm_positions_long_all) || 0,
+              nonCommercialsShort: parseInt(row.noncomm_positions_short_all) || 0,
+              openInterest: parseInt(row.open_interest_all) || 0,
             })).reverse();
-            
+
             historyMap[currency] = historicalData;
-            
-            // Calculate percentile rank
-            const commNetHistory = data.map((row: any) => 
+
+            // Calculate percentile rank (52W window for current signal)
+            const window = data.slice(0, 52);
+            const commNetHistory = window.map((row: any) =>
               parseInt(row.comm_positions_long_all || 0) - parseInt(row.comm_positions_short_all || 0)
             );
-            const sortedNets = [...commNetHistory].sort((a, b) => a - b);
-            const rank = sortedNets.findIndex(n => n >= commercialsNet);
-            const percentileRank = Math.round((rank / Math.max(sortedNets.length, 1)) * 100);
-            
+            const minNet = Math.min(...commNetHistory);
+            const maxNet = Math.max(...commNetHistory);
+            const range = maxNet - minNet;
+            const percentileRank = range > 0
+              ? Math.round(((commercialsNet - minNet) / range) * 100)
+              : 50;
+
             // Determine signal based on percentile
             let signal = 'neutral';
             if (percentileRank >= 80) signal = 'strong_long';
             else if (percentileRank >= 60) signal = 'long';
             else if (percentileRank <= 20) signal = 'strong_short';
             else if (percentileRank <= 40) signal = 'short';
-            
+
             results.push({
               currency,
-              date: latest.report_date_as_yyyy_mm_dd?.substring(0, 10),
+              date: (latest.report_date_as_yyyy_mm_dd || '').substring(0, 10),
               commercialsLong,
               commercialsShort,
               commercialsNet,
+              nonCommercialsLong,
+              nonCommercialsShort,
+              nonCommercialsNet,
               weeklyChange,
               percentileRank,
               signal,
@@ -354,7 +369,7 @@ export const webExternalApi = {
           }
         }
       }
-      
+
       // Cache the results
       saveToStorage(STORAGE_KEYS.COT, { data: results, history: historyMap, timestamp: Date.now() });
       return { success: true, data: results, history: historyMap };
@@ -362,6 +377,61 @@ export const webExternalApi = {
       // Return cached data if available
       const cached = getFromStorage<any>(STORAGE_KEYS.COT, null);
       if (cached) return { success: true, data: cached.data, history: cached.history, cached: true };
+      return { success: false, error: String(error) };
+    }
+  },
+
+  // Historische Forex-Preise von frankfurter.app (ECB, CORS-frei, kein API-Key)
+  async fetchForexPrices(startDate?: string): Promise<any> {
+    try {
+      const start = startDate || '2020-01-01';
+      const end = new Date().toISOString().split('T')[0];
+      const url = `https://api.frankfurter.app/${start}..${end}?from=EUR&to=USD,GBP,JPY,CAD,AUD,NZD,CHF`;
+
+      const response = await fetch(url);
+      if (!response.ok) return { success: false, error: `HTTP ${response.status}` };
+
+      const json = await response.json();
+      const rates = json.rates as Record<string, Record<string, number>>;
+      if (!rates || Object.keys(rates).length === 0) {
+        return { success: false, error: 'Keine Preisdaten' };
+      }
+
+      const dates = Object.keys(rates).sort();
+      const daily: Record<string, Array<{ date: string; price: number }>> = {
+        EUR: [], GBP: [], JPY: [], CAD: [], AUD: [], NZD: [], CHF: [], DXY: [],
+      };
+
+      for (const date of dates) {
+        const r = rates[date];
+        if (!r || !r.USD) continue;
+        const eurUsd = r.USD;
+        daily.EUR.push({ date, price: eurUsd });
+        daily.GBP.push({ date, price: r.GBP ? eurUsd / r.GBP : 0 });
+        daily.JPY.push({ date, price: r.JPY ? eurUsd / r.JPY : 0 });
+        daily.CAD.push({ date, price: r.CAD ? eurUsd / r.CAD : 0 });
+        daily.AUD.push({ date, price: r.AUD ? eurUsd / r.AUD : 0 });
+        daily.NZD.push({ date, price: r.NZD ? eurUsd / r.NZD : 0 });
+        daily.CHF.push({ date, price: r.CHF ? eurUsd / r.CHF : 0 });
+        daily.DXY.push({ date, price: 1 / eurUsd }); // höher = USD stärker
+      }
+
+      // Auf Freitag (COT-Tag) heruntersamplen
+      const weekly: Record<string, Array<{ date: string; price: number }>> = {};
+      for (const [ccy, arr] of Object.entries(daily)) {
+        const w: Array<{ date: string; price: number }> = [];
+        let lastFriday: { date: string; price: number } | null = null;
+        for (const d of arr) {
+          const dow = new Date(d.date).getDay();
+          if (dow === 5) lastFriday = d;
+          else if (dow === 1 && lastFriday) { w.push(lastFriday); lastFriday = null; }
+        }
+        if (arr.length > 0) w.push(arr[arr.length - 1]);
+        weekly[ccy] = w;
+      }
+
+      return { success: true, data: weekly };
+    } catch (error) {
       return { success: false, error: String(error) };
     }
   },
@@ -536,7 +606,7 @@ export const webAPI = {
   
   // External Data
   fetchCOTData: webExternalApi.fetchCOTData,
-  fetchForexPrices: async (_startDate?: string) => ({ success: false as const, error: 'Only available in desktop app' }),
+  fetchForexPrices: webExternalApi.fetchForexPrices,
   fetchEconomicCalendar: webExternalApi.fetchEconomicCalendar,
   fetchInterestRates: webExternalApi.fetchInterestRates,
   

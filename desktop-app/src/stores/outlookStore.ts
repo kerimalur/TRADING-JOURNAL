@@ -275,6 +275,10 @@ export const useOutlookStore = create<OutlookState>((set, get) => ({
       createdAt: outlookData.createdAt || now,
       updatedAt: now,
       executedTradeId: outlookData.executedTradeId,
+      isStarred: outlookData.isStarred ?? false,
+      setupId: outlookData.setupId,
+      strategyChecklist: outlookData.strategyChecklist,
+      fundamentalOutlook: outlookData.fundamentalOutlook,
     };
 
     // Auto-populate COT bias if not provided
@@ -300,9 +304,31 @@ export const useOutlookStore = create<OutlookState>((set, get) => ({
     });
 
     // Persist to Supabase in background (skip in offline mode)
+    // Lokaler Save ist bereits erfolgt — Supabase-Fehler ist nicht kritisch
     if (!isOfflineMode()) {
-      outlookService.saveOutlook(outlook as any).catch(err =>
-        console.error('Supabase outlook save failed:', err)
+      const payload: Record<string, any> = {
+        id: outlook.id,
+        symbol: outlook.symbol,
+        direction: outlook.direction,
+        thesis: outlook.thesis,
+        confidence: outlook.confidence,
+        status: outlook.status,
+        cotBias: outlook.cotBias,
+        tags: outlook.tags ?? [],
+        targetEntry: outlook.targetEntry,
+        targetSl: outlook.targetSL,
+        targetTp: outlook.targetTP,
+        interestingZone: outlook.interestingZone,
+        imageData: outlook.imageData,
+        expiresAt: outlook.expiresAt,
+        executedTradeId: outlook.executedTradeId,
+        isStarred: outlook.isStarred ?? false,
+        setupId: outlook.setupId,
+        strategyChecklist: outlook.strategyChecklist ?? [],
+        fundamentalOutlook: outlook.fundamentalOutlook ?? '',
+      };
+      outlookService.saveOutlook(payload as any).catch(err =>
+        console.warn('Outlook Supabase-Sync übersprungen (lokal gespeichert):', err?.message || err)
       );
     }
 
