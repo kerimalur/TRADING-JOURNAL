@@ -42,7 +42,8 @@ import { clsx } from 'clsx';
 import { useOutlookStore, getUpcomingHighImpactNews, getCurrenciesFromSymbol, type UpcomingNewsEvent } from '@/stores/outlookStore';
 import { useUIStore } from '@/stores/uiStore';
 import type { Outlook, OutlookStatus, ConfidenceLevel, OutlookTag } from '@/types';
-import { OUTLOOK_STATUS_CONFIG, getConfluences, getAllPairs, addCustomPair } from '@/types';
+import { OUTLOOK_STATUS_CONFIG, getConfluences, getAllPairs, addCustomPair, PAIR_GROUPS } from '@/types';
+import { OutlookWizard } from '@/components/outlook/OutlookWizard';
 import { PageTransition } from '@/components/ui/PageTransition';
 import { MetricDisplay } from '@/components/ui/MetricDisplay';
 import { motion } from 'framer-motion';
@@ -595,6 +596,7 @@ interface OutlookCardProps {
 }
 
 function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, onStart, onClose }: OutlookCardProps) {
+  const { toggleStar } = useOutlookStore();
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const statusConfig = OUTLOOK_STATUS_CONFIG[outlook.status];
 
@@ -627,6 +629,12 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
           <h3 className="text-sm font-bold font-mono tracking-wide text-text-primary">
             {outlook.symbol}
           </h3>
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleStar(outlook.id); }}
+            className="p-0.5 rounded hover:bg-white/[0.06]"
+          >
+            <Star size={12} className={outlook.isStarred ? 'text-accent-gold fill-accent-gold' : 'text-text-muted/30'} />
+          </button>
           <span className={clsx(
             'text-[10px] uppercase tracking-[0.1em] font-bold',
             outlook.direction === 'long' ? 'text-pnl-positive' : 'text-pnl-negative'
@@ -1157,6 +1165,9 @@ export function Outlook() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [closeDialog, setCloseDialog] = useState<string | null>(null);
   const [closeAccounts, setCloseAccounts] = useState<{ ek: boolean; funded: boolean }>({ ek: false, funded: false });
+  const [viewMode, setViewMode] = useState<'watchlist' | 'list'>('watchlist');
+  const [wizardSymbol, setWizardSymbol] = useState<string | null>(null);
+  const [wizardOutlook, setWizardOutlook] = useState<any>(null);
 
   useEffect(() => {
     loadOutlooks();
@@ -1311,6 +1322,26 @@ export function Outlook() {
           >
             <Upload size={14} />
           </button>
+          {/* View Toggle */}
+          <div className="flex items-center bg-white/[0.03] rounded-lg p-0.5 border border-white/[0.06]">
+            <button
+              onClick={() => setViewMode('watchlist')}
+              className={clsx('px-2.5 py-1 rounded text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors',
+                viewMode === 'watchlist' ? 'bg-accent-primary/20 text-accent-primary' : 'text-text-muted'
+              )}
+            >
+              Watchlist
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={clsx('px-2.5 py-1 rounded text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors',
+                viewMode === 'list' ? 'bg-accent-primary/20 text-accent-primary' : 'text-text-muted'
+              )}
+            >
+              Liste
+            </button>
+          </div>
+
           <button
             onClick={() => openForm()}
             className="btn-primary flex items-center gap-1.5 text-xs px-3 py-1.5"
@@ -1330,6 +1361,67 @@ export function Outlook() {
         <MetricDisplay label="Ausgefuehrt" value={stats.executed} size="sm" />
       </div>
 
+      {/* ══ WATCHLIST VIEW ══ */}
+      {viewMode === 'watchlist' && (
+        <div className="space-y-4 mb-5">
+          {Object.entries(PAIR_GROUPS).map(([group, pairs]) => (
+            <div key={group}>
+              <div className="text-[10px] uppercase tracking-[0.15em] font-semibold text-text-muted mb-2 px-1">
+                {group} Pairs
+              </div>
+              <div className="grid grid-cols-4 lg:grid-cols-7 gap-2">
+                {pairs.map(pair => {
+                  const outlook = outlooks.find(o => o.symbol === pair && o.status !== 'executed' && o.status !== 'cancelled');
+                  const statusColor = outlook
+                    ? outlook.status === 'active' ? 'bg-pnl-positive' : outlook.status === 'waiting' ? 'bg-accent-gold' : 'bg-accent-blue'
+                    : 'bg-white/[0.06]';
+
+                  return (
+                    <button
+                      key={pair}
+                      onClick={() => {
+                        if (outlook) {
+                          setWizardOutlook(outlook);
+                          setWizardSymbol(pair);
+                        } else {
+                          setWizardOutlook(null);
+                          setWizardSymbol(pair);
+                        }
+                      }}
+                      className={clsx(
+                        'relative px-3 py-2.5 rounded-lg border text-left transition-all hover:scale-[1.02]',
+                        outlook
+                          ? 'border-white/[0.1] bg-white/[0.04]'
+                          : 'border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03]'
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-text-primary">{pair}</span>
+                        <div className={clsx('w-2 h-2 rounded-full', statusColor)} />
+                      </div>
+                      {outlook && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className={clsx('text-[9px] font-bold',
+                            outlook.direction === 'long' ? 'text-pnl-positive' : 'text-pnl-negative'
+                          )}>
+                            {outlook.direction === 'long' ? '↑' : '↓'}
+                          </span>
+                          {outlook.isStarred && <Star size={8} className="text-accent-gold fill-accent-gold" />}
+                          <span className="text-[8px] text-text-muted truncate">{outlook.thesis?.slice(0, 20)}</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ══ LIST VIEW ══ */}
+      {viewMode === 'list' && (
+      <>
       {/* Filter Bar - pill style */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
         {/* Status Filter */}
@@ -1457,6 +1549,39 @@ export function Outlook() {
         </motion.div>
       )}
 
+      </>
+      )}
+
+      {/* Wizard Modal */}
+      {wizardSymbol && (
+        <OutlookWizard
+          symbol={wizardSymbol}
+          existingOutlook={wizardOutlook}
+          onSave={(data) => {
+            saveOutlook({
+              id: wizardOutlook?.id,
+              symbol: data.symbol,
+              direction: data.direction,
+              thesis: data.thesis,
+              confidence: data.confidence,
+              status: wizardOutlook?.status || 'observation',
+              tags: data.confluences,
+              targetEntry: data.targetEntry,
+              targetSL: data.targetSL,
+              targetTP: data.targetTP,
+              isStarred: data.isStarred,
+              setupId: data.setupId,
+              strategyChecklist: data.strategyChecklist,
+              fundamentalOutlook: data.fundamentalOutlook,
+            });
+            setWizardSymbol(null);
+            setWizardOutlook(null);
+            showToast(wizardOutlook ? 'Outlook aktualisiert' : 'Outlook erstellt', 'success');
+          }}
+          onClose={() => { setWizardSymbol(null); setWizardOutlook(null); }}
+        />
+      )}
+
       {/* Form Modal */}
       {isFormOpen && (
         <OutlookForm
@@ -1510,38 +1635,32 @@ export function Outlook() {
         />
       )}
 
-      {/* ── Close-Trade-Dialog ── */}
+      {/* ── Close-Trade-Dialog (Enhanced: Journal oder nicht?) ── */}
       {closeDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.15 }}
-            className="bg-[#0d0f14] border border-white/[0.06] rounded-lg shadow-2xl p-5 max-w-sm w-full"
+            className="bg-[#0d0f14] border border-white/[0.06] rounded-xl shadow-2xl p-5 max-w-md w-full"
           >
-            {/* Header */}
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-full bg-accent-gold/15 flex items-center justify-center">
                 <CheckCircle2 className="text-accent-gold" size={16} />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-text-primary">Trade abschließen</h3>
-                <p className="text-[11px] text-text-muted">In welche(s) Journal soll der Trade eingetragen werden?</p>
+                <p className="text-[11px] text-text-muted">Soll der Trade im Journal eingetragen werden?</p>
               </div>
             </div>
 
             {/* Account-Auswahl */}
-            <div className="space-y-2 mb-5">
-              {(
-                [
-                  { key: 'ek'     as const, label: 'Eigenkapital-Journal' },
-                  { key: 'funded' as const, label: 'Funded-Journal'       },
-                ] as const
-              ).map(({ key, label }) => (
-                <label
-                  key={key}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-white/[0.06] hover:border-accent-primary/30 cursor-pointer transition-colors"
-                >
+            <div className="space-y-2 mb-4">
+              {([
+                { key: 'ek' as const, label: 'Eigenkapital-Journal' },
+                { key: 'funded' as const, label: 'Funded-Journal' },
+              ]).map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-white/[0.06] hover:border-accent-primary/30 cursor-pointer transition-colors">
                   <input
                     type="checkbox"
                     checked={closeAccounts[key]}
@@ -1553,21 +1672,34 @@ export function Outlook() {
               ))}
             </div>
 
-            {/* Aktionen */}
-            <div className="flex justify-end gap-2">
+            {/* Actions */}
+            <div className="flex justify-between gap-2">
               <button
-                onClick={() => { setCloseDialog(null); setCloseAccounts({ ek: false, funded: false }); }}
+                onClick={() => {
+                  setStatus(closeDialog, 'executed');
+                  setCloseDialog(null);
+                  setCloseAccounts({ ek: false, funded: false });
+                  showToast('Outlook abgeschlossen (ohne Journal)', 'success');
+                }}
                 className="px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
               >
-                Abbrechen
+                Ohne Journal schließen
               </button>
-              <button
-                onClick={handleConfirmClose}
-                disabled={!closeAccounts.ek && !closeAccounts.funded}
-                className="px-3 py-1.5 text-xs font-medium bg-accent-gold hover:bg-accent-gold/90 disabled:opacity-40 text-black rounded transition-colors"
-              >
-                Abschließen & Journalen
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setCloseDialog(null); setCloseAccounts({ ek: false, funded: false }); }}
+                  className="px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={handleConfirmClose}
+                  disabled={!closeAccounts.ek && !closeAccounts.funded}
+                  className="px-3 py-1.5 text-xs font-medium bg-accent-gold hover:bg-accent-gold/90 disabled:opacity-40 text-black rounded transition-colors"
+                >
+                  Abschließen & Journalen
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>

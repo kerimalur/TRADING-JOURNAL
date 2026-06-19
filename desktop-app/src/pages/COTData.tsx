@@ -18,7 +18,7 @@ import {
 import {
   Database, RefreshCw, TrendingUp, TrendingDown, AlertCircle, CheckCircle2,
   ExternalLink, ArrowRightLeft, Edit3, X, Save, Zap, Activity, AlertTriangle,
-  Target, ArrowUpRight, ArrowDownRight, Minus, Brain
+  Target, ArrowUpRight, ArrowDownRight, Minus, Brain, Lightbulb
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -63,6 +63,7 @@ export function COTData() {
   const [activeTab, setActiveTab] = useState<'overview' | 'pairs' | 'ml'>('overview');
   const [mlPredictions, setMlPredictions] = useState<Record<string, MLPrediction>>({});
   const [mlLoading, setMlLoading] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -211,7 +212,7 @@ export function COTData() {
     setMlLoading(true);
     try {
       // Prüfe localStorage-Cache
-      let priceData: Record<string, PricePoint[]> = {};
+      let priceData: Record<string, Array<{ date: string; price: number }>> = {};
       const cachedPrices = localStorage.getItem('smartCotPrices');
       const cachedPricesDate = localStorage.getItem('smartCotPricesDate');
       const daysSincePrices = cachedPricesDate
@@ -335,7 +336,7 @@ export function COTData() {
     if (score >= 15) return '#86efac';
     if (score <= -40) return '#ef4444';
     if (score <= -15) return '#fca5a5';
-    return '#9ca3af';
+    return '#d4d4d8';
   };
 
   const getScoreLabel = (score: number) => {
@@ -416,6 +417,14 @@ export function COTData() {
           >
             CFTC <ExternalLink size={10} />
           </a>
+
+          <button
+            onClick={() => setShowInfoModal(true)}
+            className="text-[10px] uppercase tracking-[0.1em] text-accent-gold hover:text-accent-gold/80 flex items-center gap-1 px-2 py-1 rounded bg-accent-gold/10 hover:bg-accent-gold/15 transition-colors"
+            title="Wie funktioniert Smart COT?"
+          >
+            <Lightbulb size={10} />
+          </button>
 
           <button
             onClick={openManualInput}
@@ -554,9 +563,11 @@ export function COTData() {
                       contentStyle={{ backgroundColor: 'rgba(15,15,15,0.95)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', fontSize: '11px' }}
                       formatter={(value: number) => [`Score: ${value}`, 'Smart Score']}
                     />
-                    <Bar dataKey="score" radius={[2, 2, 2, 2]} barSize={12}>
+                    <Bar dataKey="score" radius={[2, 2, 2, 2]} barSize={14}
+                      label={{ position: 'right', fontSize: 10, fill: '#FAFAFA', fontWeight: 600 }}
+                    >
                       {scoreChartData.map((entry, i) => (
-                        <Cell key={i} fill={entry.fill} fillOpacity={0.8} />
+                        <Cell key={i} fill={entry.fill} fillOpacity={0.9} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -1086,8 +1097,14 @@ export function COTData() {
             ) : Object.keys(mlPredictions).length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Brain size={24} className="text-text-muted mb-3" />
-                <p className="text-xs text-text-primary font-medium mb-1">ML-Modell noch nicht trainiert</p>
-                <p className="text-[10px] text-text-muted mb-3">Klicke "Refresh & Analyse" um COT + Preisdaten zu laden und das Modell zu trainieren.</p>
+                <p className="text-xs text-text-primary font-medium mb-1">
+                  {analyses.length > 0 ? 'Keine Preisdaten verfügbar' : 'ML-Modell noch nicht trainiert'}
+                </p>
+                <p className="text-[10px] text-text-muted mb-3">
+                  {analyses.length > 0
+                    ? 'Für die ML-Analyse werden historische Forex-Preise benötigt. Nur in der Desktop-App (Electron) verfügbar.'
+                    : 'Klicke "Refresh & Analyse" um COT + Preisdaten zu laden und das Modell zu trainieren.'}
+                </p>
                 <p className="text-[9px] text-text-muted">Benötigt: 260 Wochen COT-Daten + historische Forex-Preise (frankfurter.app)</p>
               </div>
             ) : (
@@ -1263,123 +1280,104 @@ export function COTData() {
       </>
       )}
 
-      {/* ── Erklärung: Datenquelle & Bedeutung ── */}
-      <div className="mt-4 space-y-3">
+      {/* ── Info Modal (Lightbulb) ── */}
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-background-elevated border border-white/[0.06] rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.04] sticky top-0 bg-background-elevated z-10">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="text-accent-gold" size={14} />
+                <span className="text-xs font-semibold text-text-primary">Wie funktioniert Smart COT?</span>
+              </div>
+              <button onClick={() => setShowInfoModal(false)} className="text-text-muted hover:text-text-primary p-1 rounded hover:bg-white/[0.06]">
+                <X size={14} />
+              </button>
+            </div>
 
-        {/* Datenquelle */}
-        <div className="px-4 py-3 bg-white/[0.02] rounded-xl border border-white/[0.04]">
-          <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Woher kommen die Daten?</h4>
-          <p className="text-[10px] text-text-muted leading-relaxed mb-2">
-            Die Daten stammen direkt von der{' '}
-            <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">
-              CFTC (Commodity Futures Trading Commission)
-            </a>
-            {' '}— der US-Behörde, die alle Futures-Positionen überwacht.
-            Jeden <strong className="text-text-secondary">Freitag um 21:30 CET</strong> veröffentlicht die CFTC den "Commitment of Traders" Report
-            mit Positionsdaten vom <strong className="text-text-secondary">Dienstag</strong> derselben Woche (3 Tage Verzögerung).
-          </p>
-          <p className="text-[10px] text-text-muted leading-relaxed">
-            Smart COT lädt automatisch die letzten <strong className="text-text-secondary">52 Wochen</strong> Daten für 8 Währungs-Futures
-            (DXY, EUR, GBP, JPY, CAD, AUD, NZD, CHF) von der CFTC-API.
-            Die Daten werden lokal gecacht und in Supabase persistiert, damit die History wächst und
-            die Analyse mit jeder Woche präziser wird.
-          </p>
-        </div>
+            <div className="p-4 space-y-4">
+              {/* Update-Frequenz */}
+              <div className="px-3 py-2 bg-accent-primary/5 rounded-lg border border-accent-primary/10">
+                <p className="text-[10px] text-text-muted leading-relaxed">
+                  <strong className="text-accent-primary">Aktualisierung:</strong> Daten werden neu geladen wenn du <strong className="text-text-secondary">"Refresh & Analyse"</strong> klickst.
+                  Die CFTC veröffentlicht neue Daten jeden <strong className="text-text-secondary">Freitag um 21:30 CET</strong> (Positionsdaten vom Dienstag).
+                  Empfehlung: einmal pro Woche am Wochenende refreshen.
+                </p>
+              </div>
 
-        {/* Was sind Commercials? */}
-        <div className="px-4 py-3 bg-white/[0.02] rounded-xl border border-white/[0.04]">
-          <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Was bedeuten die Positionen?</h4>
-          <div className="space-y-2 text-[10px] text-text-muted leading-relaxed">
-            <p>
-              <strong className="text-pnl-positive">Commercials (Smart Money)</strong> — Banken, große Institutionen und Hedger.
-              Sie nutzen Futures zur Absicherung ihres echten Geschäfts. Wenn Commercials <em>stark long</em> sind,
-              positionieren sie sich für eine Aufwertung der Währung. Ihre Positionen gelten als verlässlichster Indikator,
-              weil sie am besten informiert sind.
-            </p>
-            <p>
-              <strong className="text-pnl-negative">Non-Commercials (Spekulanten)</strong> — Hedge Funds und große Trader.
-              Sie spekulieren auf Preisbewegungen. Wenn Spekulanten und Commercials in <em>entgegengesetzte Richtungen</em> positioniert sind
-              ("Spec-Divergenz"), ist das ein starkes Signal — denn historisch liegen die Commercials häufiger richtig.
-            </p>
-            <p>
-              <strong className="text-text-secondary">Open Interest</strong> — Gesamtzahl offener Kontrakte.
-              Steigendes OI + steigende Net-Position = <em>überzeugte Positionierung</em>.
-              Fallendes OI bei steigender Net-Position = <em>OI-Divergenz</em> = weniger Überzeugung.
-            </p>
-          </div>
-        </div>
+              {/* Datenquelle */}
+              <div>
+                <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Woher kommen die Daten?</h4>
+                <p className="text-[10px] text-text-muted leading-relaxed">
+                  Direkt von der CFTC (US-Aufsichtsbehörde). Smart COT lädt die letzten <strong className="text-text-secondary">260 Wochen (5 Jahre)</strong> für
+                  8 Währungs-Futures (DXY, EUR, GBP, JPY, CAD, AUD, NZD, CHF). Daten werden in Supabase persistiert.
+                </p>
+              </div>
 
-        {/* Smart Score Erklärung */}
-        <div className="px-4 py-3 bg-white/[0.02] rounded-xl border border-white/[0.04]">
-          <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Wie berechnet Smart COT den Score?</h4>
-          <div className="space-y-2 text-[10px] text-text-muted leading-relaxed">
-            <p>
-              Der <strong className="text-text-secondary">Smart Score (-100 bis +100)</strong> kombiniert mehrere Faktoren
-              zu einem einzigen Wert pro Währung:
-            </p>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
-                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Perzentil (Basis)</div>
-                <p>Wo steht die aktuelle Net-Position im Vergleich zur 52-Wochen-Range?
-                  80%+ = überkauft (bullish), 20%- = überverkauft (bearish).</p>
+              {/* Positionen */}
+              <div>
+                <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Was bedeuten die Positionen?</h4>
+                <div className="space-y-1.5 text-[10px] text-text-muted leading-relaxed">
+                  <p><strong className="text-pnl-positive">Commercials (Smart Money)</strong> — Banken und Hedger. Stark long = bullish für Währung.</p>
+                  <p><strong className="text-pnl-negative">Non-Commercials (Spekulanten)</strong> — Hedge Funds. Wenn Specs ≠ Commercials = starkes Signal.</p>
+                  <p><strong className="text-text-secondary">Open Interest</strong> — Steigendes OI + Net = Überzeugung. Fallendes OI = Schwäche.</p>
+                </div>
               </div>
-              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
-                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Momentum (1W/4W/8W)</div>
-                <p>Wie schnell ändern Commercials ihre Positionen?
-                  4W beschleunigend = starkes Signal. Misst Geschwindigkeit UND Richtung der Positionsänderung.</p>
+
+              {/* Smart Score */}
+              <div>
+                <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Smart Score Berechnung</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    ['Perzentil', 'Position vs. 52W-Range. 80%+ = bullish, 20%- = bearish.'],
+                    ['Momentum', '1W/4W/8W Positionsänderung. Beschleunigung = starkes Signal.'],
+                    ['Trend', 'Aufbau/Abbau seit X Wochen. Längerer Trend = mehr Gewicht.'],
+                    ['Extremzonen', '>4 Wochen am Extrem → Reversionrisiko steigt.'],
+                    ['Change of Character', 'Net-Position wechselt Vorzeichen → Umkehr-Signal.'],
+                    ['Spec-Divergenz & OI', 'Smart Money ≠ Spekulanten → Score verstärkt.'],
+                  ].map(([title, desc], i) => (
+                    <div key={i} className="bg-white/[0.02] rounded-lg px-3 py-2">
+                      <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-0.5">{title}</div>
+                      <p className="text-[10px] text-text-muted">{desc}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
-                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Trend</div>
-                <p>"Aufbau" = Commercials erhöhen Positionen seit X Wochen.
-                  "Abbau" = sie reduzieren. Je länger der Trend, desto mehr Gewicht.</p>
+
+              {/* Pair Signale */}
+              <div>
+                <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Pair-Signale</h4>
+                <p className="text-[10px] text-text-muted leading-relaxed">
+                  Basieren auf <strong className="text-text-secondary">Smart Score Divergenz</strong> zwischen zwei Währungen.
+                  Momentum-Alignment ✓ = beide Währungen unterstützen die Richtung.
+                  Stärke 1-5 basiert auf Score-Differenz (20+ pro Punkt). Min. Divergenz: 15.
+                </p>
               </div>
-              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
-                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Extremzonen</div>
-                <p>Wenn Commercials &gt;4 Wochen am Extrem stehen, steigt das Reversionrisiko.
-                  Score wird leicht abgeschwächt — übertriebene Positionierung = Vorsicht.</p>
+
+              {/* ML */}
+              <div>
+                <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">ML Analyse</h4>
+                <p className="text-[10px] text-text-muted leading-relaxed">
+                  Logistic Regression trainiert auf 260+ Wochen COT + Forex-Preise (ECB/frankfurter.app).
+                  15 Features pro Währung. Backtest zeigt historische Win Rate, Avg Win/Loss, Profit Factor.
+                  Feature Importance zeigt welche Faktoren bei welcher Währung am meisten zählen.
+                </p>
               </div>
-              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
-                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Change of Character</div>
-                <p>Wenn die Net-Position das Vorzeichen wechselt (Long→Short oder umgekehrt)
-                  oder das Perzentil innerhalb von 4 Wochen von &gt;75% auf &lt;25% flippt — starkes Umkehr-Signal.</p>
-              </div>
-              <div className="bg-white/[0.02] rounded-lg px-3 py-2">
-                <div className="text-[9px] uppercase tracking-[0.1em] text-accent-primary font-semibold mb-1">Spec-Divergenz & OI</div>
-                <p>Wenn Smart Money ≠ Spekulanten → Score wird verstärkt (Commercials "wissen es besser").
-                  OI-Divergenz (OI fällt, Net steigt) → Score wird abgeschwächt.</p>
+
+              {/* Disclaimer */}
+              <div className="px-3 py-2 bg-accent-gold/5 rounded-lg border border-accent-gold/10">
+                <p className="text-[9px] text-text-muted leading-relaxed">
+                  <strong className="text-accent-gold">Hinweis:</strong> COT-Daten sind ein langfristiger Indikator (Wochen bis Monate).
+                  Kein Ersatz für technische Analyse und Risikomanagement.
+                </p>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
-
-        {/* Pair Signale Erklärung */}
-        <div className="px-4 py-3 bg-white/[0.02] rounded-xl border border-white/[0.04]">
-          <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Pair-Signale</h4>
-          <p className="text-[10px] text-text-muted leading-relaxed mb-2">
-            Pair-Empfehlungen entstehen aus der <strong className="text-text-secondary">Smart Score Divergenz</strong> zwischen zwei Währungen.
-            Beispiel: EUR Smart Score +45 und USD Smart Score -30 → EUR/USD LONG mit Score +75.
-          </p>
-          <p className="text-[10px] text-text-muted leading-relaxed mb-2">
-            <strong className="text-text-secondary">Momentum-Alignment ✓</strong> erscheint, wenn beide Währungen
-            ein Momentum in die gleiche Trade-Richtung haben (Base-Momentum bullish + Quote-Momentum bearish für LONG).
-            Pairs mit Momentum-Alignment haben historisch eine höhere Trefferquote.
-          </p>
-          <p className="text-[10px] text-text-muted leading-relaxed">
-            <strong className="text-text-secondary">Stärke (1-5 Punkte)</strong> basiert auf der absoluten Score-Differenz:
-            20+ = 1 Punkt, 40+ = 2, 60+ = 3, 80+ = 4, 100+ = 5. Nur Pairs mit Divergenz ≥15 werden angezeigt.
-          </p>
-        </div>
-
-        {/* Disclaimer */}
-        <div className="px-4 py-2 bg-accent-gold/5 rounded-xl border border-accent-gold/10">
-          <p className="text-[9px] text-text-muted leading-relaxed">
-            <strong className="text-accent-gold">Hinweis:</strong> COT-Daten sind ein langfristiger Indikator (Wochen bis Monate).
-            Sie ersetzen keine technische Analyse und kein Risikomanagement.
-            Commercials können über Wochen "falsch" liegen, bevor sich ihre Position auszahlt.
-            Nutze Smart COT als einen von mehreren Confluences in deiner Analyse.
-          </p>
-        </div>
-      </div>
+      )}
 
       {/* ── Manual Input Modal ── */}
       {showManualInput && (

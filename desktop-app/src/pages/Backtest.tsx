@@ -10,7 +10,7 @@
  * - Persistente Sessions (NICHT im EK Journal!)
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import {
   FlaskConical,
   Play,
@@ -51,6 +51,7 @@ interface BacktestTrade {
   setups: string[];
   timestamp: number;
   screenshot?: string;
+  notes?: string;
 }
 
 interface BacktestSession {
@@ -92,6 +93,7 @@ export function Backtest() {
     date: new Date().toISOString().split('T')[0],
     setups: [] as string[],
     screenshot: '' as string,
+    notes: '' as string,
   });
 
   const pairInputRef = useRef<HTMLSelectElement>(null);
@@ -185,13 +187,14 @@ export function Backtest() {
       pair: formData.pair, direction: formData.direction, result: formData.result,
       rMultiple: formData.rMultiple, date: formData.date, setups: formData.setups,
       timestamp: Date.now(), screenshot: formData.screenshot || undefined,
+      notes: formData.notes || undefined,
     };
     const updatedSession: BacktestSession = {
       ...currentSession, trades: [...currentSession.trades, newTrade], updatedAt: Date.now(),
       elapsedMs: currentSession.elapsedMs + (Date.now() - currentSession.updatedAt),
     };
     saveSessions(sessions.map(s => s.id === currentSessionId ? updatedSession : s));
-    setFormData(prev => ({ ...prev, rMultiple: prev.result === 'win' ? 1 : prev.result === 'loss' ? -1 : 0, screenshot: '' }));
+    setFormData(prev => ({ ...prev, rMultiple: prev.result === 'win' ? 1 : prev.result === 'loss' ? -1 : 0, screenshot: '', notes: '' }));
     pairInputRef.current?.focus();
   }, [formData, currentSession, currentSessionId, sessions, saveSessions]);
 
@@ -451,6 +454,18 @@ export function Backtest() {
                     )}
                   </div>
                 </div>
+
+                {/* Notes / Fehler */}
+                <div className="col-span-4 mt-2">
+                  <label className="input-label">Notizen / Fehler (optional)</label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Was lief gut/schlecht? Fehler im Setup? Lessons learned..."
+                    className="input min-h-[60px] text-sm"
+                    rows={2}
+                  />
+                </div>
               </div>
               <button onClick={handleSubmit} disabled={currentSession.isCompleted}
                 className={clsx('btn btn-primary w-full mt-4', currentSession.isCompleted && 'opacity-50 cursor-not-allowed')}>
@@ -518,7 +533,8 @@ export function Backtest() {
                   </thead>
                   <tbody>
                     {[...currentSession.trades].reverse().slice(0, 10).map((trade, i) => (
-                      <tr key={trade.id} className="border-b border-border/50 hover:bg-white/[0.03]">
+                      <Fragment key={trade.id}>
+                      <tr className="border-b border-border/50 hover:bg-white/[0.03]">
                         <td className="py-2 px-3 text-text-muted">{currentSession.trades.length - i}</td>
                         <td className="py-2 px-3 font-medium">{trade.pair}</td>
                         <td className="py-2 px-3">
@@ -552,6 +568,14 @@ export function Backtest() {
                           </button>
                         </td>
                       </tr>
+                      {trade.notes && (
+                        <tr className="border-b border-border/30">
+                          <td colSpan={7} className="px-3 py-1">
+                            <span className="text-[10px] text-text-muted italic">{trade.notes}</span>
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>

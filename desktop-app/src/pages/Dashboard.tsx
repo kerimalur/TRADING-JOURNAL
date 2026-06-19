@@ -5,10 +5,10 @@
  * Anpassbares Bento-Grid: Widgets ein-/ausblendbar über Einstellungen.
  */
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Calendar, Plus, Printer, Download, TrendingUp,
-  SlidersHorizontal, X, Check, Target,
+  SlidersHorizontal, X, Check, Target, Star,
   List, Globe2, Newspaper, BarChart2, Percent, Bell, Settings2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -196,8 +196,38 @@ function MonthCalendar({ heatmapData }: { heatmapData: HeatmapDay[] }) {
 
 // ── Widget-Customizer Panel ────────────────────────────────────────────
 function WidgetCustomizer({
-  prefs, onChange, onClose,
-}: { prefs: DashboardPrefs; onChange: (p: DashboardPrefs) => void; onClose: () => void }) {
+  prefs, onChange, onClose, dashboardBg, onBgChange,
+}: {
+  prefs: DashboardPrefs;
+  onChange: (p: DashboardPrefs) => void;
+  onClose: () => void;
+  dashboardBg: string | null;
+  onBgChange: (bg: string | null) => void;
+}) {
+  const bgInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      img.onload = () => {
+        const maxW = 1920;
+        const scale = Math.min(1, maxW / img.width);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressed = canvas.toDataURL('image/jpeg', 0.7);
+        onBgChange(compressed);
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -211,6 +241,32 @@ function WidgetCustomizer({
           <X size={14} />
         </button>
       </div>
+
+      {/* Background Image */}
+      <div className="mb-3 pb-3 border-b border-white/[0.06]">
+        <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">Hintergrundbild</span>
+        <div className="flex items-center gap-2 mt-1.5">
+          <input ref={bgInputRef} type="file" accept="image/*" onChange={handleBgUpload} className="hidden" />
+          <button
+            onClick={() => bgInputRef.current?.click()}
+            className="text-[10px] px-2 py-1 rounded bg-white/[0.06] text-text-muted hover:text-text-primary hover:bg-white/[0.1] transition-colors"
+          >
+            {dashboardBg ? 'Ändern' : 'Bild wählen'}
+          </button>
+          {dashboardBg && (
+            <button
+              onClick={() => onBgChange(null)}
+              className="text-[10px] px-2 py-1 rounded bg-pnl-negative/10 text-pnl-negative hover:bg-pnl-negative/20 transition-colors"
+            >
+              Entfernen
+            </button>
+          )}
+        </div>
+        {dashboardBg && (
+          <img src={dashboardBg} alt="" className="mt-1.5 w-full h-12 object-cover rounded border border-white/[0.06]" />
+        )}
+      </div>
+
       <div className="space-y-1">
         {(Object.keys(DEFAULT_PREFS) as (keyof DashboardPrefs)[]).map(key => (
           <label key={key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.04] cursor-pointer transition-colors">
@@ -635,13 +691,14 @@ export function Dashboard() {
   const { loadConfigs, configs } = useAccountStore();
   const { accountFilter, setAccountFilter, getDateRange,
           calculatePerformance, calculateMonthlyReturns, calculateEquityCurve } = useAnalyticsStore();
-  const { outlooks, loadOutlooks } = useOutlookStore();
+  const { outlooks, loadOutlooks, getStarredOutlooks } = useOutlookStore();
   const { showToast } = useUIStore();
 
   const [greeting, setGreeting]         = useState('');
   const [userName, setUserName]         = useState('Trader');
   const [prefs, setPrefs]               = useState<DashboardPrefs>(loadPrefs);
   const [showCustomizer, setShowCustomizer] = useState(false);
+  const [dashboardBg, setDashboardBg] = useState<string | null>(() => localStorage.getItem('tradingJournal_dashboardBg'));
 
   useEffect(() => {
     loadTrades();
@@ -775,7 +832,16 @@ export function Dashboard() {
 
   return (
     <PageTransition>
-      <div className="page-container space-y-4">
+      <div
+        className="page-container space-y-4 relative"
+        style={dashboardBg ? {
+          backgroundImage: `url(${dashboardBg})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
+        } : undefined}
+      >
+        {dashboardBg && <div className="absolute inset-0 bg-background/80 pointer-events-none" />}
 
         {/* ── Header ── */}
         <motion.div
@@ -825,6 +891,12 @@ export function Dashboard() {
               prefs={prefs}
               onChange={handlePrefsChange}
               onClose={() => setShowCustomizer(false)}
+              dashboardBg={dashboardBg}
+              onBgChange={(bg) => {
+                setDashboardBg(bg);
+                if (bg) localStorage.setItem('tradingJournal_dashboardBg', bg);
+                else localStorage.removeItem('tradingJournal_dashboardBg');
+              }}
             />
           )}
         </AnimatePresence>
@@ -1006,6 +1078,42 @@ export function Dashboard() {
               </div>
             </BentoCell>
           )}
+
+          {/* STARRED OUTLOOKS */}
+          {(() => {
+            const starred = getStarredOutlooks();
+            if (starred.length === 0) return null;
+            return (
+              <BentoCell delay={0.43} noPadding>
+                <div className="p-3 h-full flex flex-col">
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <div className="flex items-center gap-1.5">
+                      <Star size={12} className="text-accent-gold fill-accent-gold" />
+                      <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">Favoriten</span>
+                    </div>
+                    <button onClick={() => navigate('/outlook')} className="text-[10px] text-accent-primary hover:underline">Alle →</button>
+                  </div>
+                  <div className="flex-1 space-y-1 overflow-hidden">
+                    {starred.slice(0, 6).map(o => (
+                      <div key={o.id} className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white/[0.03]">
+                        <span className={clsx('text-[10px] font-bold', o.direction === 'long' ? 'text-pnl-positive' : 'text-pnl-negative')}>
+                          {o.direction === 'long' ? '↑' : '↓'}
+                        </span>
+                        <span className="text-[11px] font-semibold text-text-primary">{o.symbol}</span>
+                        <span className={clsx('text-[9px] px-1 py-0.5 rounded',
+                          o.status === 'active' ? 'bg-pnl-positive/15 text-pnl-positive' :
+                          o.status === 'waiting' ? 'bg-accent-gold/15 text-accent-gold' :
+                          'bg-accent-blue/15 text-accent-blue'
+                        )}>
+                          {o.status === 'active' ? 'Aktiv' : o.status === 'waiting' ? 'Wartend' : 'Beobachtung'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </BentoCell>
+            );
+          })()}
 
           {/* MONATS-KALENDER */}
           {prefs.showMonthCalendar && (

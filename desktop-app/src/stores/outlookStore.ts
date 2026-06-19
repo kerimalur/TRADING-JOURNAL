@@ -10,6 +10,7 @@
 import { create } from 'zustand';
 import type { Outlook, OutlookStatus, CurrencyBias } from '@/types';
 import * as outlookService from '@/services/outlookService';
+import { updateOne as supabaseUpdateOne } from '@/services/supabaseService';
 import { isElectron } from '@/services/webApi';
 
 // ============================================================
@@ -108,6 +109,10 @@ interface OutlookState {
   startTrade: (id: string) => void;
   closeTrade: (id: string, accounts: ('ek' | 'funded')[]) => void;
   
+  // Star System
+  toggleStar: (id: string) => void;
+  getStarredOutlooks: () => Outlook[];
+
   // Export / Import
   exportOutlooks: () => string;
   importOutlooks: (jsonString: string, overwrite?: boolean) => { success: boolean; count: number; error?: string };
@@ -568,9 +573,29 @@ export const useOutlookStore = create<OutlookState>((set, get) => ({
   },
 
   // ============================================================
+  // Star System
+  // ============================================================
+
+  toggleStar: (id: string) => {
+    const { outlooks } = get();
+    const updated = outlooks.map(o =>
+      o.id === id ? { ...o, isStarred: !o.isStarred } : o
+    );
+    set({ outlooks: updated });
+    saveToStorage(updated);
+    const outlook = updated.find(o => o.id === id);
+    if (outlook && !isOfflineMode()) {
+      supabaseUpdateOne('outlooks', id, { isStarred: outlook.isStarred }).catch(console.error);
+    }
+  },
+
+  getStarredOutlooks: (): Outlook[] => {
+    return get().outlooks.filter(o => o.isStarred && o.status !== 'cancelled' && o.status !== 'executed');
+  },
+
   // Export / Import Functions
   // ============================================================
-  
+
   // Export all outlooks to JSON
   exportOutlooks: (): string => {
     const { outlooks } = get();

@@ -153,11 +153,16 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
       const calculatedProfit = tradeData.profitAmount ?? ((tradeData.riskAmount || 0) * (tradeData.rMultiple || 0));
       const currentConfig = configs?.[accountType];
 
-      // Auto-fill accountBalanceBefore / accountBalanceAfter for new trades
+      // Auto-fill accountBalanceBefore / accountBalanceAfter
       let enrichedTradeData = { ...tradeData, type: accountType };
       if (isNewTrade && currentConfig) {
         enrichedTradeData.accountBalanceBefore = currentConfig.currentBalance;
         enrichedTradeData.accountBalanceAfter = Math.round((currentConfig.currentBalance + calculatedProfit) * 100) / 100;
+      } else if (!isNewTrade && currentConfig && oldTrade) {
+        const oldProfit = oldTrade.profitAmount || ((oldTrade.riskAmount || 0) * (oldTrade.rMultiple || 0));
+        const balanceBefore = Math.round((currentConfig.currentBalance - oldProfit) * 100) / 100;
+        enrichedTradeData.accountBalanceBefore = balanceBefore;
+        enrichedTradeData.accountBalanceAfter = Math.round((balanceBefore + calculatedProfit) * 100) / 100;
       }
 
       const savedTrade = await tradeService.saveTrade(enrichedTradeData);

@@ -332,6 +332,16 @@ export const getAllPairs = (): string[] => {
 
 export type CurrencyPair = typeof PAIR_LIST[number];
 
+export const PAIR_GROUPS: Record<string, string[]> = {
+  'EUR': ['EURUSD', 'EURGBP', 'EURJPY', 'EURAUD', 'EURNZD', 'EURCAD', 'EURCHF'],
+  'GBP': ['GBPUSD', 'GBPJPY', 'GBPAUD', 'GBPNZD', 'GBPCAD', 'GBPCHF'],
+  'AUD': ['AUDUSD', 'AUDJPY', 'AUDNZD', 'AUDCAD', 'AUDCHF'],
+  'NZD': ['NZDUSD', 'NZDJPY', 'NZDCAD', 'NZDCHF'],
+  'USD': ['USDJPY', 'USDCAD', 'USDCHF'],
+  'CAD': ['CADJPY', 'CADCHF'],
+  'CHF': ['CHFJPY'],
+};
+
 export const CURRENCIES = ['EUR', 'USD', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD'] as const;
 
 export type Currency = typeof CURRENCIES[number];
@@ -348,6 +358,13 @@ export interface CurrencyBias {
   currency: string;
   signal: 'strong_long' | 'long' | 'neutral' | 'short' | 'strong_short';
   percentile: number;
+}
+
+export interface StrategyChecklistItem {
+  ruleId: string;
+  text: string;
+  type: 'entry' | 'exit' | 'filter' | 'risk';
+  checked: boolean;
 }
 
 export interface Outlook {
@@ -374,6 +391,10 @@ export interface Outlook {
   imageData?: string;
   tags?: string[];
   expiresAt?: string;
+  isStarred?: boolean;
+  setupId?: string;
+  strategyChecklist?: StrategyChecklistItem[];
+  fundamentalOutlook?: string;
 }
 
 export const OUTLOOK_STATUS_CONFIG: Record<OutlookStatus, { label: string; color: string; bgColor: string }> = {

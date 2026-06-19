@@ -823,7 +823,7 @@ function registerIPCHandlers(): void {
           if (rawData && Array.isArray(rawData) && rawData.length > 0) {
             // Historische Daten für Charts
             const historicalData = rawData.map((row: any) => ({
-              date: row.report_date_as_yyyy_mm_dd,
+              date: (row.report_date_as_yyyy_mm_dd || '').split('T')[0],
               // Legacy COT Kategorien: Commercials und Non-Commercials
               commercialsLong: parseInt(row.comm_positions_long_all) || 0,
               commercialsShort: parseInt(row.comm_positions_short_all) || 0,
