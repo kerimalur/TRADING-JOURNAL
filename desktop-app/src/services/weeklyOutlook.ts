@@ -42,6 +42,36 @@ export interface WeeklyPairOutlook {
 }
 
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const SAFE_HAVENS = ['JPY', 'CHF'];
+
+export interface RiskRegime {
+  riskOff: boolean;
+  strongHavens: string[];
+  detail: string;
+}
+
+/**
+ * Risk-Off-Wächter: Carry-Trades brechen in Risk-Off-Phasen.
+ * Proxy: Sind die sicheren Häfen (JPY, CHF) gleichzeitig stark positioniert,
+ * deutet das auf Risikoaversion → Carry-Paare verwundbar.
+ */
+export function detectRiskRegime(analyses: CurrencyAnalysis[]): RiskRegime {
+  const byCode = new Map(analyses.map(a => [a.currency, a]));
+  const strong = SAFE_HAVENS.filter(h => (byCode.get(h)?.finalConviction ?? 0) >= 15);
+
+  const riskOff = strong.length >= 2; // beide Häfen stark = klares Risk-Off
+  const elevated = strong.length === 1;
+
+  let detail: string;
+  if (riskOff) {
+    detail = `Risk-Off: ${strong.join(' & ')} (sichere Häfen) gleichzeitig stark — Carry-Trades sind in solchen Phasen anfällig für plötzliche Auflösungen. Short-Bewegungen können echte Reversals sein, keine Korrekturen.`;
+  } else if (elevated) {
+    detail = `Leicht erhöhte Risikoaversion: ${strong[0]} stark. Carry-Paare mit etwas Vorsicht.`;
+  } else {
+    detail = 'Risk-On bzw. neutral: keine auffällige Stärke der sicheren Häfen — Carry-Bias hat tendenziell Rückenwind.';
+  }
+  return { riskOff, strongHavens: strong, detail };
+}
 
 // Welche Kalender-Währung gehört zu welchem COT-Code (DXY = USD)
 function matchesCurrency(eventCcy: string, cotCode: string): boolean {
@@ -111,6 +141,7 @@ export function buildWeeklyOutlook(
     if (a.currency === 'DXY') byCode.set('USD', a);
   }
 
+  const regime = detectRiskRegime(analyses);
   const result: WeeklyPairOutlook[] = [];
 
   for (const sig of pairSignals) {
@@ -132,20 +163,47 @@ export function buildWeeklyOutlook(
     const strongSide = sig.direction === 'long' ? base : quote;
     if (strongSide?.isExtreme && strongSide.weeksAtExtreme > 4) conf -= 8;
 
-    // Carry-Bestätigung
+    // Carry-Bestätigung (Level)
+    let carryDiff = 0;
+    let spreadWidening = false;
+    let spreadNarrowing = false;
     if (base && quote) {
-      const carryDiff = base.rateDifferential - quote.rateDifferential;
+      carryDiff = base.rateDifferential - quote.rateDifferential;
       const carryAlignsLong = carryDiff > 0.25 && sig.direction === 'long';
       const carryAlignsShort = carryDiff < -0.25 && sig.direction === 'short';
       if (carryAlignsLong || carryAlignsShort) conf += 4;
+
+      // Carry-RICHTUNG (wichtiger als Level): weitet/verengt sich der Spread?
+      // Hawkish = Notenbank hebt → Carry verbessert sich.
+      if (sig.direction === 'long') {
+        spreadWidening = base.rateTrend === 'hawkish' || quote.rateTrend === 'dovish';
+        spreadNarrowing = base.rateTrend === 'dovish' || quote.rateTrend === 'hawkish';
+      } else {
+        spreadWidening = base.rateTrend === 'dovish' || quote.rateTrend === 'hawkish';
+        spreadNarrowing = base.rateTrend === 'hawkish' || quote.rateTrend === 'dovish';
+      }
+      if (spreadWidening && !spreadNarrowing) conf += 4;
+      if (spreadNarrowing && !spreadWidening) conf -= 4;
+    }
+
+    // ── Risk-Off-Wächter: Carry-Paare (Short auf sicheren Hafen) verwundbar ──
+    const shortsHaven =
+      (SAFE_HAVENS.includes(sig.quoteCurrency) && sig.direction === 'long') ||
+      (SAFE_HAVENS.includes(sig.baseCurrency) && sig.direction === 'short');
+    let riskOffCaution: string | null = null;
+    if (regime.riskOff && shortsHaven) {
+      conf = Math.min(conf, 56);
+      const haven = SAFE_HAVENS.includes(sig.quoteCurrency) ? sig.quoteCurrency : sig.baseCurrency;
+      riskOffCaution = `Risk-Off-Phase: Diese Idee shortet ${haven} (sicherer Hafen). In Risk-Off lösen sich Carry-Trades oft schlagartig auf — erhöhtes Reversal-Risiko, nicht nur Korrektur.`;
     }
 
     // ── Event-Risiko: deckelt die Konfidenz, da Ausgang offen ──
-    let caution: string | null = null;
+    let caution: string | null = riskOffCaution;
     if (highEvents.length > 0) {
       conf = Math.min(conf, 60);
       const list = highEvents.slice(0, 2).map(e => `${e.event} (${e.currency}, ${e.weekday})`).join(', ');
-      caution = `High-Impact diese Woche: ${list}. Ausgang offen — Ausbruch in beide Richtungen möglich. Lieber das Event abwarten oder Risiko klein halten.`;
+      const eventCaution = `High-Impact diese Woche: ${list}. Ausgang offen — Ausbruch in beide Richtungen möglich. Lieber das Event abwarten oder Risiko klein halten.`;
+      caution = caution ? `${caution} ${eventCaution}` : eventCaution;
     }
 
     conf = Math.max(0, Math.min(85, Math.round(conf)));
@@ -164,10 +222,14 @@ export function buildWeeklyOutlook(
         drivers.push(`Trend bestätigt: Beide Währungen bewegen sich in Richtung ${sig.direction === 'long' ? 'Long' : 'Short'}.`);
       }
 
-      const carryDiff = base.rateDifferential - quote.rateDifferential;
       if (Math.abs(carryDiff) > 0.25) {
         const favored = carryDiff > 0 ? sig.baseCurrency : sig.quoteCurrency;
-        drivers.push(`Zins-Carry: ${favored} hat ${Math.abs(carryDiff).toFixed(2)}% Zinsvorteil — ${(carryDiff > 0) === (sig.direction === 'long') ? 'stützt' : 'bremst'} die Idee.`);
+        const dirNote = spreadWidening && !spreadNarrowing ? ' Spread weitet sich (Rückenwind).'
+          : spreadNarrowing && !spreadWidening ? ' Aber: Spread verengt sich (Gegenwind).'
+          : '';
+        drivers.push(`Zins-Carry: ${favored} hat ${Math.abs(carryDiff).toFixed(2)}% Zinsvorteil — ${(carryDiff > 0) === (sig.direction === 'long') ? 'stützt' : 'bremst'} die Idee.${dirNote}`);
+      } else if (spreadWidening && !spreadNarrowing) {
+        drivers.push(`Zins-Richtung: Spread weitet sich zugunsten der Idee (Notenbank-Pfad als Rückenwind).`);
       }
 
       if (strongSide?.isExtreme && strongSide.weeksAtExtreme > 4) {

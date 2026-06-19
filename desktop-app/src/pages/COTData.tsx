@@ -36,7 +36,7 @@ import {
 } from '@/services/smartCotML';
 import { describeCurrency, describePairIdea } from '@/services/cotNarrative';
 import {
-  buildWeeklyOutlook, prepareWeeklyEvents, type WeeklyEvent,
+  buildWeeklyOutlook, prepareWeeklyEvents, detectRiskRegime, type WeeklyEvent,
 } from '@/services/weeklyOutlook';
 
 const CURRENCIES = [
@@ -423,6 +423,9 @@ export function COTData() {
     [analyses, pairSignals, weeklyEvents]
   );
 
+  // Risk-Off-Wächter (JPY/CHF-Stärke) → Carry-Warnung
+  const riskRegime = useMemo(() => detectRiskRegime(analyses), [analyses]);
+
   const getScoreColor = (score: number) => {
     if (score >= 40) return '#22c55e';
     if (score >= 15) return '#86efac';
@@ -658,6 +661,26 @@ export function COTData() {
                 Fundamentaler Bias (COT-Positionierung + Trend + Zins-Carry) kombiniert mit dem <strong className="text-text-secondary">Event-Risiko der Woche</strong>.
                 Die <strong className="text-text-secondary">Konfidenz</strong> zeigt, wie viele Treiber in dieselbe Richtung zeigen (Confluence) —
                 <span className="text-accent-gold"> keine backgetestete Trefferquote.</span> Steht ein großes Event an, wird die Konfidenz gedeckelt (Ausgang offen).
+              </p>
+            </div>
+
+            {/* Risk-Regime-Wächter */}
+            <div className={clsx(
+              'mb-4 px-3 py-2 rounded-lg border flex items-start gap-2',
+              riskRegime.riskOff ? 'bg-pnl-negative/5 border-pnl-negative/20'
+                : riskRegime.strongHavens.length === 1 ? 'bg-accent-gold/5 border-accent-gold/15'
+                : 'bg-pnl-positive/5 border-pnl-positive/15'
+            )}>
+              {riskRegime.riskOff
+                ? <AlertTriangle size={12} className="text-pnl-negative flex-shrink-0 mt-0.5" />
+                : <Activity size={12} className={clsx('flex-shrink-0 mt-0.5', riskRegime.strongHavens.length === 1 ? 'text-accent-gold' : 'text-pnl-positive')} />}
+              <p className="text-[10px] text-text-muted leading-relaxed">
+                <span className={clsx('font-semibold uppercase tracking-[0.05em]',
+                  riskRegime.riskOff ? 'text-pnl-negative' : riskRegime.strongHavens.length === 1 ? 'text-accent-gold' : 'text-pnl-positive'
+                )}>
+                  {riskRegime.riskOff ? 'Risk-Off' : riskRegime.strongHavens.length === 1 ? 'Wachsam' : 'Risk-On / Neutral'}
+                </span>{' '}
+                {riskRegime.detail}
               </p>
             </div>
 
