@@ -35,6 +35,9 @@ import {
   runMLPipeline, FEATURE_LABELS,
 } from '@/services/smartCotML';
 import { describeCurrency, describePairIdea } from '@/services/cotNarrative';
+import {
+  buildWeeklyOutlook, prepareWeeklyEvents, type WeeklyEvent,
+} from '@/services/weeklyOutlook';
 
 const CURRENCIES = [
   { id: 'DXY', name: 'DXY', flag: '🇺🇸' },
@@ -61,14 +64,48 @@ export function COTData() {
   const [dataSource, setDataSource] = useState<'live' | 'cache' | 'manual' | 'none'>('none');
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualInputData, setManualInputData] = useState<Record<string, { long: string; short: string }>>({});
-  const [activeTab, setActiveTab] = useState<'overview' | 'pairs' | 'ml'>('overview');
+  const [activeTab, setActiveTab] = useState<'weekly' | 'overview' | 'pairs' | 'ml'>('weekly');
+  const [weeklyEvents, setWeeklyEvents] = useState<WeeklyEvent[]>([]);
   const [mlPredictions, setMlPredictions] = useState<Record<string, MLPrediction>>({});
   const [mlLoading, setMlLoading] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
     loadData();
+    loadCalendar();
+    // News/Kalender stündlich aktualisieren
+    const interval = setInterval(loadCalendar, 60 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
+
+  // Wirtschaftskalender laden (stündlicher Cache) → Events der kommenden Woche
+  const loadCalendar = async (force = false) => {
+    try {
+      // 1h-Cache prüfen
+      const cachedRaw = localStorage.getItem('cotCalendarCache');
+      if (!force && cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        const ageMin = (Date.now() - (cached.timestamp || 0)) / 60000;
+        if (ageMin < 60 && Array.isArray(cached.events)) {
+          setWeeklyEvents(prepareWeeklyEvents(cached.events));
+          return;
+        }
+      }
+      const api = getApi() as any;
+      if (!api.fetchEconomicCalendar) return;
+      const res = await api.fetchEconomicCalendar();
+      if (res?.success && Array.isArray(res.data)) {
+        localStorage.setItem('cotCalendarCache', JSON.stringify({ events: res.data, timestamp: Date.now() }));
+        setWeeklyEvents(prepareWeeklyEvents(res.data));
+      } else if (cachedRaw) {
+        // Fehlgeschlagen → alten Cache verwenden
+        const cached = JSON.parse(cachedRaw);
+        if (Array.isArray(cached.events)) setWeeklyEvents(prepareWeeklyEvents(cached.events));
+      }
+    } catch (err) {
+      console.warn('Kalender konnte nicht geladen werden:', err);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -217,6 +254,9 @@ export function COTData() {
 
       // ML: Preise laden und Pipeline starten (async, blockiert UI nicht)
       loadPricesAndRunML(deduped, force).catch(console.error);
+
+      // Kalender/News mitziehen (bei Force frisch)
+      loadCalendar(force).catch(console.error);
     } catch (err) {
       console.error('COT fetch error:', err);
       setError('Fehler beim Laden der COT-Daten.');
@@ -376,6 +416,12 @@ export function COTData() {
   }, [snapshots]);
 
   const flagOf = (id: string) => CURRENCIES.find(c => c.id === id)?.flag ?? '';
+
+  // Sonntags-Wochenausblick: fundamentaler Bias × Event-Risiko der Woche
+  const weeklyOutlook = useMemo(
+    () => buildWeeklyOutlook(analyses, pairSignals, weeklyEvents),
+    [analyses, pairSignals, weeklyEvents]
+  );
 
   const getScoreColor = (score: number) => {
     if (score >= 40) return '#22c55e';
@@ -556,6 +602,15 @@ export function COTData() {
         {/* Tab Navigation */}
         <div className="flex items-center gap-1 mb-4 bg-white/[0.02] rounded-lg p-0.5 w-fit">
           <button
+            onClick={() => setActiveTab('weekly')}
+            className={clsx(
+              'text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
+              activeTab === 'weekly' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary'
+            )}
+          >
+            <Target size={10} className="inline mr-1" /> Wochen-Ausblick
+          </button>
+          <button
             onClick={() => setActiveTab('overview')}
             className={clsx(
               'text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
@@ -589,6 +644,133 @@ export function COTData() {
         </div>
 
         <AnimatePresence mode="wait">
+        {activeTab === 'weekly' && (
+          <motion.div key="weekly" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+
+            {/* Intro */}
+            <div className="mb-4 px-3 py-2.5 bg-accent-primary/5 border border-accent-primary/15 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <Target size={12} className="text-accent-primary" />
+                <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-text-primary">Wochen-Ausblick</span>
+                <span className="text-[9px] text-text-muted">— Sonntags-Check für die kommende Woche</span>
+              </div>
+              <p className="text-[10px] text-text-muted leading-relaxed">
+                Fundamentaler Bias (COT-Positionierung + Trend + Zins-Carry) kombiniert mit dem <strong className="text-text-secondary">Event-Risiko der Woche</strong>.
+                Die <strong className="text-text-secondary">Konfidenz</strong> zeigt, wie viele Treiber in dieselbe Richtung zeigen (Confluence) —
+                <span className="text-accent-gold"> keine backgetestete Trefferquote.</span> Steht ein großes Event an, wird die Konfidenz gedeckelt (Ausgang offen).
+              </p>
+            </div>
+
+            {/* Event-Kalender der Woche */}
+            {weeklyEvents.length > 0 && (
+              <div className="mb-4 rounded-xl border border-border bg-background-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle size={12} className="text-accent-gold" />
+                  <span className="text-[10px] uppercase tracking-[0.15em] font-semibold text-text-muted">Wichtige Events diese Woche</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {weeklyEvents.filter(e => e.impact === 'high').slice(0, 16).map((e, i) => (
+                    <span key={i} className="text-[9px] px-2 py-1 rounded bg-pnl-negative/10 text-text-secondary border border-pnl-negative/15">
+                      <span className="font-bold text-pnl-negative">{e.weekday}</span>{' '}
+                      <span className="font-semibold">{e.currency}</span>{' '}
+                      <span className="text-text-muted">{e.event}</span>
+                    </span>
+                  ))}
+                  {weeklyEvents.filter(e => e.impact === 'high').length === 0 && (
+                    <span className="text-[10px] text-text-muted">Keine High-Impact-Events — ruhigere Woche, fundamentaler Bias wiegt mehr.</span>
+                  )}
+                </div>
+              </div>
+            )}
+            {weeklyEvents.length === 0 && (
+              <div className="mb-4 px-3 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg">
+                <p className="text-[10px] text-text-muted">
+                  Kalender noch nicht geladen. Klicke „Refresh & Analyse" — die Events werden dann mitgeladen (danach stündlich aktualisiert).
+                </p>
+              </div>
+            )}
+
+            {/* Pair-Ausblicke */}
+            {weeklyOutlook.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Target size={24} className="text-text-muted mb-3" />
+                <p className="text-xs text-text-primary font-medium mb-1">Kein klarer Wochen-Ausblick</p>
+                <p className="text-[10px] text-text-muted">Aktuell zu geringe Divergenz zwischen den Währungen.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {weeklyOutlook.map((o, i) => {
+                  const leanColor = o.lean === 'long' ? '#22c55e' : o.lean === 'short' ? '#ef4444' : '#d4d4d8';
+                  return (
+                    <motion.div
+                      key={o.pair}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                      className={clsx(
+                        'rounded-xl border bg-background-card p-4',
+                        o.lean === 'long' ? 'border-pnl-positive/15' : o.lean === 'short' ? 'border-pnl-negative/15' : 'border-border'
+                      )}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold tracking-wide text-text-primary">{o.pair}</span>
+                        <span className="text-[9px] uppercase tracking-[0.1em] font-bold px-2 py-0.5 rounded"
+                          style={{ backgroundColor: `${leanColor}1a`, color: leanColor }}>
+                          {o.lean === 'long' ? '↑ LONG' : o.lean === 'short' ? '↓ SHORT' : '— ABWARTEN'}
+                        </span>
+                      </div>
+
+                      {/* Konfidenz */}
+                      <div className="mb-2.5" title="Confluence: wie viele Treiber in dieselbe Richtung zeigen. Keine statistische Trefferquote.">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-[8px] uppercase tracking-[0.1em] text-text-muted">Konfidenz ({o.confidenceLabel})</span>
+                          <span className="font-mono tabular-nums text-[10px] font-bold" style={{ color: leanColor }}>{o.confidence}%</span>
+                        </div>
+                        <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${o.confidence}%`, backgroundColor: leanColor }} />
+                        </div>
+                      </div>
+
+                      {/* Treiber */}
+                      <div className="space-y-1 mb-2">
+                        {o.drivers.map((d, j) => (
+                          <div key={j} className="flex items-start gap-1.5 text-[10px] text-text-muted leading-snug">
+                            <span className="mt-1 w-1 h-1 rounded-full bg-text-muted flex-shrink-0" />
+                            <span>{d}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Events der Woche */}
+                      {o.events.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-2 border-t border-white/[0.05]">
+                          {o.events.slice(0, 5).map((e, j) => (
+                            <span key={j} className={clsx(
+                              'text-[8px] px-1.5 py-0.5 rounded',
+                              e.impact === 'high' ? 'bg-pnl-negative/10 text-pnl-negative' : 'bg-white/[0.04] text-text-muted'
+                            )}>
+                              {e.weekday} {e.currency} {e.event}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Caution */}
+                      {o.caution && (
+                        <div className="mt-2 flex items-start gap-1.5 px-2 py-1.5 bg-accent-gold/5 border border-accent-gold/15 rounded">
+                          <AlertTriangle size={10} className="text-accent-gold flex-shrink-0 mt-0.5" />
+                          <span className="text-[9px] text-text-muted leading-snug">{o.caution}</span>
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+
+          </motion.div>
+        )}
         {activeTab === 'overview' && (
           <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
 
