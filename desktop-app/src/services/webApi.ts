@@ -381,12 +381,14 @@ export const webExternalApi = {
     }
   },
 
-  // Historische Forex-Preise von frankfurter.app (ECB, CORS-frei, kein API-Key)
+  // Historische Forex-Preise von frankfurter.dev (ECB, CORS-frei, kein API-Key)
   async fetchForexPrices(startDate?: string): Promise<any> {
     try {
       const start = startDate || '2020-01-01';
       const end = new Date().toISOString().split('T')[0];
-      const url = `https://api.frankfurter.app/${start}..${end}?from=EUR&to=USD,GBP,JPY,CAD,AUD,NZD,CHF`;
+      // WICHTIG: api.frankfurter.app macht 301 -> api.frankfurter.dev (Redirect bricht CORS).
+      // Daher direkt das neue /v1-Endpoint mit base/symbols. Antwort-Format ist identisch.
+      const url = `https://api.frankfurter.dev/v1/${start}..${end}?base=EUR&symbols=USD,GBP,JPY,CAD,AUD,NZD,CHF`;
 
       const response = await fetch(url);
       if (!response.ok) return { success: false, error: `HTTP ${response.status}` };

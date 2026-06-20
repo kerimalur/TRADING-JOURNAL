@@ -11,7 +11,10 @@
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('build:', p.scripts.build\\); console.log\\('vercel-build:', p.scripts['vercel-build']||'\\(none\\)'\\)\")",
       "Bash(grep -i noUnused tsconfig.json)",
       "Skill(schedule)",
-      "Skill(schedule:*)"
+      "Skill(schedule:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\\\\n\" \"https://api.frankfurter.app/2024-01-01..2024-01-10?from=EUR&to=USD\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://api.frankfurter.dev/v1/2024-01-01..2024-01-10?base=EUR&symbols=USD\")",
+      "Bash(curl -s \"https://api.frankfurter.dev/v1/2024-01-01..2024-01-05?base=EUR&symbols=USD,GBP\")"
     ]
   }
 }

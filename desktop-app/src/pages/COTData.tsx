@@ -664,6 +664,55 @@ export function COTData() {
               </p>
             </div>
 
+            {/* Währungs-Stärke-Board: wer ist stark, wer schwach (rang-basiert) */}
+            {rankedAnalyses.length > 0 && (() => {
+              const strong = rankedAnalyses.filter(a => a.finalConviction > 0);
+              const weak = [...rankedAnalyses].filter(a => a.finalConviction <= 0).sort((a, b) => a.finalConviction - b.finalConviction);
+              const tagFor = (a: typeof rankedAnalyses[number]) => {
+                const parts: string[] = [];
+                parts.push(a.currentPercentile >= 60 ? 'COT long' : a.currentPercentile <= 40 ? 'COT short' : 'COT neutral');
+                if (a.rateDifferential > 0.25) parts.push('Carry+');
+                else if (a.rateDifferential < -0.25) parts.push('Carry−');
+                if (a.momentumSignal.includes('accelerating')) parts.push('Momentum↑');
+                return parts.join(' · ');
+              };
+              const Row = ({ a, strong: isStrong }: { a: typeof rankedAnalyses[number]; strong: boolean }) => (
+                <button
+                  onClick={() => { setActiveTab('overview'); setSelectedCurrency(a.currency); }}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/[0.03] transition-colors text-left"
+                >
+                  <span className="text-base w-6 text-center">{flagOf(a.currency)}</span>
+                  <span className="text-xs font-bold text-text-primary w-9">{a.currency}</span>
+                  <span className="text-[9px] text-text-muted flex-1 truncate">{tagFor(a)}</span>
+                  <span className="font-mono tabular-nums text-xs font-bold" style={{ color: isStrong ? '#22c55e' : '#ef4444' }}>
+                    {a.finalConviction > 0 ? '+' : ''}{a.finalConviction}
+                  </span>
+                </button>
+              );
+              return (
+                <div className="mb-4 rounded-xl border border-border bg-background-card p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <TrendingUp size={12} className="text-accent-primary" />
+                    <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-text-primary">Währungs-Stärke</span>
+                    <span className="text-[9px] text-text-muted">strukturell (Wochen–Monate) — Stärkste oben, Schwächste oben</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div>
+                      <div className="text-[9px] uppercase tracking-[0.12em] text-pnl-positive font-bold mb-1 px-2">▲ Stark — kaufen</div>
+                      {strong.length > 0 ? strong.map(a => <Row key={a.currency} a={a} strong />) : <div className="text-[10px] text-text-muted px-2 py-1">—</div>}
+                    </div>
+                    <div>
+                      <div className="text-[9px] uppercase tracking-[0.12em] text-pnl-negative font-bold mb-1 px-2">▼ Schwach — verkaufen</div>
+                      {weak.length > 0 ? weak.map(a => <Row key={a.currency} a={a} strong={false} />) : <div className="text-[10px] text-text-muted px-2 py-1">—</div>}
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-text-muted mt-2 px-2 leading-relaxed">
+                    Trade-Idee = oben links (stark) gegen oben rechts (schwach). Klick auf eine Währung öffnet die Detail-Analyse.
+                  </p>
+                </div>
+              );
+            })()}
+
             {/* Risk-Regime-Wächter */}
             <div className={clsx(
               'mb-4 px-3 py-2 rounded-lg border flex items-start gap-2',
@@ -1526,6 +1575,50 @@ export function COTData() {
                   Positiver Carry (höherer Zins) zieht Käufer an → Rückenwind für Long. Fließt direkt in die <strong className="text-text-secondary">Final Conviction</strong> ein:
                   Carry in Score-Richtung verstärkt, Carry gegen den Score schwächt ab. Zinssätze werden bei jedem Refresh mitgeladen.
                 </p>
+              </div>
+
+              {/* Welche Daten den Markt bewegen */}
+              <div>
+                <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Welche Daten bewegen den Markt — und wie stark</h4>
+                <div className="space-y-1.5">
+                  {[
+                    ['Zinsentscheid / Notenbank', 'Höchster Impact. Bestimmt den Carry-Trend. Nicht nur die Entscheidung — der TON (hawkish/dovish) und die Projektionen bewegen am meisten.', 'sehr hoch'],
+                    ['CPI / Inflation', 'Sehr hoch. Treibt Zinserwartungen direkt. Überraschung nach oben = hawkisch = Währung stark (solange kein Stagflations-Schock).', 'sehr hoch'],
+                    ['Arbeitsmarkt (NFP, Quote, Löhne)', 'Hoch — v.a. USA (NFP, erster Freitag). Löhne sind der Inflations-Vorlauf, oft wichtiger als die reine Quote.', 'hoch'],
+                    ['BIP / Wachstum', 'Mittel-hoch. Mittelfristiger Treiber. Wachstumsvorsprung zieht Kapital an.', 'mittel'],
+                    ['PMI (Einkaufsmanager)', 'Mittel. Frühindikator — zeigt Richtung der Wirtschaft vor den harten Daten.', 'mittel'],
+                    ['Einzelhandel / Konsum', 'Mittel. Konsum = Großteil der Wirtschaft, beeinflusst die nächste Notenbank-Sitzung.', 'mittel'],
+                    ['Risk-Sentiment (Aktien, VIX, Safe-Haven)', 'Situativ sehr hoch. In Risk-Off steigen JPY/CHF/USD, Carry-Trades brechen — überschreibt kurzfristig die Fundamentaldaten.', 'situativ'],
+                  ].map(([title, desc, tag], i) => (
+                    <div key={i} className="flex items-start gap-2 bg-white/[0.02] rounded-lg px-3 py-1.5">
+                      <span className={clsx('text-[8px] uppercase tracking-[0.08em] font-bold px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0 w-16 text-center',
+                        tag === 'sehr hoch' ? 'bg-pnl-negative/15 text-pnl-negative' :
+                        tag === 'hoch' ? 'bg-accent-gold/15 text-accent-gold' :
+                        tag === 'situativ' ? 'bg-accent-primary/15 text-accent-primary' : 'bg-white/[0.06] text-text-muted'
+                      )}>{tag}</span>
+                      <div>
+                        <div className="text-[10px] text-text-secondary font-semibold">{title}</div>
+                        <p className="text-[10px] text-text-muted leading-snug">{desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[9px] text-text-muted mt-2 leading-relaxed">
+                  <strong className="text-accent-gold">Faustregel:</strong> Nicht die Zahl selbst zählt, sondern die <strong className="text-text-secondary">Überraschung gegenüber dem Forecast</strong>. „Besser als erwartet" = Währung stark, egal ob absolut gut oder schlecht.
+                </p>
+              </div>
+
+              {/* Sonntags-Routine */}
+              <div className="px-3 py-2.5 bg-accent-primary/5 rounded-lg border border-accent-primary/15">
+                <h4 className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-primary mb-2">Deine Sonntags-Routine</h4>
+                <ol className="space-y-1 text-[10px] text-text-muted leading-relaxed list-decimal list-inside">
+                  <li><strong className="text-text-secondary">„Refresh & Analyse"</strong> klicken — COT, Preise, Zinsen, Kalender frisch laden.</li>
+                  <li><strong className="text-text-secondary">Währungs-Stärke-Board</strong> lesen: Wer ist stark, wer schwach? Notiere die 2 stärksten + 2 schwächsten.</li>
+                  <li><strong className="text-text-secondary">Risk-Regime</strong> prüfen: Risk-Off? Dann Carry-Paare vorsichtig.</li>
+                  <li><strong className="text-text-secondary">Event-Kalender</strong> scannen: Welche deiner Paare haben High-Impact-Events? Diese mit Vorsicht / nach dem Event traden.</li>
+                  <li><strong className="text-text-secondary">Pair-Ausblick</strong>: Stärkste gegen schwächste Währung = deine Top-Idee. Konfidenz + Treiber lesen.</li>
+                  <li><strong className="text-text-secondary">TradingView</strong>: Für die 2–3 besten Paare das Chart-Setup suchen (Zone, Struktur, Timing). Das Tool gibt die Richtung — den Einstieg machst du im Chart.</li>
+                </ol>
               </div>
 
               {/* Was es NICHT ist — Ehrlichkeit */}

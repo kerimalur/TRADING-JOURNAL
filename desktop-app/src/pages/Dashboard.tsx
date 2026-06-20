@@ -109,7 +109,7 @@ async function loadPrefsFromSupabase(): Promise<DashboardPrefs | null> {
       .from('user_preferences')
       .select('preferences')
       .eq('user_id', session.user.id)
-      .single();
+      .maybeSingle();
     if (data?.preferences?.dashboardPrefs) {
       return { ...DEFAULT_PREFS, ...data.preferences.dashboardPrefs };
     }
@@ -127,7 +127,7 @@ async function savePrefsToSupabase(p: DashboardPrefs): Promise<void> {
       .from('user_preferences')
       .select('preferences')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
     const merged = { ...(existing?.preferences ?? {}), dashboardPrefs: p };
     await supabase
       .from('user_preferences')

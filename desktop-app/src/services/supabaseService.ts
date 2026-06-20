@@ -102,7 +102,7 @@ export async function fetchOne<T>(table: string, id: string): Promise<T | null> 
     .select('*')
     .eq('id', id)
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
 
   if (error) {
     if (error.code === 'PGRST116') return null;

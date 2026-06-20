@@ -35,7 +35,7 @@ export async function loadRiskSettings(): Promise<RiskSettings> {
       .from(TABLE)
       .select('settings')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (error) {
       if (error.code === 'PGRST116') return DEFAULT_SETTINGS;

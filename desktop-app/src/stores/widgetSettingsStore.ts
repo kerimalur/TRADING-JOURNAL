@@ -76,7 +76,7 @@ async function loadFromSupabaseDB(): Promise<WidgetSettings | null> {
       .from('user_widget_settings')
       .select('settings')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
     if (error || !data) return null;
     const remote = data.settings as Partial<WidgetSettings>;
     return {
