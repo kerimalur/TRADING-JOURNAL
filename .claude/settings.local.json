@@ -14,7 +14,13 @@
       "Skill(schedule:*)",
       "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\\\\n\" \"https://api.frankfurter.app/2024-01-01..2024-01-10?from=EUR&to=USD\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://api.frankfurter.dev/v1/2024-01-01..2024-01-10?base=EUR&symbols=USD\")",
-      "Bash(curl -s \"https://api.frankfurter.dev/v1/2024-01-01..2024-01-05?base=EUR&symbols=USD,GBP\")"
+      "Bash(curl -s \"https://api.frankfurter.dev/v1/2024-01-01..2024-01-05?base=EUR&symbols=USD,GBP\")",
+      "Bash(git remote *)",
+      "Bash(git check-ignore *)",
+      "Bash(git ls-files *)",
+      "Bash(git grep *)",
+      "Bash(git fetch *)",
+      "Bash(git ls-tree *)"
     ]
   }
 }
