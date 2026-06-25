@@ -1299,6 +1299,59 @@ export function COTData() {
                   </div>
                 )}
 
+                {/* Fehler-Analyse — Hypothesen, wo die Regel versagt */}
+                <div className="mb-4 rounded-xl border border-accent-gold/25 bg-accent-gold/[0.04] p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle size={12} className="text-accent-gold" />
+                    <span className="text-[10px] uppercase tracking-[0.15em] font-semibold text-accent-gold">Fehler-Analyse — wo lag's daneben?</span>
+                  </div>
+                  <p className="text-[9px] text-text-muted mb-3 leading-relaxed">
+                    Diese Filter teilen die gleichen Wochen in Gruppen und zeigen die Trefferquote je Gruppe.
+                    <strong className="text-accent-gold"> Achtung: In-Sample = Hypothesen, kein Beweis.</strong> Ein hoher Wert hier kann Zufall der Vergangenheit sein. Erst per Forward-Snapshots / Walk-Forward bestätigen, bevor du danach filterst.
+                  </p>
+
+                  {/* Bucket-Vergleiche */}
+                  <div className="space-y-3">
+                    {[...evalResult.buckets.driverAgreement, ...evalResult.buckets.stretch].map((b, i) => {
+                      const enough = b.sample >= 15;
+                      const col = !enough ? '#71717a' : b.hitRate >= 55 ? '#22c55e' : b.hitRate >= 48 ? '#d4d4d8' : '#ef4444';
+                      return (
+                        <div key={i} className={clsx('flex items-center gap-3', !enough && 'opacity-50')}>
+                          <span className="text-[10px] text-text-secondary w-48">{b.label}</span>
+                          <div className="flex-1 h-2 bg-white/[0.05] rounded-full relative overflow-hidden">
+                            <div className="absolute top-0 h-full rounded-full" style={{ width: `${b.hitRate}%`, backgroundColor: col }} />
+                            <div className="absolute top-0 h-full w-px bg-white/50" style={{ left: '50%' }} />
+                          </div>
+                          <span className="font-mono tabular-nums text-[10px] font-bold w-9 text-right" style={{ color: col }}>{b.hitRate}%</span>
+                          <span className={clsx('font-mono tabular-nums text-[9px] w-12 text-right', b.delta > 0 ? 'text-pnl-positive' : b.delta < 0 ? 'text-pnl-negative' : 'text-text-muted')}>
+                            {b.delta > 0 ? '+' : ''}{b.delta}pp
+                          </span>
+                          <span className="text-[8px] text-text-muted w-10 text-right">n={b.sample}{!enough && ' ⚠'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Horizont-Scan */}
+                  <div className="mt-4 pt-3 border-t border-border/50">
+                    <div className="text-[9px] uppercase tracking-[0.12em] font-semibold text-text-muted mb-2">Welcher Horizont trägt die Edge?</div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {evalResult.horizons.map((h, i) => {
+                        const isBase = h.horizonWeeks === evalResult.horizonWeeks;
+                        const col = h.hitRate >= 55 ? '#22c55e' : h.hitRate >= 48 ? '#d4d4d8' : '#ef4444';
+                        return (
+                          <div key={i} className={clsx('rounded-lg border p-2 text-center', isBase ? 'border-accent-gold/40 bg-accent-gold/[0.06]' : 'border-border bg-background-card')}>
+                            <div className="text-[9px] text-text-muted">{h.horizonWeeks}W</div>
+                            <div className="font-mono tabular-nums text-sm font-bold" style={{ color: col }}>{h.hitRate}%</div>
+                            <div className="text-[8px] text-text-muted">n={h.sample}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[8px] text-text-muted mt-2">Springt die Quote je nach Horizont stark, ist sie eher Rauschen als echte Edge.</p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   {/* Pro Währung */}
                   <div className="rounded-xl border border-border bg-background-card p-4">

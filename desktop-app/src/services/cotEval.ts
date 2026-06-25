@@ -25,12 +25,28 @@ export interface EvalWeek {
   pair: string;
   correct: boolean;
   movePct: number; // (topReturn - bottomReturn) * 100
+  driversAgree: boolean; // COT-Ranking + 4W-Momentum bestätigen sich gegenseitig
+  stretched: boolean;    // top >=90 oder bottom <=10 Perzentil (crowded)
 }
 
 export interface DriverHit {
   driver: string;
   hitRate: number;
   sample: number;
+}
+
+export interface Bucket {
+  label: string;
+  hitRate: number;
+  sample: number;
+  delta: number; // Differenz zur Gesamt-Trefferquote (Prozentpunkte)
+}
+
+export interface HorizonScore {
+  horizonWeeks: number;
+  hitRate: number;
+  sample: number;
+  avgMovePct: number;
 }
 
 export interface EvalResult {
@@ -41,6 +57,11 @@ export interface EvalResult {
   avgMovePct: number;       // Durchschnitt der korrekten Richtung (Edge-Größe)
   perCurrency: Array<{ currency: string; hitRate: number; sample: number }>;
   byDriver: DriverHit[];
+  buckets: {
+    driverAgreement: Bucket[]; // [einig, uneinig]
+    stretch: Bucket[];         // [ausgereizt, normal]
+  };
+  horizons: HorizonScore[];    // gleiche Regel bei 2/4/6/8 Wochen
 }
 
 const CCYS = ['DXY', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'NZD', 'CHF'];
@@ -103,30 +124,25 @@ function strengthSeries(snapshots: COTSnapshot[]) {
   return byCcy;
 }
 
-/**
- * Mechanische Auswertung: stärkste vs. schwächste Währung je Woche.
- */
-export function evaluateMechanical(
-  snapshots: COTSnapshot[],
+// Kern: eine Auswertung bei festem Horizont. Liefert die rohen Aggregate.
+function runEval(
+  series: ReturnType<typeof strengthSeries>,
   priceData: Record<string, PricePoint[]>,
-  horizonWeeks = 4,
-): EvalResult {
-  const series = strengthSeries(snapshots);
-  // alle Datumswerte (Wochen) sammeln
+  horizonWeeks: number,
+) {
   const dateSet = new Set<string>();
   for (const ccy of Object.keys(series)) for (const r of series[ccy]) dateSet.add(r.date);
   const dates = Array.from(dateSet).sort();
 
   const weeks: EvalWeek[] = [];
   const perCcy: Record<string, { hit: number; total: number }> = {};
-  // Treiber-Attribution: pro Währung-Woche prüft ein Treiber bullish/bearish vs. eigener Return
   const driverAgg: Record<string, { hit: number; total: number }> = {
     'COT-Positionierung': { hit: 0, total: 0 },
     'Momentum': { hit: 0, total: 0 },
   };
+  const code = (c: string) => (c === 'DXY' ? 'USD' : c);
 
   for (const date of dates) {
-    // Snapshot der Stärke an diesem Datum
     const ranked: Array<{ ccy: string; percentile: number; momentum4w: number }> = [];
     for (const ccy of Object.keys(series)) {
       const row = series[ccy].find(r => r.date === date);
@@ -143,7 +159,10 @@ export function evaluateMechanical(
     if (topRet !== null && bottomRet !== null) {
       const spreadRet = topRet - bottomRet;
       const correct = spreadRet > 0;
-      const code = (c: string) => (c === 'DXY' ? 'USD' : c);
+      // Treiber einig: Momentum bestätigt das COT-Ranking (top stärkt, bottom schwächt)
+      const driversAgree = top.momentum4w >= 0 && bottom.momentum4w <= 0;
+      // ausgereizt: eine Seite an einem Extrem (crowded)
+      const stretched = top.percentile >= 90 || bottom.percentile <= 10;
       weeks.push({
         date,
         topCcy: code(top.ccy),
@@ -151,6 +170,8 @@ export function evaluateMechanical(
         pair: `${code(top.ccy)}/${code(bottom.ccy)}`,
         correct,
         movePct: spreadRet * 100,
+        driversAgree,
+        stretched,
       });
       for (const c of [top.ccy, bottom.ccy]) {
         if (!perCcy[c]) perCcy[c] = { hit: 0, total: 0 };
@@ -159,17 +180,14 @@ export function evaluateMechanical(
       }
     }
 
-    // Treiber-Attribution pro Währung an diesem Datum
     for (const r of ranked) {
       const ret = ccyReturn(priceData, r.ccy, date, horizonWeeks);
       if (ret === null) continue;
-      // COT-Positionierung
       if (r.percentile >= 60 || r.percentile <= 40) {
         const bullish = r.percentile >= 60;
         driverAgg['COT-Positionierung'].total++;
         if ((bullish && ret > 0) || (!bullish && ret < 0)) driverAgg['COT-Positionierung'].hit++;
       }
-      // Momentum
       if (Math.abs(r.momentum4w) > 0) {
         const bullish = r.momentum4w > 0;
         driverAgg['Momentum'].total++;
@@ -178,8 +196,34 @@ export function evaluateMechanical(
     }
   }
 
+  return { weeks, perCcy, driverAgg };
+}
+
+// Trefferquote einer Teilmenge von Wochen → Bucket (mit Abstand zur Gesamtquote).
+function bucketOf(label: string, subset: EvalWeek[], overallHitRate: number): Bucket {
+  const sample = subset.length;
+  const hit = subset.filter(w => w.correct).length;
+  const hitRate = sample > 0 ? Math.round((hit / sample) * 100) : 0;
+  return { label, sample, hitRate, delta: sample > 0 ? hitRate - overallHitRate : 0 };
+}
+
+/**
+ * Mechanische Auswertung: stärkste vs. schwächste Währung je Woche.
+ * Zusätzlich: Fehler-Buckets (Treiber-Einigkeit, ausgereizt) + Horizont-Scan.
+ * WICHTIG: Buckets sind In-Sample → Hypothesen, KEIN Beweis. Erst out-of-sample
+ * (Walk-Forward / Forward-Snapshots) bestätigen, bevor man danach handelt.
+ */
+export function evaluateMechanical(
+  snapshots: COTSnapshot[],
+  priceData: Record<string, PricePoint[]>,
+  horizonWeeks = 4,
+): EvalResult {
+  const series = strengthSeries(snapshots);
+  const { weeks, perCcy, driverAgg } = runEval(series, priceData, horizonWeeks);
+
   const hit = weeks.filter(w => w.correct).length;
   const sample = weeks.length;
+  const hitRate = sample > 0 ? Math.round((hit / sample) * 100) : 0;
   const correctMoves = weeks.filter(w => w.correct).map(w => Math.abs(w.movePct));
   const avgMovePct = correctMoves.length > 0 ? correctMoves.reduce((s, v) => s + v, 0) / correctMoves.length : 0;
 
@@ -192,13 +236,41 @@ export function evaluateMechanical(
     .filter(([, v]) => v.total > 0)
     .map(([driver, v]) => ({ driver, hitRate: Math.round((v.hit / v.total) * 100), sample: v.total }));
 
+  // Fehler-Buckets (In-Sample-Hypothesen)
+  const buckets = {
+    driverAgreement: [
+      bucketOf('Treiber einig (COT + Momentum)', weeks.filter(w => w.driversAgree), hitRate),
+      bucketOf('Treiber uneinig', weeks.filter(w => !w.driversAgree), hitRate),
+    ],
+    stretch: [
+      bucketOf('Normal (nicht ausgereizt)', weeks.filter(w => !w.stretched), hitRate),
+      bucketOf('Ausgereizt / crowded', weeks.filter(w => w.stretched), hitRate),
+    ],
+  };
+
+  // Horizont-Scan: gleiche Regel bei 2/4/6/8 Wochen
+  const horizons: HorizonScore[] = [2, 4, 6, 8].map(h => {
+    const r = runEval(series, priceData, h);
+    const s = r.weeks.length;
+    const hh = r.weeks.filter(w => w.correct).length;
+    const moves = r.weeks.filter(w => w.correct).map(w => Math.abs(w.movePct));
+    return {
+      horizonWeeks: h,
+      hitRate: s > 0 ? Math.round((hh / s) * 100) : 0,
+      sample: s,
+      avgMovePct: moves.length > 0 ? Math.round((moves.reduce((a, b) => a + b, 0) / moves.length) * 100) / 100 : 0,
+    };
+  });
+
   return {
     horizonWeeks,
     weeks,
-    hitRate: sample > 0 ? Math.round((hit / sample) * 100) : 0,
+    hitRate,
     sample,
     avgMovePct: Math.round(avgMovePct * 100) / 100,
     perCurrency,
     byDriver,
+    buckets,
+    horizons,
   };
 }
