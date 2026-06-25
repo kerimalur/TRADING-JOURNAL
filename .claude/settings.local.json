@@ -20,7 +20,14 @@
       "Bash(git ls-files *)",
       "Bash(git grep *)",
       "Bash(git fetch *)",
-      "Bash(git ls-tree *)"
+      "Bash(git ls-tree *)",
+      "Bash(mkdir -p ~/.claude/skills/llm-council)",
+      "Bash(curl -fsSL https://raw.githubusercontent.com/aiwithremy/claude-skills-llm-council/main/SKILL.md -o ~/.claude/skills/llm-council/SKILL.md)",
+      "Read(//c/Users/Kerim/.claude/skills/llm-council/**)",
+      "Bash(gh pr *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

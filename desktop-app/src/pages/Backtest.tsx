@@ -26,7 +26,9 @@ import {
   ChevronDown,
   X,
   Image,
-  StopCircle
+  StopCircle,
+  Download,
+  BarChart3
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useUIStore } from '@/stores/uiStore';
@@ -76,6 +78,31 @@ interface BacktestStats {
 }
 
 const STORAGE_KEY = 'backtestSessions';
+
+/**
+ * Verkleinert ein Bild (DataURL) auf max. maxPx Kantenlänge und re-encodet als
+ * JPEG. Hält localStorage klein (TradingView-Screenshots sind sonst MB-groß).
+ * `window.Image` explizit, um Kollision mit dem lucide-Icon `Image` zu vermeiden.
+ */
+function downscaleImage(src: string, maxPx = 900, quality = 0.7): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(src); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      try { resolve(canvas.toDataURL('image/jpeg', quality)); }
+      catch { resolve(src); }
+    };
+    img.onerror = () => resolve(src);
+    img.src = src;
+  });
+}
 
 export function Backtest() {
   const { showToast } = useUIStore();
@@ -144,11 +171,27 @@ export function Backtest() {
 
   const handleKeyboardShortcut = useCallback((e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    // Vorzeichen aus dem aktuellen Ergebnis: Win=+, Loss=−, BE=0
+    const signFor = (r: 'win' | 'loss' | 'breakeven') => (r === 'win' ? 1 : r === 'loss' ? -1 : 0);
+    // Ziffern 1–9 → R-Betrag direkt setzen (Vorzeichen aus Ergebnis)
+    if (/^[1-9]$/.test(e.key)) {
+      const mag = parseInt(e.key, 10);
+      setFormData(prev => ({ ...prev, rMultiple: mag * (signFor(prev.result) || 1) }));
+      return;
+    }
+    if (e.key === '+' || e.key === '=') {
+      setFormData(prev => ({ ...prev, rMultiple: Math.round((prev.rMultiple + 0.5) * 10) / 10 }));
+      return;
+    }
+    if (e.key === '-') {
+      setFormData(prev => ({ ...prev, rMultiple: Math.round((prev.rMultiple - 0.5) * 10) / 10 }));
+      return;
+    }
     switch(e.key.toLowerCase()) {
       case 'l': setFormData(prev => ({ ...prev, direction: 'long' })); break;
       case 's': setFormData(prev => ({ ...prev, direction: 'short' })); break;
-      case 'w': setFormData(prev => ({ ...prev, result: 'win', rMultiple: Math.abs(prev.rMultiple) })); break;
-      case 'x': setFormData(prev => ({ ...prev, result: 'loss', rMultiple: -Math.abs(prev.rMultiple) })); break;
+      case 'w': setFormData(prev => ({ ...prev, result: 'win', rMultiple: Math.abs(prev.rMultiple) || 1 })); break;
+      case 'x': setFormData(prev => ({ ...prev, result: 'loss', rMultiple: -(Math.abs(prev.rMultiple) || 1) })); break;
       case 'b': setFormData(prev => ({ ...prev, result: 'breakeven', rMultiple: 0 })); break;
     }
   }, []);
@@ -180,6 +223,49 @@ export function Backtest() {
     });
   })();
 
+  // Performance pro Setup: Winrate, Expectancy (ΣR/n), ΣR, Stichprobe n.
+  // Ein Trade mit mehreren Setups zählt bei jedem Setup. BE zählt nicht als Win/Loss.
+  const MIN_SAMPLE = 20;
+  const setupStats = (() => {
+    const trades = currentSession?.trades || [];
+    const agg: Record<string, { n: number; wins: number; losses: number; totalR: number }> = {};
+    for (const t of trades) {
+      for (const key of (t.setups.length ? t.setups : ['(ohne Setup)'])) {
+        if (!agg[key]) agg[key] = { n: 0, wins: 0, losses: 0, totalR: 0 };
+        agg[key].n++;
+        agg[key].totalR += t.rMultiple;
+        if (t.result === 'win') agg[key].wins++;
+        else if (t.result === 'loss') agg[key].losses++;
+      }
+    }
+    return Object.entries(agg).map(([key, v]) => {
+      const def = (SETUP_DEFINITIONS as any)[key];
+      const decided = v.wins + v.losses;
+      return {
+        key,
+        label: def?.short || def?.label || key,
+        color: def?.color as string | undefined,
+        n: v.n,
+        winRate: decided > 0 ? (v.wins / decided) * 100 : 0,
+        totalR: v.totalR,
+        expectancy: v.n > 0 ? v.totalR / v.n : 0,
+        reliable: v.n >= MIN_SAMPLE,
+      };
+    }).sort((a, b) => b.expectancy - a.expectancy);
+  })();
+
+  const exportSessionJSON = () => {
+    if (!currentSession) return;
+    const blob = new Blob([JSON.stringify(currentSession, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentSession.name.replace(/[^\w-]+/g, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Session als JSON exportiert', 'success');
+  };
+
   const handleSubmit = useCallback(() => {
     if (!currentSession || currentSession.isCompleted) return;
     const newTrade: BacktestTrade = {
@@ -197,6 +283,43 @@ export function Backtest() {
     setFormData(prev => ({ ...prev, rMultiple: prev.result === 'win' ? 1 : prev.result === 'loss' ? -1 : 0, screenshot: '', notes: '' }));
     pairInputRef.current?.focus();
   }, [formData, currentSession, currentSessionId, sessions, saveSessions]);
+
+  // Enter speichert (außer im Notizen-Feld → dort Zeilenumbruch via Shift+Enter)
+  useEffect(() => {
+    const onEnter = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.shiftKey) return;
+      if (e.target instanceof HTMLTextAreaElement) return;
+      e.preventDefault();
+      handleSubmit();
+    };
+    window.addEventListener('keydown', onEnter);
+    return () => window.removeEventListener('keydown', onEnter);
+  }, [handleSubmit]);
+
+  // Strg+V: Screenshot aus Zwischenablage direkt einfügen (TradingView-Workflow)
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (!file) continue;
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            const small = await downscaleImage(reader.result as string);
+            setFormData(prev => ({ ...prev, screenshot: small }));
+            showToast('Screenshot aus Zwischenablage übernommen', 'success');
+          };
+          reader.readAsDataURL(file);
+          e.preventDefault();
+          break;
+        }
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [showToast]);
 
   const togglePause = () => {
     if (!currentSession) return;
@@ -244,7 +367,10 @@ export function Backtest() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => { setFormData(prev => ({ ...prev, screenshot: reader.result as string })); };
+    reader.onloadend = async () => {
+      const small = await downscaleImage(reader.result as string);
+      setFormData(prev => ({ ...prev, screenshot: small }));
+    };
     reader.readAsDataURL(file);
   };
 
@@ -366,6 +492,9 @@ export function Backtest() {
                     </button>
                   </>
                 )}
+                <button onClick={exportSessionJSON} className="btn btn-secondary" title="Session als JSON exportieren">
+                  <Download size={16} /> Export
+                </button>
                 <button onClick={createNewSession} className="btn btn-secondary"><RotateCcw size={16} /> Neue Session</button>
               </div>
             </div>
@@ -374,11 +503,16 @@ export function Backtest() {
           <div className="grid grid-cols-3 gap-6">
             {/* Speed Entry Form */}
             <div className="col-span-2 card">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Keyboard size={20} className="text-accent-primary" />
-                Speed Entry
-                <span className="text-xs text-text-muted ml-2">(L=Long, S=Short, W=Win, X=Loss, B=BE)</span>
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Keyboard size={20} className="text-accent-primary" />
+                  Speed Entry
+                  <span className="text-xs text-text-muted ml-2">L/S=Richtung · W/X/B=Ergebnis · 1–9=R · +/− · Enter=Speichern · Strg+V=Bild</span>
+                </h3>
+                <span className="text-sm font-mono px-2.5 py-1 rounded bg-accent-primary/15 text-accent-primary whitespace-nowrap">
+                  Eintrag #{currentSession.trades.length + 1}
+                </span>
+              </div>
               <div className="grid grid-cols-4 gap-4">
                 <div>
                   <label className="input-label">Währungspaar</label>
@@ -510,6 +644,56 @@ export function Backtest() {
                     <Line type="monotone" dataKey="equity" stroke="#FFD700" strokeWidth={2} dot={{ fill: '#FFD700', strokeWidth: 0, r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Setup-Performance */}
+          {setupStats.length > 0 && (
+            <div className="card mt-6">
+              <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
+                <BarChart3 size={20} className="text-accent-primary" />
+                Setup-Performance
+              </h3>
+              <p className="text-xs text-text-muted mb-4">
+                Expectancy = Ø R pro Trade (ΣR ÷ Anzahl). Werte mit weniger als {MIN_SAMPLE} Trades sind statistisch
+                unsicher (ausgegraut) — noch zu kleine Stichprobe für eine belastbare Aussage.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 px-3 text-text-muted font-medium">Setup</th>
+                      <th className="text-right py-2 px-3 text-text-muted font-medium">Trades (n)</th>
+                      <th className="text-right py-2 px-3 text-text-muted font-medium">Winrate</th>
+                      <th className="text-right py-2 px-3 text-text-muted font-medium">Expectancy</th>
+                      <th className="text-right py-2 px-3 text-text-muted font-medium">ΣR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {setupStats.map(s => (
+                      <tr key={s.key} className={clsx('border-b border-border/50 hover:bg-white/[0.03]', !s.reliable && 'opacity-50')}>
+                        <td className="py-2 px-3 font-medium">
+                          <span className="inline-flex items-center gap-2">
+                            {s.color && <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }} />}
+                            {s.label}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono">
+                          {s.n}
+                          {!s.reliable && <span className="ml-1 text-[10px] text-accent-gold" title={`Stichprobe < ${MIN_SAMPLE}`}>⚠</span>}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono">{s.winRate.toFixed(0)}%</td>
+                        <td className={clsx('py-2 px-3 text-right font-mono font-semibold', s.expectancy >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
+                          {s.expectancy >= 0 ? '+' : ''}{s.expectancy.toFixed(2)}R
+                        </td>
+                        <td className={clsx('py-2 px-3 text-right font-mono', s.totalR >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
+                          {s.totalR >= 0 ? '+' : ''}{s.totalR.toFixed(1)}R
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
