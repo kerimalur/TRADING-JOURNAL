@@ -19,6 +19,7 @@
  */
 
 import type { CurrencyAnalysis, PairSignal } from './smartCotService';
+import { surpriseFor, type CurrencySurprise } from './fundamentalDrivers';
 
 export interface WeeklyEvent {
   date: string;       // ISO
@@ -134,6 +135,7 @@ export function buildWeeklyOutlook(
   analyses: CurrencyAnalysis[],
   pairSignals: PairSignal[],
   weeklyEvents: WeeklyEvent[],
+  surprise: Record<string, CurrencySurprise> = {},
 ): WeeklyPairOutlook[] {
   const byCode = new Map<string, CurrencyAnalysis>();
   for (const a of analyses) {
@@ -186,6 +188,18 @@ export function buildWeeklyOutlook(
       if (spreadNarrowing && !spreadWidening) conf -= 4;
     }
 
+    // ── #3 Wachstums-Überraschung (Daten-Momentum dieser/letzter Woche) ──
+    const baseSurp = surpriseFor(surprise, sig.baseCurrency);
+    const quoteSurp = surpriseFor(surprise, sig.quoteCurrency);
+    const surpDelta = (baseSurp?.score ?? 0) - (quoteSurp?.score ?? 0); // >0 stützt Long
+    let surpriseDriver: string | null = null;
+    if (Math.abs(surpDelta) >= 20) {
+      const supportsLean = (surpDelta > 0) === (sig.direction === 'long');
+      conf += supportsLean ? 5 : -5;
+      const strongerData = surpDelta > 0 ? sig.baseCurrency : sig.quoteCurrency;
+      surpriseDriver = `Daten-Überraschung: ${strongerData} überrascht zuletzt positiver — ${supportsLean ? 'stützt' : 'bremst'} die Idee (nur jüngste Woche).`;
+    }
+
     // ── Risk-Off-Wächter: Carry-Paare (Short auf sicheren Hafen) verwundbar ──
     const shortsHaven =
       (SAFE_HAVENS.includes(sig.quoteCurrency) && sig.direction === 'long') ||
@@ -235,6 +249,8 @@ export function buildWeeklyOutlook(
       if (strongSide?.isExtreme && strongSide.weeksAtExtreme > 4) {
         drivers.push(`Warnung: ${strongSide.currency} ist seit ${strongSide.weeksAtExtreme} Wochen am Extrem — erhöhtes Rückschlagrisiko.`);
       }
+
+      if (surpriseDriver) drivers.push(surpriseDriver);
     }
 
     result.push({

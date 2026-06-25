@@ -38,6 +38,9 @@ import { describeCurrency, describePairIdea } from '@/services/cotNarrative';
 import {
   buildWeeklyOutlook, prepareWeeklyEvents, detectRiskRegime, type WeeklyEvent,
 } from '@/services/weeklyOutlook';
+import { growthSurprise, surpriseFor, type CurrencySurprise } from '@/services/fundamentalDrivers';
+import { saveWeeklySnapshot } from '@/services/snapshotService';
+import { evaluateMechanical, type EvalResult, type PricePoint } from '@/services/cotEval';
 
 const CURRENCIES = [
   { id: 'DXY', name: 'DXY', flag: '🇺🇸' },
@@ -64,8 +67,10 @@ export function COTData() {
   const [dataSource, setDataSource] = useState<'live' | 'cache' | 'manual' | 'none'>('none');
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualInputData, setManualInputData] = useState<Record<string, { long: string; short: string }>>({});
-  const [activeTab, setActiveTab] = useState<'weekly' | 'overview' | 'pairs' | 'ml'>('weekly');
+  const [activeTab, setActiveTab] = useState<'weekly' | 'overview' | 'eval' | 'ml'>('weekly');
+  const [priceData, setPriceData] = useState<Record<string, PricePoint[]>>({});
   const [weeklyEvents, setWeeklyEvents] = useState<WeeklyEvent[]>([]);
+  const [surprise, setSurprise] = useState<Record<string, CurrencySurprise>>({});
   const [mlPredictions, setMlPredictions] = useState<Record<string, MLPrediction>>({});
   const [mlLoading, setMlLoading] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -73,6 +78,11 @@ export function COTData() {
   useEffect(() => {
     loadData();
     loadCalendar();
+    // Gecachte Preise hydrieren (für Trefferquote-Auswertung ohne Refresh)
+    try {
+      const cp = localStorage.getItem('smartCotPrices');
+      if (cp) setPriceData(JSON.parse(cp));
+    } catch { /* ignore */ }
     // News/Kalender stündlich aktualisieren
     const interval = setInterval(loadCalendar, 60 * 60 * 1000);
     return () => clearInterval(interval);
@@ -82,12 +92,16 @@ export function COTData() {
   const loadCalendar = async (force = false) => {
     try {
       // 1h-Cache prüfen
+      const apply = (events: any[]) => {
+        setWeeklyEvents(prepareWeeklyEvents(events));
+        setSurprise(growthSurprise(events)); // #3 Wachstums-Überraschung
+      };
       const cachedRaw = localStorage.getItem('cotCalendarCache');
       if (!force && cachedRaw) {
         const cached = JSON.parse(cachedRaw);
         const ageMin = (Date.now() - (cached.timestamp || 0)) / 60000;
         if (ageMin < 60 && Array.isArray(cached.events)) {
-          setWeeklyEvents(prepareWeeklyEvents(cached.events));
+          apply(cached.events);
           return;
         }
       }
@@ -96,11 +110,11 @@ export function COTData() {
       const res = await api.fetchEconomicCalendar();
       if (res?.success && Array.isArray(res.data)) {
         localStorage.setItem('cotCalendarCache', JSON.stringify({ events: res.data, timestamp: Date.now() }));
-        setWeeklyEvents(prepareWeeklyEvents(res.data));
+        apply(res.data);
       } else if (cachedRaw) {
         // Fehlgeschlagen → alten Cache verwenden
         const cached = JSON.parse(cachedRaw);
-        if (Array.isArray(cached.events)) setWeeklyEvents(prepareWeeklyEvents(cached.events));
+        if (Array.isArray(cached.events)) apply(cached.events);
       }
     } catch (err) {
       console.warn('Kalender konnte nicht geladen werden:', err);
@@ -295,6 +309,8 @@ export function COTData() {
         return;
       }
 
+      setPriceData(priceData); // für die Trefferquote-Auswertung
+
       // ML für jede Währung laufen lassen
       const predictions: Record<string, MLPrediction> = {};
       for (const ccy of CURRENCIES.map(c => c.id)) {
@@ -419,12 +435,39 @@ export function COTData() {
 
   // Sonntags-Wochenausblick: fundamentaler Bias × Event-Risiko der Woche
   const weeklyOutlook = useMemo(
-    () => buildWeeklyOutlook(analyses, pairSignals, weeklyEvents),
-    [analyses, pairSignals, weeklyEvents]
+    () => buildWeeklyOutlook(analyses, pairSignals, weeklyEvents, surprise),
+    [analyses, pairSignals, weeklyEvents, surprise]
   );
 
   // Risk-Off-Wächter (JPY/CHF-Stärke) → Carry-Warnung
   const riskRegime = useMemo(() => detectRiskRegime(analyses), [analyses]);
+
+  // Trefferquote-Auswertung (mechanische Historie: stärkste vs. schwächste Währung)
+  const evalResult = useMemo<EvalResult | null>(() => {
+    if (snapshots.length === 0 || Object.keys(priceData).length === 0) return null;
+    try { return evaluateMechanical(snapshots, priceData, 4); } catch { return null; }
+  }, [snapshots, priceData]);
+
+  // #2 Sonntags-Snapshot: einmal pro ISO-Woche die Stärke-Leiter + Leans + Carry-Benchmark
+  // persistieren (Validierungs-Rückgrat). Idempotent pro Woche.
+  useEffect(() => {
+    if (rankedAnalyses.length === 0 || weeklyOutlook.length === 0) return;
+    const benchmarkCarry = [...analyses]
+      .filter(a => a.latestDate)
+      .sort((a, b) => b.rateDifferential - a.rateDifferential)
+      .map(a => a.currency);
+    saveWeeklySnapshot({
+      strength: rankedAnalyses.map(a => ({
+        currency: a.currency,
+        conviction: a.finalConviction,
+        signal: a.currentSignal,
+        percentile: a.currentPercentile,
+        stretched: a.specCrowdingExtreme || (a.isExtreme && a.weeksAtExtreme > 4),
+      })),
+      benchmarkCarry,
+      leans: weeklyOutlook.map(o => ({ pair: o.pair, lean: o.lean, confidenceLabel: o.confidenceLabel })),
+    }).catch(() => { /* nicht kritisch */ });
+  }, [rankedAnalyses, weeklyOutlook, analyses]);
 
   const getScoreColor = (score: number) => {
     if (score >= 40) return '#22c55e';
@@ -623,16 +666,13 @@ export function COTData() {
             <Database size={10} className="inline mr-1" /> Währungen
           </button>
           <button
-            onClick={() => setActiveTab('pairs')}
+            onClick={() => setActiveTab('eval')}
             className={clsx(
               'text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
-              activeTab === 'pairs' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary'
+              activeTab === 'eval' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary'
             )}
           >
-            <ArrowRightLeft size={10} className="inline mr-1" /> Pair Signale
-            {pairSignals.length > 0 && (
-              <span className="ml-1 bg-accent-primary/30 text-accent-primary px-1 py-0 rounded text-[8px]">{pairSignals.length}</span>
-            )}
+            <CheckCircle2 size={10} className="inline mr-1" /> Trefferquote
           </button>
           <button
             onClick={() => setActiveTab('ml')}
@@ -674,8 +714,14 @@ export function COTData() {
                 if (a.rateDifferential > 0.25) parts.push('Carry+');
                 else if (a.rateDifferential < -0.25) parts.push('Carry−');
                 if (a.momentumSignal.includes('accelerating')) parts.push('Momentum↑');
+                const s = surpriseFor(surprise, a.currency);
+                if (s && s.count > 0 && s.score >= 20) parts.push('Daten+');
+                else if (s && s.count > 0 && s.score <= -20) parts.push('Daten−');
                 return parts.join(' · ');
               };
+              // #3 Crowding/Extrem-Warnung: starke Positionierung kann am Wendepunkt sein
+              const stretched = (a: typeof rankedAnalyses[number]) =>
+                a.specCrowdingExtreme || (a.isExtreme && a.weeksAtExtreme > 4);
               const Row = ({ a, strong: isStrong }: { a: typeof rankedAnalyses[number]; strong: boolean }) => (
                 <button
                   onClick={() => { setActiveTab('overview'); setSelectedCurrency(a.currency); }}
@@ -683,6 +729,12 @@ export function COTData() {
                 >
                   <span className="text-base w-6 text-center">{flagOf(a.currency)}</span>
                   <span className="text-xs font-bold text-text-primary w-9">{a.currency}</span>
+                  {stretched(a) && (
+                    <span className="text-[8px] uppercase tracking-[0.06em] font-bold px-1 py-0.5 rounded bg-accent-gold/15 text-accent-gold flex-shrink-0"
+                      title="Positionierung überdehnt/überfüllt — erhöhtes Rückschlagrisiko. Stark, aber evtl. nahe am Wendepunkt.">
+                      ⚠ ausgereizt
+                    </span>
+                  )}
                   <span className="text-[9px] text-text-muted flex-1 truncate">{tagFor(a)}</span>
                   <span className="font-mono tabular-nums text-xs font-bold" style={{ color: isStrong ? '#22c55e' : '#ef4444' }}>
                     {a.finalConviction > 0 ? '+' : ''}{a.finalConviction}
@@ -793,11 +845,14 @@ export function COTData() {
                         </span>
                       </div>
 
-                      {/* Konfidenz */}
-                      <div className="mb-2.5" title="Confluence: wie viele Treiber in dieselbe Richtung zeigen. Keine statistische Trefferquote.">
+                      {/* Signal-Stärke (Confluence) — bewusst KEINE %-Trefferquote */}
+                      <div className="mb-2.5" title="Signal-Stärke = wie viele fundamentale Treiber in dieselbe Richtung zeigen (Confluence). Das ist KEINE backgetestete Trefferquote/Wahrscheinlichkeit.">
                         <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-[8px] uppercase tracking-[0.1em] text-text-muted">Konfidenz ({o.confidenceLabel})</span>
-                          <span className="font-mono tabular-nums text-[10px] font-bold" style={{ color: leanColor }}>{o.confidence}%</span>
+                          <span className="text-[8px] uppercase tracking-[0.1em] text-text-muted">Signal-Stärke</span>
+                          <span className="text-[9px] uppercase tracking-[0.08em] font-bold px-1.5 py-0.5 rounded"
+                            style={{ backgroundColor: `${leanColor}1a`, color: leanColor }}>
+                            {o.confidenceLabel} · {o.drivers.filter(d => !d.startsWith('Warnung')).length} Treiber
+                          </span>
                         </div>
                         <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                           <div className="h-full rounded-full" style={{ width: `${o.confidence}%`, backgroundColor: leanColor }} />
@@ -1159,116 +1214,137 @@ export function COTData() {
           </motion.div>
         )}
 
-        {activeTab === 'pairs' && (
-          <motion.div key="pairs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        {activeTab === 'eval' && (
+          <motion.div key="eval" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
 
-            {pairSignals.length === 0 ? (
+            {/* Intro */}
+            <div className="mb-4 px-3 py-2.5 bg-accent-primary/5 border border-accent-primary/15 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle2 size={12} className="text-accent-primary" />
+                <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-text-primary">Trefferquote — wie oft lag das Tool richtig?</span>
+              </div>
+              <p className="text-[10px] text-text-muted leading-relaxed">
+                Mechanische Simulation auf der echten COT-Historie: jede Woche <strong className="text-text-secondary">stärkste vs. schwächste Währung</strong> (nach Commercial-Perzentil, nur Vergangenheitsdaten), geprüft über <strong className="text-text-secondary">4 Wochen</strong>.
+                <span className="text-accent-gold"> Kein getuntes Backtest, kein Beweis</span> — grobe Orientierung. Ab jetzt sammeln die wöchentlichen Live-Snapshots den sauberen Forward-Test.
+                <strong className="text-text-secondary"> Maßstab: muss 50% (Münzwurf) schlagen.</strong>
+              </p>
+            </div>
+
+            {!evalResult || evalResult.sample === 0 ? (
               <div className="flex flex-col items-center justify-center py-12">
-                <Target size={24} className="text-text-muted mb-3" />
-                <p className="text-xs text-text-primary font-medium mb-1">Keine Pair-Signale</p>
-                <p className="text-[10px] text-text-muted">Smart Score Divergenz zwischen Währungen zu gering (&lt;15 Punkte).</p>
+                <CheckCircle2 size={24} className="text-text-muted mb-3" />
+                <p className="text-xs text-text-primary font-medium mb-1">Noch keine Auswertung</p>
+                <p className="text-[10px] text-text-muted mb-3">Klicke „Refresh & Analyse" — dann werden COT-Historie + Preise geladen und ausgewertet.</p>
+                <button onClick={() => fetchCOTData(true)} className="text-[10px] uppercase text-text-primary flex items-center gap-1.5 px-3 py-1.5 rounded bg-accent-primary/20 hover:bg-accent-primary/30">
+                  <RefreshCw size={10} /> Laden & auswerten
+                </button>
               </div>
             ) : (
               <>
-                {/* Top Signals */}
-                <div className="mb-3 flex items-center gap-2">
-                  <Target size={12} className="text-accent-primary" />
-                  <span className="text-[10px] uppercase tracking-[0.15em] font-semibold text-text-muted">
-                    {pairSignals.length} Pair-Signale
-                  </span>
-                  <span className="text-[9px] text-text-muted">sortiert nach Smart Score Divergenz</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  {pairSignals.map((signal, i) => (
-                    <motion.div
-                      key={signal.pair}
-                      initial={{ opacity: 0, scale: 0.96 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.04 }}
-                      className={clsx(
-                        'rounded-xl border bg-background-card p-4',
-                        signal.direction === 'long' ? 'border-pnl-positive/15' : 'border-pnl-negative/15'
-                      )}
-                    >
-                      {/* Pair Header */}
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-bold tracking-wide text-text-primary">{signal.pair}</span>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="font-mono tabular-nums text-sm font-bold"
-                            style={{ color: signal.direction === 'long' ? '#22c55e' : '#ef4444' }}
-                          >
-                            {signal.smartScore > 0 ? '+' : ''}{signal.smartScore}
-                          </span>
-                          <span className={clsx(
-                            'text-[9px] uppercase tracking-[0.1em] font-bold px-2 py-0.5 rounded',
-                            signal.direction === 'long' ? 'bg-pnl-positive/15 text-pnl-positive' : 'bg-pnl-negative/15 text-pnl-negative'
-                          )}>
-                            {signal.direction === 'long' ? '↑ LONG' : '↓ SHORT'}
-                          </span>
+                {/* Headline-Trefferquote */}
+                {(() => {
+                  const hr = evalResult.hitRate;
+                  const col = hr >= 58 ? '#22c55e' : hr >= 50 ? '#d4d4d8' : '#ef4444';
+                  return (
+                    <div className="mb-4 rounded-xl border border-border bg-background-card p-4">
+                      <div className="flex items-end gap-4">
+                        <div>
+                          <div className="text-[9px] uppercase tracking-[0.12em] text-text-muted mb-0.5">Trefferquote (4W)</div>
+                          <div className="font-mono tabular-nums text-3xl font-bold" style={{ color: col }}>{hr}%</div>
                         </div>
-                      </div>
-
-                      {/* Klartext: was die Idee bedeutet */}
-                      <p className="text-[11px] text-text-secondary leading-snug mb-3">
-                        {describePairIdea(signal.pair, signal.direction, signal.baseCurrency, signal.quoteCurrency)}
-                      </p>
-
-                      {/* Score Comparison */}
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="flex-1 bg-white/[0.02] rounded px-2 py-1.5 text-center">
-                          <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted">{signal.baseCurrency}</div>
-                          <div className="font-mono tabular-nums text-xs font-bold" style={{ color: getScoreColor(signal.baseSmartScore) }}>
-                            {signal.baseSmartScore > 0 ? '+' : ''}{signal.baseSmartScore}
+                        <div className="flex-1 pb-1">
+                          {/* Skala mit 50%-Linie */}
+                          <div className="h-3 bg-white/[0.05] rounded-full relative overflow-hidden">
+                            <div className="absolute top-0 h-full rounded-full" style={{ width: `${hr}%`, backgroundColor: col }} />
+                            <div className="absolute top-0 h-full w-px bg-white/50" style={{ left: '50%' }} title="Münzwurf 50%" />
+                            <div className="absolute top-0 h-full w-px bg-pnl-positive/60" style={{ left: '60%' }} title="ab ~60% gut" />
                           </div>
-                        </div>
-                        <span className="text-text-muted text-[10px]">vs</span>
-                        <div className="flex-1 bg-white/[0.02] rounded px-2 py-1.5 text-center">
-                          <div className="text-[8px] uppercase tracking-[0.1em] text-text-muted">{signal.quoteCurrency}</div>
-                          <div className="font-mono tabular-nums text-xs font-bold" style={{ color: getScoreColor(signal.quoteSmartScore) }}>
-                            {signal.quoteSmartScore > 0 ? '+' : ''}{signal.quoteSmartScore}
+                          <div className="flex justify-between text-[8px] text-text-muted mt-0.5">
+                            <span>0%</span><span>50% Münzwurf</span><span>100%</span>
                           </div>
                         </div>
                       </div>
-
-                      {/* Strength + Momentum */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[8px] uppercase tracking-[0.1em] text-text-muted mr-1">STR</span>
-                          {[...Array(5)].map((_, j) => (
-                            <div
-                              key={j}
-                              className={clsx(
-                                'w-1.5 h-1.5 rounded-full',
-                                j < signal.strength ? 'bg-accent-primary' : 'bg-white/[0.06]'
-                              )}
-                            />
-                          ))}
-                        </div>
-                        {signal.momentumAligned && (
-                          <span className="text-[8px] uppercase tracking-[0.1em] bg-pnl-positive/10 text-pnl-positive px-1.5 py-0.5 rounded font-semibold flex items-center gap-0.5">
-                            <CheckCircle2 size={8} /> Momentum ✓
-                          </span>
+                      <div className="flex gap-4 mt-3 text-[10px]">
+                        <span className="text-text-muted">Stichprobe: <span className="text-text-secondary font-semibold">{evalResult.sample} Wochen</span></span>
+                        <span className="text-text-muted">Ø Bewegung bei Treffern: <span className="text-pnl-positive font-semibold">{evalResult.avgMovePct}%</span></span>
+                        {evalResult.sample < 40 && (
+                          <span className="text-accent-gold">⚠ kleine Stichprobe — noch nicht belastbar</span>
                         )}
                       </div>
+                    </div>
+                  );
+                })()}
 
-                      {/* Reasons */}
-                      <div className="space-y-1 mt-2 pt-2 border-t border-white/[0.04]">
-                        {signal.reasons.slice(0, 6).map((reason, j) => (
-                          <div key={j} className="flex items-start gap-1.5 text-[9px] text-text-muted leading-relaxed">
-                            <span className={clsx(
-                              'mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0',
-                              reason.impact === 'positive' ? 'bg-pnl-positive' :
-                              reason.impact === 'negative' ? 'bg-pnl-negative' : 'bg-text-muted'
-                            )} />
-                            <span>{reason.description}</span>
+                {/* Treiber-Attribution */}
+                {evalResult.byDriver.length > 0 && (
+                  <div className="mb-4 rounded-xl border border-border bg-background-card p-4">
+                    <div className="text-[10px] uppercase tracking-[0.15em] font-semibold text-text-muted mb-2">Was verdient? — Treiber-Attribution</div>
+                    <p className="text-[9px] text-text-muted mb-3">Trefferquote jedes Treibers einzeln: sagt eine hohe/niedrige Ausprägung die Richtung der Folge-4-Wochen voraus?</p>
+                    <div className="space-y-2">
+                      {evalResult.byDriver.map((d, i) => {
+                        const col = d.hitRate >= 55 ? '#22c55e' : d.hitRate >= 48 ? '#d4d4d8' : '#ef4444';
+                        return (
+                          <div key={i} className="flex items-center gap-3">
+                            <span className="text-[10px] text-text-secondary w-36">{d.driver}</span>
+                            <div className="flex-1 h-2 bg-white/[0.05] rounded-full relative overflow-hidden">
+                              <div className="absolute top-0 h-full rounded-full" style={{ width: `${d.hitRate}%`, backgroundColor: col }} />
+                              <div className="absolute top-0 h-full w-px bg-white/50" style={{ left: '50%' }} />
+                            </div>
+                            <span className="font-mono tabular-nums text-[10px] font-bold w-9 text-right" style={{ color: col }}>{d.hitRate}%</span>
+                            <span className="text-[8px] text-text-muted w-12 text-right">n={d.sample}</span>
                           </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  ))}
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Pro Währung */}
+                  <div className="rounded-xl border border-border bg-background-card p-4">
+                    <div className="text-[10px] uppercase tracking-[0.15em] font-semibold text-text-muted mb-2">Trefferquote pro Währung</div>
+                    <div className="space-y-1">
+                      {evalResult.perCurrency.map((c, i) => {
+                        const col = c.hitRate >= 55 ? '#22c55e' : c.hitRate >= 48 ? '#d4d4d8' : '#ef4444';
+                        return (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="text-base w-6 text-center">{flagOf(c.currency === 'USD' ? 'DXY' : c.currency)}</span>
+                            <span className="text-xs font-bold text-text-primary w-9">{c.currency}</span>
+                            <div className="flex-1 h-1.5 bg-white/[0.05] rounded-full overflow-hidden relative">
+                              <div className="absolute top-0 h-full rounded-full" style={{ width: `${c.hitRate}%`, backgroundColor: col }} />
+                              <div className="absolute top-0 h-full w-px bg-white/40" style={{ left: '50%' }} />
+                            </div>
+                            <span className="font-mono tabular-nums text-[10px] font-bold w-9 text-right" style={{ color: col }}>{c.hitRate}%</span>
+                            <span className="text-[8px] text-text-muted w-10 text-right">n={c.sample}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Letzte Wochen ✓/✗ */}
+                  <div className="rounded-xl border border-border bg-background-card p-4">
+                    <div className="text-[10px] uppercase tracking-[0.15em] font-semibold text-text-muted mb-2">Letzte Wochen</div>
+                    <div className="space-y-1">
+                      {[...evalResult.weeks].slice(-14).reverse().map((w, i) => (
+                        <div key={i} className="flex items-center gap-2 text-[10px]">
+                          <span className={clsx('w-4 text-center font-bold', w.correct ? 'text-pnl-positive' : 'text-pnl-negative')}>
+                            {w.correct ? '✓' : '✗'}
+                          </span>
+                          <span className="font-mono tabular-nums text-text-muted w-20">{w.date}</span>
+                          <span className="text-text-secondary flex-1">{w.pair}</span>
+                          <span className={clsx('font-mono tabular-nums', w.movePct >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
+                            {w.movePct >= 0 ? '+' : ''}{w.movePct.toFixed(1)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
+
+                <p className="text-[9px] text-text-muted mt-3 leading-relaxed px-1">
+                  <strong className="text-accent-gold">Ehrlich:</strong> Unter ~40 Wochen ist alles Zufallsrauschen. Diese Simulation nutzt nur COT-Positionierung (Carry/Wachstum fehlen historisch). Die <strong className="text-text-secondary">Live-Snapshots ab jetzt</strong> messen deine *vollständige* Methode forward — das ist der ehrliche Test. Beachte Spread/Swap, die kleine Edges auffressen.
+                </p>
               </>
             )}
 

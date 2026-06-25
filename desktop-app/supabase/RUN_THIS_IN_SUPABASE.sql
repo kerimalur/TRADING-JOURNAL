@@ -240,6 +240,17 @@ CREATE TABLE IF NOT EXISTS cot_pair_signals (
   UNIQUE(user_id, pair)
 );
 
+-- Wöchentliche Snapshots (Validierungs-Rückgrat: Stärke-Leiter + Leans + Carry-Benchmark)
+CREATE TABLE IF NOT EXISTS cot_weekly_snapshots (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  iso_week TEXT NOT NULL,
+  snapshot_date TEXT NOT NULL,
+  data JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id, iso_week)
+);
+
 -- ============================================================
 -- OUTLOOK-ERWEITERUNGEN (Star-System, Strategy)
 -- ============================================================
@@ -260,7 +271,7 @@ BEGIN
     'user_profiles','accounts','strategies','outlooks','trades','trade_screenshots',
     'transactions','backtest_sessions','fundamentals_notes','pair_notes','risk_settings',
     'user_preferences','user_watchlists','user_widget_settings',
-    'cot_snapshots','cot_currency_analysis','cot_pair_signals'
+    'cot_snapshots','cot_currency_analysis','cot_pair_signals','cot_weekly_snapshots'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
@@ -280,6 +291,7 @@ CREATE INDEX IF NOT EXISTS idx_outlooks_starred ON outlooks(user_id) WHERE is_st
 CREATE INDEX IF NOT EXISTS idx_cot_snap_lookup ON cot_snapshots(user_id, currency, date DESC);
 CREATE INDEX IF NOT EXISTS idx_cot_analysis_user ON cot_currency_analysis(user_id);
 CREATE INDEX IF NOT EXISTS idx_cot_pairs_user ON cot_pair_signals(user_id);
+CREATE INDEX IF NOT EXISTS idx_cot_snapshots_week ON cot_weekly_snapshots(user_id, iso_week DESC);
 
 -- ============================================================
 -- TRIGGERS (auto updated_at)
