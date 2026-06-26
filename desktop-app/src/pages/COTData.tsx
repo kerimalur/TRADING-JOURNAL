@@ -41,6 +41,9 @@ import {
 import { growthSurprise, surpriseFor, type CurrencySurprise } from '@/services/fundamentalDrivers';
 import { saveWeeklySnapshot } from '@/services/snapshotService';
 import { evaluateMechanical, type EvalResult, type PricePoint } from '@/services/cotEval';
+import { extractReleases, releasesByCurrency, releaseSupport, type MacroRelease } from '@/services/fundamentalData';
+import { loadPref, savePref } from '@/services/preferencesService';
+import { SETUP_DEFINITIONS } from '@/types';
 
 const CURRENCIES = [
   { id: 'DXY', name: 'DXY', flag: '🇺🇸' },
@@ -71,9 +74,64 @@ export function COTData() {
   const [priceData, setPriceData] = useState<Record<string, PricePoint[]>>({});
   const [weeklyEvents, setWeeklyEvents] = useState<WeeklyEvent[]>([]);
   const [surprise, setSurprise] = useState<Record<string, CurrencySurprise>>({});
+  const [rawEvents, setRawEvents] = useState<any[]>([]);
   const [mlPredictions, setMlPredictions] = useState<Record<string, MLPrediction>>({});
   const [mlLoading, setMlLoading] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+
+  // Manueller Geopolitik-/Risiko-Schalter (Krieg etc. = kein sauberer Daten-Feed).
+  type GeoLevel = 'calm' | 'elevated' | 'high';
+  const [geoRisk, setGeoRisk] = useState<{ level: GeoLevel; note: string }>(() => {
+    try {
+      const raw = localStorage.getItem('geoRisk');
+      return raw ? JSON.parse(raw) : { level: 'calm', note: '' };
+    } catch { return { level: 'calm', note: '' }; }
+  });
+  const setGeo = (next: { level: GeoLevel; note: string }) => {
+    setGeoRisk(next);
+    localStorage.setItem('geoRisk', JSON.stringify(next));
+    savePref('geoRisk', next).catch(() => { /* offline ok */ });
+  };
+  // Geopolitik aus Backend hydrieren (überschreibt lokalen Mirror, wenn vorhanden)
+  useEffect(() => {
+    (async () => {
+      try {
+        const remote = await loadPref<{ level: GeoLevel; note: string } | null>('geoRisk', null);
+        if (remote && remote.level) { setGeoRisk(remote); localStorage.setItem('geoRisk', JSON.stringify(remote)); }
+      } catch { /* nicht kritisch */ }
+    })();
+  }, []);
+
+  // Länder-Makrodaten aus den rohen Kalender-Events (actual vs forecast)
+  const releasesByCcy = useMemo(() => releasesByCurrency(extractReleases(rawEvents)), [rawEvents]);
+
+  // #3 ML ehrlich: Performance aus DEINEN Backtest-Trades (was lief gut/schlecht).
+  // "Selbst-verbessernd" = mehr Trades → belastbarere Schätzung, kein Magie-Bewusstsein.
+  const MIN_TRADE_SAMPLE = 20;
+  const tradePerf = useMemo(() => {
+    let trades: any[] = [];
+    try {
+      const raw = localStorage.getItem('backtestSessions');
+      if (raw) for (const s of JSON.parse(raw)) trades = trades.concat(s.trades || []);
+    } catch { /* ignore */ }
+    const aggBy = (keyFn: (t: any) => string[]) => {
+      const agg: Record<string, { n: number; wins: number; losses: number; totalR: number }> = {};
+      for (const t of trades) {
+        for (const k of keyFn(t)) {
+          if (!agg[k]) agg[k] = { n: 0, wins: 0, losses: 0, totalR: 0 };
+          agg[k].n++; agg[k].totalR += t.rMultiple || 0;
+          if (t.result === 'win') agg[k].wins++; else if (t.result === 'loss') agg[k].losses++;
+        }
+      }
+      return Object.entries(agg).map(([key, v]) => {
+        const decided = v.wins + v.losses;
+        return { key, n: v.n, winRate: decided > 0 ? (v.wins / decided) * 100 : 0, totalR: v.totalR, expectancy: v.n > 0 ? v.totalR / v.n : 0 };
+      });
+    };
+    const setups = aggBy(t => (t.setups?.length ? t.setups : ['(ohne Setup)'])).sort((a, b) => b.expectancy - a.expectancy);
+    const problems = aggBy(t => (t.problems?.length ? t.problems : [])).sort((a, b) => a.totalR - b.totalR); // größter Leak zuerst
+    return { total: trades.length, setups, problems };
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -95,6 +153,7 @@ export function COTData() {
       const apply = (events: any[]) => {
         setWeeklyEvents(prepareWeeklyEvents(events));
         setSurprise(growthSurprise(events)); // #3 Wachstums-Überraschung
+        setRawEvents(Array.isArray(events) ? events : []); // #4 Länder-Makrodaten
       };
       const cachedRaw = localStorage.getItem('cotCalendarCache');
       if (!force && cachedRaw) {
@@ -628,6 +687,38 @@ export function COTData() {
         <button onClick={() => setShowInfoModal(true)} className="ml-1 text-accent-gold/80 hover:text-accent-gold underline decoration-dotted">wie's funktioniert</button>
       </motion.div>
 
+      {/* ── Geopolitik / Risiko (manuell — kein sauberer Daten-Feed für Krieg etc.) ── */}
+      <div className={clsx(
+        'mb-4 px-3 py-2 rounded-lg border flex flex-wrap items-center gap-2',
+        geoRisk.level === 'high' ? 'bg-pnl-negative/10 border-pnl-negative/30'
+          : geoRisk.level === 'elevated' ? 'bg-accent-gold/10 border-accent-gold/25'
+          : 'bg-white/[0.02] border-white/[0.06]'
+      )}>
+        <AlertTriangle size={12} className={clsx('flex-shrink-0',
+          geoRisk.level === 'high' ? 'text-pnl-negative' : geoRisk.level === 'elevated' ? 'text-accent-gold' : 'text-text-muted')} />
+        <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">Geopolitik / Risiko</span>
+        <div className="flex gap-1">
+          {([['calm', 'Ruhig'], ['elevated', 'Erhöht'], ['high', 'Hoch']] as const).map(([lvl, label]) => (
+            <button key={lvl} onClick={() => setGeo({ ...geoRisk, level: lvl })}
+              className={clsx('text-[10px] px-2 py-0.5 rounded transition-colors',
+                geoRisk.level === lvl
+                  ? (lvl === 'high' ? 'bg-pnl-negative/30 text-pnl-negative font-bold' : lvl === 'elevated' ? 'bg-accent-gold/30 text-accent-gold font-bold' : 'bg-white/[0.08] text-text-primary font-bold')
+                  : 'text-text-muted hover:text-text-primary')}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <input
+          value={geoRisk.note}
+          onChange={e => setGeo({ ...geoRisk, note: e.target.value })}
+          placeholder="Notiz (z.B. Konflikt-Eskalation, Wahl, Sanktionen)…"
+          className="flex-1 min-w-[160px] bg-transparent text-[11px] text-text-secondary outline-none border-b border-white/[0.08] focus:border-accent-primary/40 px-1 py-0.5"
+        />
+        {geoRisk.level !== 'calm' && (
+          <span className="text-[10px] text-text-muted">→ Risk-Off-Bias: sichere Häfen (JPY/CHF) bevorzugt, Carry vorsichtig.</span>
+        )}
+      </div>
+
       {/* ── Error State ── */}
       {error && (
         <motion.div
@@ -943,6 +1034,11 @@ export function COTData() {
                 const isSelected = selectedCurrency === analysis.currency;
                 const color = getScoreColor(analysis.finalConviction);
                 const raw = latestRawByCcy[analysis.currency];
+                const ds = driversFor(analysis);
+                const supCount = ds.filter(d => d.supports === true).length;
+                const conCount = ds.filter(d => d.supports === false).length;
+                const consLabel = (supCount + conCount) === 0 ? 'neutral' : conCount > supCount ? 'widersprüchlich' : (supCount - conCount) >= 2 ? 'einig' : 'gemischt';
+                const consCol = conCount > supCount ? '#ef4444' : (supCount - conCount) >= 2 ? '#22c55e' : '#9ca3af';
 
                 return (
                   <motion.button
@@ -974,11 +1070,18 @@ export function COTData() {
                     </div>
 
                     {/* Headline */}
-                    <p className="text-[11px] text-text-secondary leading-snug mb-2.5">{n.headline}</p>
+                    <p className="text-[11px] text-text-secondary leading-snug mb-2">{n.headline}</p>
+
+                    {/* Treiber-Konsens: wie viele der 5 Treiber stützen den Bias */}
+                    <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-white/[0.05]">
+                      <span className="text-[8px] uppercase tracking-[0.08em] text-text-muted">Konsens</span>
+                      <span className="text-[10px] font-bold" style={{ color: consCol }}>{supCount} stützen · {conCount} dagegen</span>
+                      <span className="text-[8px] uppercase font-bold px-1.5 py-0.5 rounded ml-auto" style={{ backgroundColor: `${consCol}1a`, color: consCol }}>{consLabel}</span>
+                    </div>
 
                     {/* Treiber-Panel: 5 Treiber, COT als einer davon */}
                     <div className="space-y-1 mb-2.5">
-                      {driversFor(analysis).map(d => {
+                      {ds.map(d => {
                         const col = d.risk ? '#f0b429' : d.supports === true ? '#22c55e' : d.supports === false ? '#ef4444' : '#9ca3af';
                         const arrow = d.dir > 0 ? '↑' : d.dir < 0 ? '↓' : d.risk ? '⚠' : '·';
                         return (
@@ -1016,6 +1119,54 @@ export function COTData() {
                 );
               })}
             </div>
+
+            {/* ── Länder-Makrodaten (BIP / Arbeitsmarkt / Handel / Inflation / Zinsen) ── */}
+            {Object.keys(releasesByCcy).length > 0 && (
+              <div className="mb-4 rounded-xl border border-border bg-background-card p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Database size={12} className="text-accent-primary" />
+                  <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-text-primary">Makrodaten je Land</span>
+                  <span className="text-[9px] text-text-muted">— actual vs. forecast (jüngste ~3 Wochen)</span>
+                </div>
+                <p className="text-[9px] text-text-muted mb-3 leading-relaxed">
+                  <span className="text-pnl-positive">Grün</span> = Daten schlagen Forecast (stützt Währung),
+                  <span className="text-pnl-negative"> Rot</span> = darunter. Bei Arbeitslosigkeit ist „höher" schlecht — schon berücksichtigt.
+                  Nur Überraschung zählt, nicht der Absolutwert.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {rankedAnalyses
+                    .filter(a => (releasesByCcy[a.currency === 'DXY' ? 'USD' : a.currency] || []).length > 0)
+                    .map(a => {
+                      const code = a.currency === 'DXY' ? 'USD' : a.currency;
+                      const rels = (releasesByCcy[code] || []).slice(0, 6);
+                      return (
+                        <div key={a.currency} className="rounded-lg border border-white/[0.05] bg-white/[0.015] p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-base">{flagOf(a.currency)}</span>
+                            <span className="text-xs font-bold text-text-primary">{a.currency}</span>
+                          </div>
+                          <div className="space-y-1">
+                            {rels.map((r: MacroRelease, i: number) => {
+                              const sup = releaseSupport(r);
+                              const col = sup > 0 ? '#22c55e' : sup < 0 ? '#ef4444' : '#9ca3af';
+                              return (
+                                <div key={i} className="flex items-center gap-2 text-[10px]">
+                                  <span className="text-[8px] uppercase tracking-[0.06em] text-text-muted w-16 flex-shrink-0">{r.category}</span>
+                                  <span className="text-text-secondary flex-1 truncate" title={r.event}>{r.event}</span>
+                                  <span className="font-mono tabular-nums text-text-muted">
+                                    {r.actual ?? '—'}{r.forecast != null && <span className="text-text-muted/50"> / {r.forecast}</span>}
+                                  </span>
+                                  <span className="font-mono w-3 text-center" style={{ color: col }}>{sup > 0 ? '↑' : sup < 0 ? '↓' : '·'}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
 
             {/* ── Selected Currency Detail ── */}
             <AnimatePresence>
@@ -1468,6 +1619,65 @@ export function COTData() {
                   activeTab === 'ml' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary')}>
                 <Brain size={10} className="inline mr-1" /> Experimentell
               </button>
+            </div>
+
+            {/* #3 Lernen aus deinen Trades — Performance je Setup/Problem */}
+            <div className="mb-4 rounded-xl border border-accent-primary/20 bg-accent-primary/[0.03] p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Brain size={12} className="text-accent-primary" />
+                <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-text-primary">Lernen aus deinen Trades</span>
+                <span className="text-[9px] text-text-muted">— {tradePerf.total} Backtest-Trades</span>
+              </div>
+              <p className="text-[9px] text-text-muted mb-3 leading-relaxed">
+                Was lief gut, was schlecht — aus deinen geloggten Backtest-Trades. <strong className="text-text-secondary">Mehr Trades → belastbarere Zahlen</strong> (ehrliche Statistik, kein Magie-Lernen). Werte mit &lt;{MIN_TRADE_SAMPLE} Trades sind unsicher (grau).
+              </p>
+
+              {tradePerf.total === 0 ? (
+                <p className="text-[10px] text-text-muted">Noch keine Backtest-Trades geloggt. Logge welche im Backtest-Tab → hier erscheint die Auswertung.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Setup-Performance */}
+                  <div>
+                    <div className="text-[9px] uppercase tracking-[0.12em] font-semibold text-text-muted mb-2">Setups — beste zuerst</div>
+                    <div className="space-y-1">
+                      {tradePerf.setups.map(s => {
+                        const def = (SETUP_DEFINITIONS as any)[s.key];
+                        const reliable = s.n >= MIN_TRADE_SAMPLE;
+                        const col = s.expectancy >= 0 ? '#22c55e' : '#ef4444';
+                        return (
+                          <div key={s.key} className={clsx('flex items-center gap-2 text-[10px]', !reliable && 'opacity-50')}>
+                            <span className="text-text-secondary flex-1 truncate">{def?.label || s.key}</span>
+                            <span className="font-mono text-text-muted w-10 text-right">{s.winRate.toFixed(0)}%</span>
+                            <span className="font-mono w-12 text-right" style={{ color: col }}>{s.expectancy >= 0 ? '+' : ''}{s.expectancy.toFixed(2)}R</span>
+                            <span className="font-mono text-text-muted/70 w-12 text-right">n={s.n}{!reliable && ' ⚠'}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {/* Problem-Leak-Report */}
+                  <div>
+                    <div className="text-[9px] uppercase tracking-[0.12em] font-semibold text-text-muted mb-2">Fehler-Leaks — teuerste zuerst</div>
+                    {tradePerf.problems.length === 0 ? (
+                      <p className="text-[10px] text-text-muted">Keine Probleme getaggt.</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {tradePerf.problems.map(p => (
+                          <div key={p.key} className="flex items-center gap-2 text-[10px]">
+                            <span className="text-text-secondary flex-1 truncate">{p.key}</span>
+                            <span className="font-mono text-text-muted w-10 text-right">{p.winRate.toFixed(0)}%</span>
+                            <span className={clsx('font-mono w-12 text-right', p.totalR < 0 ? 'text-pnl-negative' : 'text-pnl-positive')}>{p.totalR >= 0 ? '+' : ''}{p.totalR.toFixed(1)}R</span>
+                            <span className="font-mono text-text-muted/70 w-12 text-right">n={p.n}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              <p className="text-[8px] text-text-muted mt-3 leading-relaxed">
+                COT-Kombination: ehrlich nur <strong className="text-text-secondary">vorwärts</strong> — dazu müsste jeder Trade mit der COT-Lage zum Einstieg getaggt werden (rückwirkend nicht rekonstruierbar). Das COT-Modell unten ist davon getrennt.
+              </p>
             </div>
 
             {/* Ehrlicher Hinweis */}
