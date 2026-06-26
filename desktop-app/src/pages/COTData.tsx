@@ -514,6 +514,37 @@ export function COTData() {
     return nextFriday;
   }, []);
 
+  // Einheitliches Treiber-Panel je Währung: COT ist nur EINER von fünf Treibern.
+  // Reine Anzeige aus vorhandenen Feldern — keine neue Berechnung.
+  // supports = Treiber-Richtung stimmt mit dem Gesamt-Bias (finalConviction) überein.
+  const driversFor = (a: CurrencyAnalysis) => {
+    const bias = Math.sign(a.finalConviction);
+    const raw = latestRawByCcy[a.currency];
+    const netK = (n: number) => {
+      const mag = Math.abs(n) >= 1000 ? `${Math.round(Math.abs(n) / 1000)}k` : `${Math.abs(n)}`;
+      return `${n > 0 ? '+' : n < 0 ? '−' : ''}${mag}`;
+    };
+    const cotDir = a.currentPercentile >= 60 ? 1 : a.currentPercentile <= 40 ? -1 : 0;
+    const momDir = a.momentumSignal.includes('long') ? 1 : a.momentumSignal.includes('short') ? -1 : 0;
+    const carry = a.rateDifferential;
+    const carryDir = carry > 0.25 ? 1 : carry < -0.25 ? -1 : 0;
+    const s = surpriseFor(surprise, a.currency);
+    const grDir = s && s.count > 0 ? (s.score >= 20 ? 1 : s.score <= -20 ? -1 : 0) : 0;
+    const evCount = weeklyEvents.filter(e => e.impact === 'high' && e.currency === a.currency).length;
+
+    const rows = [
+      { key: 'cot', label: 'Position. (COT)', dir: cotDir, value: `P${Math.round(a.currentPercentile)}${raw ? ' · ' + netK(raw.commercialsNet) : ''}`, risk: false },
+      { key: 'mom', label: 'Momentum', dir: momDir, value: getMomentumLabel(a.momentumSignal), risk: false },
+      { key: 'carry', label: 'Zins-Carry', dir: carryDir, value: `${carry > 0 ? '+' : ''}${carry.toFixed(2)}%`, risk: false },
+      { key: 'growth', label: 'Wachstum', dir: grDir, value: s && s.count > 0 ? `${s.score > 0 ? '+' : ''}${Math.round(s.score)} (${s.count})` : '—', risk: false },
+      { key: 'events', label: 'Event-Risiko', dir: 0, value: evCount > 0 ? `${evCount} High-Impact` : 'ruhig', risk: evCount > 0 },
+    ];
+    return rows.map(d => ({
+      ...d,
+      supports: bias !== 0 && d.dir !== 0 ? d.dir === bias : null as boolean | null,
+    }));
+  };
+
   // Smart Score bar chart data
   const scoreChartData = useMemo(() => {
     return sortedAnalyses.map(a => ({
@@ -895,57 +926,19 @@ export function COTData() {
         {activeTab === 'overview' && (
           <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
 
-            {/* ── Stärke-Leiter ── */}
-            <div className="mb-4 rounded-xl border border-border bg-background-card p-4">
+            {/* ── Intro: Treiber-Erklärung (Stärke-Ranking steht im Bias-Tab) ── */}
+            <div className="mb-4 px-3 py-2.5 bg-accent-primary/5 border border-accent-primary/15 rounded-lg">
               <div className="flex items-center gap-2 mb-1">
                 <Activity size={12} className="text-accent-primary" />
-                <span className="text-[11px] uppercase tracking-[0.15em] font-semibold text-text-primary">Stärke-Leiter</span>
+                <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-text-primary">Treiber je Währung</span>
+                <span className="text-[9px] text-text-muted">— warum stark/schwach</span>
               </div>
-              <p className="text-[10px] text-text-muted mb-3">
-                Wer ist fundamental stark, wer schwach? Sortiert nach Gesamt-Einschätzung (COT-Positionierung + Trend + Zins-Carry). Klick auf eine Währung für Details.
+              <p className="text-[10px] text-text-muted leading-relaxed">
+                Jede Währung aus <strong className="text-text-secondary">fünf Treibern</strong>: Positionierung (COT), Momentum,
+                Zins-Carry, Wachstum, Event-Risiko. <span className="text-pnl-positive">Grün</span> = Treiber stützt den Bias,
+                <span className="text-pnl-negative"> Rot</span> = arbeitet dagegen. <strong className="text-text-secondary">COT ist nur einer von fünf.</strong>{' '}
+                Sortiert nach Gesamt-Einschätzung. Klick auf eine Karte für Rohdaten + Verlauf.
               </p>
-              <div className="space-y-1">
-                {rankedAnalyses.map((a) => {
-                  const n = describeCurrency(a);
-                  const color = getScoreColor(a.finalConviction);
-                  const pct = Math.min(50, Math.abs(a.finalConviction) / 2);
-                  const isSel = selectedCurrency === a.currency;
-                  return (
-                    <button
-                      key={a.currency}
-                      onClick={() => setSelectedCurrency(isSel ? null : a.currency)}
-                      className={clsx(
-                        'w-full flex items-center gap-3 px-2 py-1.5 rounded-lg transition-colors text-left',
-                        isSel ? 'bg-white/[0.05] ring-1 ring-accent-primary/40' : 'hover:bg-white/[0.03]'
-                      )}
-                    >
-                      <span className="text-base w-6 text-center">{flagOf(a.currency)}</span>
-                      <span className="text-xs font-bold text-text-primary w-9">{a.currency}</span>
-                      <span
-                        className="text-[8px] uppercase tracking-[0.1em] font-bold px-1.5 py-0.5 rounded w-16 text-center"
-                        style={{ backgroundColor: `${color}1a`, color }}
-                      >
-                        {n.verdict}
-                      </span>
-                      {/* zentrierte Balken-Achse */}
-                      <div className="flex-1 h-2 bg-white/[0.04] rounded-full relative overflow-hidden">
-                        <div className="absolute left-1/2 top-0 w-px h-full bg-white/15" />
-                        <div
-                          className="absolute top-0 h-full rounded-full"
-                          style={{
-                            left: a.finalConviction >= 0 ? '50%' : `${50 - pct}%`,
-                            width: `${pct}%`,
-                            backgroundColor: color,
-                          }}
-                        />
-                      </div>
-                      <span className="font-mono tabular-nums text-xs font-bold w-9 text-right" style={{ color }}>
-                        {a.finalConviction > 0 ? '+' : ''}{a.finalConviction}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
             {/* ── Klartext-Karten pro Währung ── */}
@@ -955,7 +948,6 @@ export function COTData() {
                 const isSelected = selectedCurrency === analysis.currency;
                 const color = getScoreColor(analysis.finalConviction);
                 const raw = latestRawByCcy[analysis.currency];
-                const toneColor = (t: string) => t === 'pos' ? 'bg-pnl-positive' : t === 'neg' ? 'bg-pnl-negative' : 'bg-text-muted';
 
                 return (
                   <motion.button
@@ -989,17 +981,19 @@ export function COTData() {
                     {/* Headline */}
                     <p className="text-[11px] text-text-secondary leading-snug mb-2.5">{n.headline}</p>
 
-                    {/* 3 Säulen in Klartext */}
-                    <div className="space-y-1.5 mb-2.5">
-                      {n.pillars.map((p, j) => (
-                        <div key={j} className="flex items-start gap-2">
-                          <span className={clsx('mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0', toneColor(p.tone))} />
-                          <div className="min-w-0">
-                            <span className="text-[9px] uppercase tracking-[0.08em] text-text-muted font-semibold">{p.label}: </span>
-                            <span className="text-[10px] text-text-muted leading-snug">{p.text}</span>
+                    {/* Treiber-Panel: 5 Treiber, COT als einer davon */}
+                    <div className="space-y-1 mb-2.5">
+                      {driversFor(analysis).map(d => {
+                        const col = d.risk ? '#f0b429' : d.supports === true ? '#22c55e' : d.supports === false ? '#ef4444' : '#9ca3af';
+                        const arrow = d.dir > 0 ? '↑' : d.dir < 0 ? '↓' : d.risk ? '⚠' : '·';
+                        return (
+                          <div key={d.key} className="flex items-center gap-2">
+                            <span className="text-[8px] uppercase tracking-[0.06em] text-text-muted w-24 flex-shrink-0">{d.label}</span>
+                            <span className="font-mono text-[11px] w-3 text-center" style={{ color: col }}>{arrow}</span>
+                            <span className="text-[10px] flex-1 truncate" style={{ color: col }}>{d.value}</span>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     {/* Rohe COT-Zahlen */}
