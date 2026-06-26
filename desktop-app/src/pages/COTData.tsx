@@ -1375,23 +1375,75 @@ export function COTData() {
                     </div>
                   </div>
 
-                  {/* Letzte Wochen ✓/✗ */}
+                  {/* Schwellen-Lesehilfe: erklärt die COT-Begründung der Wochen-Tabelle */}
                   <div className="rounded-xl border border-border bg-background-card p-4">
-                    <div className="text-[10px] uppercase tracking-[0.15em] font-semibold text-text-muted mb-2">Letzte Wochen</div>
-                    <div className="space-y-1">
-                      {[...evalResult.weeks].slice(-14).reverse().map((w, i) => (
-                        <div key={i} className="flex items-center gap-2 text-[10px]">
-                          <span className={clsx('w-4 text-center font-bold', w.correct ? 'text-pnl-positive' : 'text-pnl-negative')}>
+                    <div className="text-[10px] uppercase tracking-[0.15em] font-semibold text-text-muted mb-2">So liest du die Begründung</div>
+                    <div className="space-y-1.5 text-[10px] text-text-muted leading-relaxed">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono tabular-nums px-1.5 py-0.5 rounded bg-pnl-positive/15 text-pnl-positive">Perz ≥ 60</span>
+                        <span>Commercial-Net bullish → COT <strong className="text-pnl-positive">long</strong></span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono tabular-nums px-1.5 py-0.5 rounded bg-pnl-negative/15 text-pnl-negative">Perz ≤ 40</span>
+                        <span>Commercial-Net bearish → COT <strong className="text-pnl-negative">short</strong></span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono tabular-nums px-1.5 py-0.5 rounded bg-accent-gold/15 text-accent-gold">≥ 90 / ≤ 10</span>
+                        <span>ausgereizt/crowded — Rückschlagrisiko</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono tabular-nums px-1.5 py-0.5 rounded bg-white/[0.06] text-text-secondary">Mom ↑/↓</span>
+                        <span>4W-Trend der Commercial-Net-Position</span>
+                      </div>
+                      <p className="pt-1 text-[9px]">Jede Woche: stärkste Perzentil-Währung (long) gegen schwächste (short). ✓ wenn das Pair sich über 4W in die erwartete Richtung bewegte.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Letzte Wochen — mit COT-Begründung (warum die Prognose so fiel) */}
+                <div className="rounded-xl border border-border bg-background-card p-4 mt-3">
+                  <div className="text-[10px] uppercase tracking-[0.15em] font-semibold text-text-muted mb-3">Letzte Wochen — mit COT-Begründung</div>
+                  <div className="space-y-1.5">
+                    {[...evalResult.weeks].slice(-14).reverse().map((w, i) => {
+                      // COT-Lesart aus dem Perzentil (gleiche Schwellen wie die Engine)
+                      const verdict = (p: number) => p >= 60 ? { t: 'long', c: '#22c55e' } : p <= 40 ? { t: 'short', c: '#ef4444' } : { t: 'neutral', c: '#d4d4d8' };
+                      const fmtMom = (m: number) => {
+                        const a = Math.abs(m);
+                        const s = a >= 1000 ? `${(a / 1000).toFixed(1)}k` : `${Math.round(a)}`;
+                        return `${m > 0 ? '↑' : m < 0 ? '↓' : '·'}${s}`;
+                      };
+                      const stretchTop = w.topPercentile >= 90;
+                      const stretchBottom = w.bottomPercentile <= 10;
+                      const vt = verdict(w.topPercentile);
+                      const vb = verdict(w.bottomPercentile);
+                      const Side = ({ ccy, perc, mom, v, stretched }: { ccy: string; perc: number; mom: number; v: { t: string; c: string }; stretched: boolean }) => (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="text-sm">{flagOf(ccy === 'USD' ? 'DXY' : ccy)}</span>
+                          <span className="text-[11px] font-bold text-text-primary">{ccy}</span>
+                          <span className="font-mono tabular-nums text-[10px] text-text-secondary">{perc.toFixed(0)}.Perz</span>
+                          <span className="font-mono tabular-nums text-[9px] text-text-muted">{fmtMom(mom)}</span>
+                          <span className="text-[8px] uppercase tracking-[0.06em] font-bold px-1 py-0.5 rounded" style={{ backgroundColor: `${v.c}1a`, color: v.c }}>COT {v.t}</span>
+                          {stretched && <span className="text-[8px] uppercase font-bold px-1 py-0.5 rounded bg-accent-gold/15 text-accent-gold" title="Positionierung am Extrem (ausgereizt)">⚠</span>}
+                        </span>
+                      );
+                      return (
+                        <div key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 border-b border-border/40 last:border-0">
+                          <span className={clsx('w-4 text-center font-bold text-sm', w.correct ? 'text-pnl-positive' : 'text-pnl-negative')}>
                             {w.correct ? '✓' : '✗'}
                           </span>
-                          <span className="font-mono tabular-nums text-text-muted w-20">{w.date}</span>
-                          <span className="text-text-secondary flex-1">{w.pair}</span>
-                          <span className={clsx('font-mono tabular-nums', w.movePct >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
+                          <span className="font-mono tabular-nums text-[10px] text-text-muted w-20">{w.date}</span>
+                          <span className="text-xs font-bold text-text-secondary w-20">{w.pair}</span>
+                          <Side ccy={w.topCcy} perc={w.topPercentile} mom={w.topMomentum4w} v={vt} stretched={stretchTop} />
+                          <span className="text-[10px] text-text-muted">vs</span>
+                          <Side ccy={w.bottomCcy} perc={w.bottomPercentile} mom={w.bottomMomentum4w} v={vb} stretched={stretchBottom} />
+                          <span className="flex-1" />
+                          {w.driversAgree && <span className="text-[8px] uppercase font-bold px-1 py-0.5 rounded bg-pnl-positive/10 text-pnl-positive" title="COT-Ranking + Momentum bestätigen sich">Treiber einig</span>}
+                          <span className={clsx('font-mono tabular-nums text-[11px] font-bold w-14 text-right', w.movePct >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
                             {w.movePct >= 0 ? '+' : ''}{w.movePct.toFixed(1)}%
                           </span>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
 

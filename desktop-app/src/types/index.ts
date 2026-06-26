@@ -437,6 +437,34 @@ export function saveConfluences(list: string[]): void {
 export const OUTLOOK_TAGS = DEFAULT_CONFLUENCES;
 export type OutlookTag = string;
 
+// Problem-Tags für Backtest-Trades – wiederverwendbar, user-verwaltbar über
+// Settings (gleiches Muster wie Confluences). Seed-Liste, frei erweiterbar.
+export const DEFAULT_PROBLEMS = [
+  'COT-Divergenz ignoriert',
+  'Zu früh eingestiegen',
+  'Zu spät eingestiegen',
+  'Stop zu eng',
+  'Kein A+ Setup',
+  'Gegen den Trend',
+  'FOMO',
+  'Plan nicht eingehalten',
+] as const;
+
+const PROBLEMS_STORAGE_KEY = 'tradingJournal_problems';
+
+export function getProblems(): string[] {
+  try {
+    const stored = localStorage.getItem(PROBLEMS_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [...DEFAULT_PROBLEMS];
+  } catch {
+    return [...DEFAULT_PROBLEMS];
+  }
+}
+
+export function saveProblems(list: string[]): void {
+  localStorage.setItem(PROBLEMS_STORAGE_KEY, JSON.stringify(list));
+}
+
 export const SETUP_DEFINITIONS: Record<string, SetupDefinition> = {
   setup_daily_bos: {
     key: 'setup_daily_bos',

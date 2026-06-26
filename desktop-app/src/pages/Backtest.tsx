@@ -28,11 +28,13 @@ import {
   Image,
   StopCircle,
   Download,
-  BarChart3
+  BarChart3,
+  Plus,
+  AlertTriangle
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useUIStore } from '@/stores/uiStore';
-import { PAIR_LIST, SETUP_DEFINITIONS } from '@/types';
+import { PAIR_LIST, SETUP_DEFINITIONS, getProblems, saveProblems } from '@/types';
 import {
   LineChart,
   Line,
@@ -51,6 +53,7 @@ interface BacktestTrade {
   rMultiple: number;
   date: string;
   setups: string[];
+  problems: string[];
   timestamp: number;
   screenshot?: string;
   notes?: string;
@@ -119,9 +122,14 @@ export function Backtest() {
     rMultiple: 1,
     date: new Date().toISOString().split('T')[0],
     setups: [] as string[],
+    problems: [] as string[],
     screenshot: '' as string,
     notes: '' as string,
   });
+
+  // Wiederverwendbare Problem-Tags (user-verwaltbar über Settings, hier nur lesen + inline ergänzen)
+  const [problemOptions, setProblemOptions] = useState<string[]>(() => getProblems());
+  const [newProblem, setNewProblem] = useState('');
 
   const pairInputRef = useRef<HTMLSelectElement>(null);
   const screenshotInputRef = useRef<HTMLInputElement>(null);
@@ -266,12 +274,45 @@ export function Backtest() {
     showToast('Session als JSON exportiert', 'success');
   };
 
+  // CSV-Export der Trade-Tabelle (öffnet direkt in Excel). Keine externe Library.
+  const exportSessionCSV = () => {
+    if (!currentSession || currentSession.trades.length === 0) return;
+    const esc = (v: string | number) => {
+      const s = String(v ?? '');
+      return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const labelOf = (key: string) => (SETUP_DEFINITIONS as any)[key]?.label || key;
+    const header = ['#', 'Datum', 'Pair', 'Richtung', 'Ergebnis', 'R-Multiple', 'Setups', 'Problem', 'Notizen'];
+    const rows = currentSession.trades.map((t, i) => [
+      i + 1,
+      t.date,
+      t.pair,
+      t.direction === 'long' ? 'Long' : 'Short',
+      t.result === 'win' ? 'Win' : t.result === 'loss' ? 'Loss' : 'Breakeven',
+      t.rMultiple,
+      (t.setups || []).map(labelOf).join('; '),
+      (t.problems || []).join('; '),
+      t.notes || '',
+    ].map(esc).join(';'));
+    // BOM für korrekte Umlaute in Excel
+    const csv = '﻿' + [header.join(';'), ...rows].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentSession.name.replace(/[^\w-]+/g, '_')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Session als CSV exportiert', 'success');
+  };
+
   const handleSubmit = useCallback(() => {
     if (!currentSession || currentSession.isCompleted) return;
     const newTrade: BacktestTrade = {
       id: `bt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       pair: formData.pair, direction: formData.direction, result: formData.result,
       rMultiple: formData.rMultiple, date: formData.date, setups: formData.setups,
+      problems: formData.problems,
       timestamp: Date.now(), screenshot: formData.screenshot || undefined,
       notes: formData.notes || undefined,
     };
@@ -280,7 +321,7 @@ export function Backtest() {
       elapsedMs: currentSession.elapsedMs + (Date.now() - currentSession.updatedAt),
     };
     saveSessions(sessions.map(s => s.id === currentSessionId ? updatedSession : s));
-    setFormData(prev => ({ ...prev, rMultiple: prev.result === 'win' ? 1 : prev.result === 'loss' ? -1 : 0, screenshot: '', notes: '' }));
+    setFormData(prev => ({ ...prev, rMultiple: prev.result === 'win' ? 1 : prev.result === 'loss' ? -1 : 0, problems: [], screenshot: '', notes: '' }));
     pairInputRef.current?.focus();
   }, [formData, currentSession, currentSessionId, sessions, saveSessions]);
 
@@ -361,6 +402,30 @@ export function Backtest() {
       ...prev,
       setups: prev.setups.includes(setupKey) ? prev.setups.filter(s => s !== setupKey) : [...prev.setups, setupKey]
     }));
+  };
+
+  const toggleProblem = (problem: string) => {
+    setFormData(prev => ({
+      ...prev,
+      problems: prev.problems.includes(problem) ? prev.problems.filter(p => p !== problem) : [...prev.problems, problem]
+    }));
+  };
+
+  // Neues Problem-Tag: in die gespeicherte Liste aufnehmen (für künftige Trades)
+  // UND direkt am aktuellen Trade aktivieren.
+  const addNewProblem = () => {
+    const val = newProblem.trim();
+    if (!val) return;
+    if (!problemOptions.includes(val)) {
+      const updated = [...problemOptions, val];
+      setProblemOptions(updated);
+      saveProblems(updated);
+    }
+    setFormData(prev => ({
+      ...prev,
+      problems: prev.problems.includes(val) ? prev.problems : [...prev.problems, val],
+    }));
+    setNewProblem('');
   };
 
   const handleScreenshotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -493,7 +558,10 @@ export function Backtest() {
                   </>
                 )}
                 <button onClick={exportSessionJSON} className="btn btn-secondary" title="Session als JSON exportieren">
-                  <Download size={16} /> Export
+                  <Download size={16} /> JSON
+                </button>
+                <button onClick={exportSessionCSV} className="btn btn-secondary" title="Trade-Tabelle als CSV exportieren (öffnet in Excel)">
+                  <Download size={16} /> CSV
                 </button>
                 <button onClick={createNewSession} className="btn btn-secondary"><RotateCcw size={16} /> Neue Session</button>
               </div>
@@ -571,6 +639,39 @@ export function Backtest() {
                     ))}
                   </div>
                 </div>
+                {/* Problem-Tags (Mehrfachauswahl, wiederverwendbar) */}
+                <div className="col-span-4">
+                  <label className="input-label flex items-center gap-1.5">
+                    <AlertTriangle size={13} className="text-accent-gold" /> Problem (optional, mehrfach)
+                  </label>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {problemOptions.map(problem => (
+                      <button key={problem} type="button" onClick={() => toggleProblem(problem)}
+                        className={clsx('px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
+                          formData.problems.includes(problem)
+                            ? 'bg-accent-gold text-black'
+                            : 'bg-background-surface-hover text-text-muted hover:text-text-primary')}>
+                        {problem}
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={newProblem}
+                        onChange={e => setNewProblem(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addNewProblem(); } }}
+                        placeholder="+ neues Problem"
+                        className="input py-1.5 text-sm w-40"
+                      />
+                      <button type="button" onClick={addNewProblem} disabled={!newProblem.trim()}
+                        className="p-1.5 rounded-lg bg-accent-gold/20 text-accent-gold hover:bg-accent-gold/30 disabled:opacity-40 transition-colors"
+                        title="Problem hinzufügen (wird gespeichert)">
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="col-span-4 mt-2">
                   <label className="input-label">Screenshot (optional)</label>
                   <div className="flex items-center gap-4">
@@ -698,28 +799,37 @@ export function Backtest() {
             </div>
           )}
 
-          {/* Recent Trades */}
+          {/* Trade-Tabelle (Excel-Stil): alle Felder pro Trade vergleichbar */}
           {currentSession.trades.length > 0 && (
             <div className="card mt-6">
-              <h3 className="text-lg font-semibold mb-4">Session Trades ({currentSession.trades.length})</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Trade-Tabelle ({currentSession.trades.length})</h3>
+                <button onClick={exportSessionCSV} className="btn btn-secondary text-sm" title="Als CSV exportieren (öffnet in Excel)">
+                  <Download size={14} /> CSV
+                </button>
+              </div>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left py-2 px-3 text-text-muted font-medium">#</th>
+                      <th className="text-left py-2 px-3 text-text-muted font-medium">Datum</th>
                       <th className="text-left py-2 px-3 text-text-muted font-medium">Pair</th>
-                      <th className="text-left py-2 px-3 text-text-muted font-medium">Direction</th>
-                      <th className="text-left py-2 px-3 text-text-muted font-medium">Result</th>
+                      <th className="text-left py-2 px-3 text-text-muted font-medium">Richtung</th>
+                      <th className="text-left py-2 px-3 text-text-muted font-medium">Ergebnis</th>
                       <th className="text-right py-2 px-3 text-text-muted font-medium">R</th>
+                      <th className="text-left py-2 px-3 text-text-muted font-medium">Setups</th>
+                      <th className="text-left py-2 px-3 text-text-muted font-medium">Problem</th>
                       <th className="text-center py-2 px-3 text-text-muted font-medium">Bild</th>
                       <th className="text-center py-2 px-3 text-text-muted font-medium">Aktion</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {[...currentSession.trades].reverse().slice(0, 10).map((trade, i) => (
+                    {[...currentSession.trades].reverse().map((trade, i) => (
                       <Fragment key={trade.id}>
                       <tr className="border-b border-border/50 hover:bg-white/[0.03]">
                         <td className="py-2 px-3 text-text-muted">{currentSession.trades.length - i}</td>
+                        <td className="py-2 px-3 font-mono text-xs text-text-muted whitespace-nowrap">{trade.date}</td>
                         <td className="py-2 px-3 font-medium">{trade.pair}</td>
                         <td className="py-2 px-3">
                           <span className={clsx('px-2 py-0.5 rounded text-xs', trade.direction === 'long' ? 'bg-pnl-positive/20 text-pnl-positive' : 'bg-pnl-negative/20 text-pnl-negative')}>
@@ -735,6 +845,30 @@ export function Backtest() {
                         </td>
                         <td className={clsx('py-2 px-3 text-right font-mono', trade.rMultiple >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
                           {trade.rMultiple >= 0 ? '+' : ''}{trade.rMultiple.toFixed(1)}R
+                        </td>
+                        <td className="py-2 px-3">
+                          <div className="flex flex-wrap gap-1">
+                            {(trade.setups || []).map(key => {
+                              const def = (SETUP_DEFINITIONS as any)[key];
+                              return (
+                                <span key={key} className="px-1.5 py-0.5 rounded text-[10px] font-medium text-white"
+                                  style={{ backgroundColor: def?.color || '#666' }}>
+                                  {def?.short || key}
+                                </span>
+                              );
+                            })}
+                            {(!trade.setups || trade.setups.length === 0) && <span className="text-text-muted/50">—</span>}
+                          </div>
+                        </td>
+                        <td className="py-2 px-3">
+                          <div className="flex flex-wrap gap-1">
+                            {(trade.problems || []).map(p => (
+                              <span key={p} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent-gold/20 text-accent-gold">
+                                {p}
+                              </span>
+                            ))}
+                            {(!trade.problems || trade.problems.length === 0) && <span className="text-text-muted/50">—</span>}
+                          </div>
                         </td>
                         <td className="py-2 px-3 text-center">
                           {trade.screenshot ? (
@@ -754,8 +888,8 @@ export function Backtest() {
                       </tr>
                       {trade.notes && (
                         <tr className="border-b border-border/30">
-                          <td colSpan={7} className="px-3 py-1">
-                            <span className="text-[10px] text-text-muted italic">{trade.notes}</span>
+                          <td colSpan={10} className="px-3 py-1">
+                            <span className="text-[10px] text-text-muted italic">📝 {trade.notes}</span>
                           </td>
                         </tr>
                       )}

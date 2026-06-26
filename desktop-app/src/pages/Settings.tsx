@@ -29,13 +29,14 @@ import {
   Tag,
   Edit2,
   Check,
+  AlertTriangle,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAccountStore } from '@/stores/accountStore';
 import { useUIStore } from '@/stores/uiStore';
 import { getApi, isElectron } from '@/services/webApi';
 import { supabase } from '@/lib/supabase';
-import { getConfluences, saveConfluences } from '@/types';
+import { getConfluences, saveConfluences, getProblems, saveProblems } from '@/types';
 import type { TransactionType } from '@/types';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { clsx } from 'clsx';
@@ -91,6 +92,44 @@ export function Settings() {
     saveConfluences(updated);
     setEditingIdx(null);
     showToast('Confluence aktualisiert', 'success');
+  };
+
+  // Problem-Tags (für Backtest-Trades) — gleiches Muster wie Confluences
+  const [problems, setProblems]             = useState<string[]>(() => getProblems());
+  const [newProblem, setNewProblem]         = useState('');
+  const [editingProblemIdx, setEditingProblemIdx] = useState<number | null>(null);
+  const [editProblemValue, setEditProblemValue]   = useState('');
+
+  const handleAddProblem = () => {
+    const val = newProblem.trim();
+    if (!val || problems.includes(val)) return;
+    const updated = [...problems, val];
+    setProblems(updated);
+    saveProblems(updated);
+    setNewProblem('');
+    showToast('Problem hinzugefügt', 'success');
+  };
+
+  const handleDeleteProblem = (idx: number) => {
+    const updated = problems.filter((_, i) => i !== idx);
+    setProblems(updated);
+    saveProblems(updated);
+  };
+
+  const handleStartEditProblem = (idx: number) => {
+    setEditingProblemIdx(idx);
+    setEditProblemValue(problems[idx]);
+  };
+
+  const handleSaveEditProblem = () => {
+    if (editingProblemIdx === null) return;
+    const val = editProblemValue.trim();
+    if (!val) return;
+    const updated = problems.map((p, i) => (i === editingProblemIdx ? val : p));
+    setProblems(updated);
+    saveProblems(updated);
+    setEditingProblemIdx(null);
+    showToast('Problem aktualisiert', 'success');
   };
 
   // Transaction form
@@ -546,6 +585,82 @@ export function Settings() {
                     </button>
                     <button
                       onClick={() => handleDeleteConfluence(idx)}
+                      className="p-1 text-text-muted/40 opacity-0 group-hover:opacity-100 hover:text-pnl-negative transition-all"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ── PROBLEME (Backtest) ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.11 }}
+        className="rounded-xl border border-white/[0.06] overflow-hidden"
+      >
+        <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
+          <AlertTriangle size={15} className="text-accent-gold" />
+          <span className="text-sm font-bold text-text-primary">Probleme</span>
+          <span className="text-[10px] text-text-muted ml-1">— Fehler-Tags für Backtest-Trades</span>
+        </div>
+
+        <div className="p-5 space-y-3">
+          {/* Neues Problem hinzufügen */}
+          <div className="flex gap-2">
+            <input
+              className={inputClass + ' flex-1'}
+              placeholder="Neues Problem (z.B. Stop zu eng)"
+              value={newProblem}
+              onChange={e => setNewProblem(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddProblem()}
+            />
+            <button
+              onClick={handleAddProblem}
+              disabled={!newProblem.trim()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent-gold/20 text-accent-gold text-xs font-semibold hover:bg-accent-gold/30 disabled:opacity-40 transition-colors"
+            >
+              <Plus size={13} />
+              Hinzufügen
+            </button>
+          </div>
+
+          {/* Liste */}
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {problems.map((p, idx) => (
+              <div key={idx} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] group transition-colors">
+                {editingProblemIdx === idx ? (
+                  <>
+                    <input
+                      className="flex-1 bg-transparent text-xs text-text-primary outline-none border-b border-accent-gold/50"
+                      value={editProblemValue}
+                      onChange={e => setEditProblemValue(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveEditProblem(); if (e.key === 'Escape') setEditingProblemIdx(null); }}
+                      autoFocus
+                    />
+                    <button onClick={handleSaveEditProblem} className="p-1 text-pnl-positive hover:text-pnl-positive/80 transition-colors">
+                      <Check size={13} />
+                    </button>
+                    <button onClick={() => setEditingProblemIdx(null)} className="p-1 text-text-muted hover:text-text-primary transition-colors">
+                      <X size={13} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex-1 text-xs text-text-primary">{p}</span>
+                    <button
+                      onClick={() => handleStartEditProblem(idx)}
+                      className="p-1 text-text-muted/40 opacity-0 group-hover:opacity-100 hover:text-accent-gold transition-all"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteProblem(idx)}
                       className="p-1 text-text-muted/40 opacity-0 group-hover:opacity-100 hover:text-pnl-negative transition-all"
                     >
                       <Trash2 size={12} />

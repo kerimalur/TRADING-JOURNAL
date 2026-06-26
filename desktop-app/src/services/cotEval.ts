@@ -27,6 +27,12 @@ export interface EvalWeek {
   movePct: number; // (topReturn - bottomReturn) * 100
   driversAgree: boolean; // COT-Ranking + 4W-Momentum bestätigen sich gegenseitig
   stretched: boolean;    // top >=90 oder bottom <=10 Perzentil (crowded)
+  // Nachvollziehbarkeit: die COT-Werte, die zur Prognose geführt haben.
+  // Reine Durchreichung der intern berechneten Werte (keine Logik-Änderung).
+  topPercentile: number;     // Commercial-Net-Perzentil der starken Seite
+  bottomPercentile: number;  // Commercial-Net-Perzentil der schwachen Seite
+  topMomentum4w: number;     // 4W-Momentum (Commercial-Net) der starken Seite
+  bottomMomentum4w: number;  // 4W-Momentum (Commercial-Net) der schwachen Seite
 }
 
 export interface DriverHit {
@@ -172,6 +178,10 @@ function runEval(
         movePct: spreadRet * 100,
         driversAgree,
         stretched,
+        topPercentile: top.percentile,
+        bottomPercentile: bottom.percentile,
+        topMomentum4w: top.momentum4w,
+        bottomMomentum4w: bottom.momentum4w,
       });
       for (const c of [top.ccy, bottom.ccy]) {
         if (!perCcy[c]) perCcy[c] = { hit: 0, total: 0 };
