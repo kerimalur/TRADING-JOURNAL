@@ -22,9 +22,17 @@ export interface BacktestSession {
   isPaused: boolean;
   elapsedMs: number;
   isCompleted?: boolean;
+  // Session-Konfiguration (im stats-JSONB unter config gespeichert, da die
+  // Tabelle keine eigenen Spalten dafür hat → keine zusätzliche Migration nötig)
+  pair?: string;
+  strategy?: string;
+  defaultRR?: number;
+  riskPercent?: number;
+  accountSize?: number;
 }
 
 function rowToSession(r: any): BacktestSession {
+  const config = (r.stats && r.stats.config) || {};
   return {
     id: r.id,
     name: r.name || '',
@@ -34,6 +42,11 @@ function rowToSession(r: any): BacktestSession {
     isPaused: true, // beim Laden immer pausiert (Timer läuft erst bei Aktion weiter)
     elapsedMs: Number(r.elapsed_ms) || 0,
     isCompleted: r.status === 'completed',
+    pair: config.pair,
+    strategy: config.strategy,
+    defaultRR: config.defaultRR,
+    riskPercent: config.riskPercent,
+    accountSize: config.accountSize,
   };
 }
 
@@ -45,6 +58,15 @@ function sessionToRow(s: BacktestSession, userId: string) {
     status: s.isCompleted ? 'completed' : 'active',
     elapsed_ms: s.elapsedMs || 0,
     trades: s.trades || [],
+    stats: {
+      config: {
+        pair: s.pair,
+        strategy: s.strategy,
+        defaultRR: s.defaultRR,
+        riskPercent: s.riskPercent,
+        accountSize: s.accountSize,
+      },
+    },
     created_at: new Date(s.createdAt || Date.now()).toISOString(),
     updated_at: new Date(s.updatedAt || Date.now()).toISOString(),
   };

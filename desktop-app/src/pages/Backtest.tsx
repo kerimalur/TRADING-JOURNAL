@@ -37,6 +37,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { PAIR_LIST, SETUP_DEFINITIONS, getProblems, saveProblems } from '@/types';
 import { loadBacktests, saveBacktest, removeBacktest, isLoggedIn } from '@/services/backtestService';
 import { loadPref, savePref } from '@/services/preferencesService';
+import { loadStrategies, type StrategyRecord } from '@/services/strategyService';
 import {
   LineChart,
   Line,
@@ -70,6 +71,12 @@ interface BacktestSession {
   isPaused: boolean;
   elapsedMs: number;
   isCompleted?: boolean;
+  // Session-Konfiguration (beim Erstellen abgefragt)
+  pair?: string;
+  strategy?: string;        // Name aus den eigenen Strategien, oder leer = "keine"
+  defaultRR?: number;       // Standard Risk-Reward (z.B. 2 = 1:2)
+  riskPercent?: number;     // Risiko pro Trade in %
+  accountSize?: number;     // Account-Größe (Kontowährung)
 }
 
 interface BacktestStats {
@@ -80,6 +87,12 @@ interface BacktestStats {
   totalR: number;
   avgR: number;
   profitFactor: number;
+  // €-Modell (nur wenn Account-Größe + Risiko% in der Session gesetzt)
+  hasEur: boolean;
+  eurRisk: number;     // €-Risiko pro Trade (fix = % der Start-Account-Größe)
+  totalEur: number;    // Summe €-P&L
+  accountEnd: number;  // Account-Größe + Summe €-P&L
+  growthPct: number;   // Kontowachstum in %
 }
 
 const STORAGE_KEY = 'backtestSessions';
@@ -138,6 +151,22 @@ export function Backtest() {
   // Wiederverwendbare Problem-Tags (user-verwaltbar über Settings, hier nur lesen + inline ergänzen)
   const [problemOptions, setProblemOptions] = useState<string[]>(() => getProblems());
   const [newProblem, setNewProblem] = useState('');
+
+  // Session-Erstellungs-Wizard: fragt Pair, Strategie, RR, Risiko, Account ab
+  const [showWizard, setShowWizard] = useState(false);
+  const [strategies, setStrategies] = useState<StrategyRecord[]>([]);
+  const [wizardData, setWizardData] = useState({
+    pair: 'EURUSD',
+    strategy: '',          // '' = keine
+    defaultRR: 2,
+    riskPercent: 1,
+    accountSize: 10000,
+  });
+
+  // Strategien (eigene) für die Auswahl im Wizard laden
+  useEffect(() => {
+    loadStrategies().then(setStrategies).catch(() => { /* nicht eingeloggt / offline */ });
+  }, []);
 
   const pairInputRef = useRef<HTMLSelectElement>(null);
   const screenshotInputRef = useRef<HTMLInputElement>(null);
@@ -238,6 +267,12 @@ export function Backtest() {
     }
   }, [currentSessionId, currentSession?.elapsedMs]);
 
+  // Beim Session-Wechsel das Pair der Session in die Eingabe übernehmen
+  useEffect(() => {
+    if (currentSession?.pair) setFormData(prev => ({ ...prev, pair: currentSession.pair! }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSessionId]);
+
   const handleKeyboardShortcut = useCallback((e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     // Vorzeichen aus dem aktuellen Ergebnis: Win=+, Loss=−, BE=0
@@ -270,9 +305,16 @@ export function Backtest() {
     return () => window.removeEventListener('keydown', handleKeyboardShortcut);
   }, [handleKeyboardShortcut]);
 
+  // €-Risiko pro Trade: fix = Risiko% der START-Account-Größe (kein Compounding).
+  // Ehrlich + einfach: macht Expectancy in € sichtbar, ohne Schein-Genauigkeit.
+  const acctSize = currentSession?.accountSize || 0;
+  const riskPct = currentSession?.riskPercent || 0;
+  const eurRisk = acctSize > 0 && riskPct > 0 ? (acctSize * riskPct) / 100 : 0;
+
   const stats: BacktestStats = (() => {
     const trades = currentSession?.trades || [];
-    if (trades.length === 0) return { totalTrades: 0, wins: 0, losses: 0, winRate: 0, totalR: 0, avgR: 0, profitFactor: 0 };
+    const base = { hasEur: eurRisk > 0, eurRisk, totalEur: 0, accountEnd: acctSize, growthPct: 0 };
+    if (trades.length === 0) return { totalTrades: 0, wins: 0, losses: 0, winRate: 0, totalR: 0, avgR: 0, profitFactor: 0, ...base };
     const wins = trades.filter(t => t.result === 'win').length;
     const losses = trades.filter(t => t.result === 'loss').length;
     const totalR = trades.reduce((sum, t) => sum + t.rMultiple, 0);
@@ -281,14 +323,18 @@ export function Backtest() {
     const grossProfit = trades.filter(t => t.rMultiple > 0).reduce((sum, t) => sum + t.rMultiple, 0);
     const grossLoss = Math.abs(trades.filter(t => t.rMultiple < 0).reduce((sum, t) => sum + t.rMultiple, 0));
     const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0;
-    return { totalTrades: trades.length, wins, losses, winRate, totalR, avgR, profitFactor };
+    const totalEur = eurRisk * totalR;
+    const accountEnd = acctSize + totalEur;
+    const growthPct = acctSize > 0 ? (totalEur / acctSize) * 100 : 0;
+    return { totalTrades: trades.length, wins, losses, winRate, totalR, avgR, profitFactor, hasEur: eurRisk > 0, eurRisk, totalEur, accountEnd, growthPct };
   })();
 
   const equityCurve = (() => {
-    let equity = 0;
+    let r = 0;
     return (currentSession?.trades || []).map((trade, i) => {
-      equity += trade.rMultiple;
-      return { trade: i + 1, equity: parseFloat(equity.toFixed(2)) };
+      r += trade.rMultiple;
+      const equity = stats.hasEur ? parseFloat((acctSize + r * eurRisk).toFixed(2)) : parseFloat(r.toFixed(2));
+      return { trade: i + 1, equity };
     });
   })();
 
@@ -383,7 +429,7 @@ export function Backtest() {
     };
     saveSessions(sessions.map(s => s.id === currentSessionId ? updatedSession : s));
     persist(updatedSession);
-    setFormData(prev => ({ ...prev, rMultiple: prev.result === 'win' ? 1 : prev.result === 'loss' ? -1 : 0, problems: [], screenshot: '', notes: '' }));
+    setFormData(prev => ({ ...prev, rMultiple: prev.result === 'win' ? (currentSession?.defaultRR || 1) : prev.result === 'loss' ? -1 : 0, problems: [], screenshot: '', notes: '' }));
     pairInputRef.current?.focus();
   }, [formData, currentSession, currentSessionId, sessions, saveSessions, persist]);
 
@@ -436,17 +482,33 @@ export function Backtest() {
     persist(updatedSession);
   };
 
-  const createNewSession = () => {
+  // Öffnet den Wizard (statt direkt eine Session zu erstellen)
+  const openWizard = () => {
+    setShowSessionList(false);
+    setWizardData({ pair: 'EURUSD', strategy: '', defaultRR: 2, riskPercent: 1, accountSize: 10000 });
+    setShowWizard(true);
+  };
+
+  // Erstellt die Session aus den Wizard-Eingaben
+  const createSessionFromWizard = () => {
+    const cfg = wizardData;
+    const stratLabel = cfg.strategy ? ` · ${cfg.strategy}` : '';
     const newSession: BacktestSession = {
       id: newId(),
-      name: `Backtest ${new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}`,
+      name: `${cfg.pair}${stratLabel} · ${new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}`,
       createdAt: Date.now(), updatedAt: Date.now(), trades: [], isPaused: false, elapsedMs: 0,
+      pair: cfg.pair,
+      strategy: cfg.strategy || undefined,
+      defaultRR: cfg.defaultRR,
+      riskPercent: cfg.riskPercent,
+      accountSize: cfg.accountSize,
     };
     saveSessions([newSession, ...sessions]);
     persist(newSession);
     setCurrentSessionId(newSession.id);
-    setShowSessionList(false);
-    showToast('Neue Backtest-Session erstellt', 'success');
+    setFormData(prev => ({ ...prev, pair: cfg.pair, rMultiple: cfg.defaultRR }));
+    setShowWizard(false);
+    showToast('Backtest-Session gestartet', 'success');
   };
 
   const deleteSession = (sessionId: string) => {
@@ -458,7 +520,8 @@ export function Backtest() {
   };
 
   const handleResultChange = (result: 'win' | 'loss' | 'breakeven') => {
-    const defaultR = result === 'win' ? 1 : result === 'loss' ? -1 : 0;
+    const rr = currentSession?.defaultRR || 1;
+    const defaultR = result === 'win' ? rr : result === 'loss' ? -1 : 0;
     setFormData(prev => ({ ...prev, result, rMultiple: defaultR }));
   };
 
@@ -556,7 +619,7 @@ export function Backtest() {
           {showSessionList && (
             <div className="absolute right-0 top-full mt-2 w-80 bg-background-surface border border-border rounded-lg shadow-xl z-50">
               <div className="p-2 border-b border-border">
-                <button onClick={createNewSession} className="w-full btn btn-primary text-sm">+ Neue Session</button>
+                <button onClick={openWizard} className="w-full btn btn-primary text-sm">+ Neue Session</button>
               </div>
               <div className="max-h-64 overflow-y-auto">
                 {sessions.length === 0 ? (
@@ -588,12 +651,64 @@ export function Backtest() {
         </div>
       </div>
 
+      {/* Session-Erstellungs-Wizard */}
+      {showWizard && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowWizard(false)}>
+          <div className="w-full max-w-md bg-background-surface border border-border rounded-xl shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2"><FlaskConical size={18} className="text-accent-primary" /> Neue Backtest-Session</h3>
+              <button onClick={() => setShowWizard(false)} className="p-1 hover:bg-white/[0.06] rounded"><X size={16} /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="input-label">Währungspaar</label>
+                <select className="input" value={wizardData.pair} onChange={e => setWizardData(p => ({ ...p, pair: e.target.value }))}>
+                  {PAIR_LIST.map(pair => <option key={pair} value={pair}>{pair}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="input-label">Strategie</label>
+                <select className="input" value={wizardData.strategy} onChange={e => setWizardData(p => ({ ...p, strategy: e.target.value }))}>
+                  <option value="">— keine —</option>
+                  {strategies.map(s => <option key={s.id || s.name} value={s.name}>{s.name}</option>)}
+                </select>
+                {strategies.length === 0 && <p className="text-[11px] text-text-muted mt-1">Keine eigenen Strategien gefunden — im Strategie-Bereich anlegen, oder „keine" wählen.</p>}
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="input-label">Standard-RR (1:x)</label>
+                  <input type="number" step="0.5" min="0.5" className="input" value={wizardData.defaultRR} onChange={e => setWizardData(p => ({ ...p, defaultRR: parseFloat(e.target.value) || 0 }))} />
+                </div>
+                <div>
+                  <label className="input-label">Risiko/Trade (%)</label>
+                  <input type="number" step="0.1" min="0" className="input" value={wizardData.riskPercent} onChange={e => setWizardData(p => ({ ...p, riskPercent: parseFloat(e.target.value) || 0 }))} />
+                </div>
+                <div>
+                  <label className="input-label">Account (€)</label>
+                  <input type="number" step="100" min="0" className="input" value={wizardData.accountSize} onChange={e => setWizardData(p => ({ ...p, accountSize: parseFloat(e.target.value) || 0 }))} />
+                </div>
+              </div>
+              {wizardData.accountSize > 0 && wizardData.riskPercent > 0 && (
+                <p className="text-[11px] text-text-muted">
+                  Risiko/Trade = <span className="text-text-secondary font-medium">{((wizardData.accountSize * wizardData.riskPercent) / 100).toLocaleString('de-DE', { maximumFractionDigits: 0 })} €</span>.
+                  P&amp;L pro Trade = R-Multiple × dieser Betrag.
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button onClick={() => setShowWizard(false)} className="btn btn-secondary flex-1">Abbrechen</button>
+              <button onClick={createSessionFromWizard} disabled={!wizardData.pair} className="btn btn-primary flex-1"><Play size={16} /> Session starten</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!currentSession ? (
         <div className="card text-center py-16">
           <FlaskConical size={64} className="mx-auto text-text-muted/50 mb-4" />
           <h3 className="text-xl font-semibold mb-2">Keine aktive Session</h3>
           <p className="text-text-muted mb-4">Erstelle eine neue Backtest-Session um zu starten.</p>
-          <button onClick={createNewSession} className="btn btn-primary">Neue Session erstellen</button>
+          <button onClick={openWizard} className="btn btn-primary">Neue Session erstellen</button>
         </div>
       ) : (
         <>
@@ -602,9 +717,14 @@ export function Backtest() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-pnl-positive">{currentSession.name}</h3>
-                <div className="flex gap-4 mt-1 text-sm text-text-muted">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-text-muted">
                   <span className="flex items-center gap-1"><Clock size={14} /> {elapsedTime}</span>
                   <span>{currentSession.trades.length} Trades</span>
+                  {currentSession.pair && <span className="text-text-secondary font-medium">{currentSession.pair}</span>}
+                  {currentSession.strategy && <span className="px-1.5 py-0.5 rounded bg-accent-primary/15 text-accent-primary text-xs">{currentSession.strategy}</span>}
+                  {currentSession.defaultRR != null && <span>RR 1:{currentSession.defaultRR}</span>}
+                  {currentSession.riskPercent != null && <span>{currentSession.riskPercent}% Risiko</span>}
+                  {currentSession.accountSize != null && <span>{currentSession.accountSize.toLocaleString('de-DE')} Konto</span>}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -632,7 +752,7 @@ export function Backtest() {
                 <button onClick={exportSessionCSV} className="btn btn-secondary" title="Trade-Tabelle als CSV exportieren (öffnet in Excel)">
                   <Download size={16} /> CSV
                 </button>
-                <button onClick={createNewSession} className="btn btn-secondary"><RotateCcw size={16} /> Neue Session</button>
+                <button onClick={openWizard} className="btn btn-secondary"><RotateCcw size={16} /> Neue Session</button>
               </div>
             </div>
           </div>
@@ -797,20 +917,33 @@ export function Backtest() {
                   {stats.profitFactor === Infinity ? '∞' : stats.profitFactor.toFixed(2)}
                 </div>
               </div>
+              {stats.hasEur && (
+                <div className="card bg-gradient-to-br from-pnl-positive/10 to-transparent">
+                  <div className="text-sm text-text-muted mb-1">P&L (€)</div>
+                  <div className={clsx('text-3xl font-bold', stats.totalEur >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
+                    {stats.totalEur >= 0 ? '+' : ''}{stats.totalEur.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €
+                  </div>
+                  <div className="text-sm text-text-muted">
+                    {stats.growthPct >= 0 ? '+' : ''}{stats.growthPct.toFixed(1)}% · Konto {stats.accountEnd.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €
+                    <span className="block text-[11px] opacity-70">{stats.eurRisk.toLocaleString('de-DE', { maximumFractionDigits: 0 })} € Risiko/Trade</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Equity Curve */}
           {equityCurve.length > 0 && (
             <div className="card mt-6">
-              <h3 className="text-lg font-semibold mb-4">Equity Curve (Session)</h3>
+              <h3 className="text-lg font-semibold mb-4">Equity Curve (Session) {stats.hasEur ? '— €' : '— R'}</h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={equityCurve}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                     <XAxis dataKey="trade" stroke="#666" />
-                    <YAxis stroke="#666" />
-                    <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }} labelStyle={{ color: '#999' }} />
+                    <YAxis stroke="#666" tickFormatter={(v) => stats.hasEur ? `${(v / 1000).toFixed(1)}k` : `${v}`} />
+                    <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }} labelStyle={{ color: '#999' }}
+                      formatter={(v: number) => [stats.hasEur ? `${v.toLocaleString('de-DE')} €` : `${v} R`, stats.hasEur ? 'Konto' : 'Equity']} />
                     <Line type="monotone" dataKey="equity" stroke="#FFD700" strokeWidth={2} dot={{ fill: '#FFD700', strokeWidth: 0, r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
