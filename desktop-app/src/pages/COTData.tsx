@@ -614,19 +614,18 @@ export function COTData() {
         </div>
       </div>
 
-      {/* ── Info Banner ── */}
+      {/* ── Info-Zeile (schlank statt Box) ── */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1 }}
-        className="mb-4 px-3 py-2 bg-accent-gold/5 border border-accent-gold/15 rounded-lg flex items-center gap-2"
+        className="mb-4 flex items-center gap-2 text-[10px] text-text-muted"
       >
-        <Zap className="text-accent-gold flex-shrink-0" size={12} />
-        <p className="text-[10px] text-text-muted leading-relaxed">
-          <span className="text-accent-gold font-semibold uppercase tracking-[0.05em]">Fundamentaler Kompass</span>{' '}
-          — wer ist stark, wer schwach? Aus COT-Positionierung, Positions-Trend und Zins-Carry. Stärke gegen Schwäche = Trade-Idee.{' '}
-          <span className="font-mono tabular-nums text-accent-gold">Nächster Report: {nextRelease.toLocaleDateString('de-DE')}</span>
-        </p>
+        <Zap className="text-accent-gold flex-shrink-0" size={11} />
+        <span>Stärke gegen Schwäche = Trade-Idee.</span>
+        <span className="text-text-muted/40">·</span>
+        <span className="font-mono tabular-nums">Nächster CFTC-Report: <span className="text-accent-gold">{nextRelease.toLocaleDateString('de-DE')}</span></span>
+        <button onClick={() => setShowInfoModal(true)} className="ml-1 text-accent-gold/80 hover:text-accent-gold underline decoration-dotted">wie's funktioniert</button>
       </motion.div>
 
       {/* ── Error State ── */}
@@ -715,17 +714,13 @@ export function COTData() {
         {activeTab === 'weekly' && (
           <motion.div key="weekly" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
 
-            {/* Intro */}
-            <div className="mb-4 px-3 py-2.5 bg-accent-primary/5 border border-accent-primary/15 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <Target size={12} className="text-accent-primary" />
-                <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-text-primary">Wochen-Ausblick</span>
-                <span className="text-[9px] text-text-muted">— Sonntags-Check für die kommende Woche</span>
-              </div>
-              <p className="text-[10px] text-text-muted leading-relaxed">
-                Fundamentaler Bias (COT-Positionierung + Trend + Zins-Carry) kombiniert mit dem <strong className="text-text-secondary">Event-Risiko der Woche</strong>.
-                Die <strong className="text-text-secondary">Konfidenz</strong> zeigt, wie viele Treiber in dieselbe Richtung zeigen (Confluence) —
-                <span className="text-accent-gold"> keine backgetestete Trefferquote.</span> Steht ein großes Event an, wird die Konfidenz gedeckelt (Ausgang offen).
+            {/* Intro (schlank) */}
+            <div className="mb-4 flex items-start gap-2 text-[10px] text-text-muted leading-relaxed">
+              <Target size={12} className="text-accent-primary flex-shrink-0 mt-0.5" />
+              <p>
+                <strong className="text-text-secondary">Wochen-Ausblick</strong> — fundamentaler Bias × Event-Risiko der Woche.
+                <strong className="text-text-secondary"> Konfidenz</strong> = wie viele Treiber gleich zeigen (Confluence),
+                <span className="text-accent-gold"> keine backgetestete Trefferquote</span>; bei großem Event gedeckelt.
               </p>
             </div>
 
