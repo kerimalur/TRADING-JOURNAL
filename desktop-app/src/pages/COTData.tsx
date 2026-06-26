@@ -531,9 +531,9 @@ export function COTData() {
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
           <Brain size={18} className="text-accent-primary" />
-          <h1 className="text-base font-semibold tracking-tight text-text-primary">Smart COT</h1>
+          <h1 className="text-base font-semibold tracking-tight text-text-primary">Fundamentaler Kompass</h1>
           <span className="text-[10px] uppercase tracking-[0.15em] text-text-muted font-medium bg-white/[0.04] px-2 py-0.5 rounded">
-            Analyse Engine
+            Fundamental Bias
           </span>
         </div>
 
@@ -645,43 +645,37 @@ export function COTData() {
       {/* ── Main Content ── */}
       {analyses.length > 0 && (
       <>
-        {/* Tab Navigation */}
+        {/* Tab Navigation — 3 Ebenen nach Entscheidungs-Nähe: Antwort / Warum / Vertrauen */}
         <div className="flex items-center gap-1 mb-4 bg-white/[0.02] rounded-lg p-0.5 w-fit">
           <button
             onClick={() => setActiveTab('weekly')}
+            title="Die Antwort: wer ist stark/schwach, welche Pair-Ideen für die Woche"
             className={clsx(
               'text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
               activeTab === 'weekly' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary'
             )}
           >
-            <Target size={10} className="inline mr-1" /> Wochen-Ausblick
+            <Target size={10} className="inline mr-1" /> Bias
           </button>
           <button
             onClick={() => setActiveTab('overview')}
+            title="Das Warum: Treiber je Währung (Positionierung/COT, Carry, Wachstum, Momentum)"
             className={clsx(
               'text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
               activeTab === 'overview' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary'
             )}
           >
-            <Database size={10} className="inline mr-1" /> Währungen
+            <Database size={10} className="inline mr-1" /> Treiber
           </button>
           <button
             onClick={() => setActiveTab('eval')}
+            title="Das Vertrauen: Trefferquote + experimentelle Modelle (Validierung, nicht für täglich)"
             className={clsx(
               'text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
-              activeTab === 'eval' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary'
+              (activeTab === 'eval' || activeTab === 'ml') ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary'
             )}
           >
-            <CheckCircle2 size={10} className="inline mr-1" /> Trefferquote
-          </button>
-          <button
-            onClick={() => setActiveTab('ml')}
-            className={clsx(
-              'text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
-              activeTab === 'ml' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary'
-            )}
-          >
-            <Brain size={10} className="inline mr-1" /> Experimentell
+            <CheckCircle2 size={10} className="inline mr-1" /> Vertrauen
             {mlLoading && <RefreshCw size={8} className="inline ml-1 animate-spin" />}
           </button>
         </div>
@@ -1217,6 +1211,20 @@ export function COTData() {
         {activeTab === 'eval' && (
           <motion.div key="eval" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
 
+            {/* Sub-Umschalter innerhalb "Vertrauen" */}
+            <div className="flex items-center gap-1 mb-4 bg-white/[0.02] rounded-lg p-0.5 w-fit">
+              <button onClick={() => setActiveTab('eval')}
+                className={clsx('text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
+                  activeTab === 'eval' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary')}>
+                <CheckCircle2 size={10} className="inline mr-1" /> Trefferquote
+              </button>
+              <button onClick={() => setActiveTab('ml')}
+                className={clsx('text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
+                  (activeTab as string) === 'ml' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary')}>
+                <Brain size={10} className="inline mr-1" /> Experimentell
+              </button>
+            </div>
+
             {/* Intro */}
             <div className="mb-4 px-3 py-2.5 bg-accent-primary/5 border border-accent-primary/15 rounded-lg">
               <div className="flex items-center gap-2 mb-1">
@@ -1458,6 +1466,20 @@ export function COTData() {
 
         {activeTab === 'ml' && (
           <motion.div key="ml" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+
+            {/* Sub-Umschalter innerhalb "Vertrauen" */}
+            <div className="flex items-center gap-1 mb-4 bg-white/[0.02] rounded-lg p-0.5 w-fit">
+              <button onClick={() => setActiveTab('eval')}
+                className={clsx('text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
+                  (activeTab as string) === 'eval' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary')}>
+                <CheckCircle2 size={10} className="inline mr-1" /> Trefferquote
+              </button>
+              <button onClick={() => setActiveTab('ml')}
+                className={clsx('text-[10px] uppercase tracking-[0.12em] px-3 py-1.5 rounded transition-colors',
+                  activeTab === 'ml' ? 'bg-accent-primary/20 text-text-primary font-semibold' : 'text-text-muted hover:text-text-primary')}>
+                <Brain size={10} className="inline mr-1" /> Experimentell
+              </button>
+            </div>
 
             {/* Ehrlicher Hinweis */}
             <div className="mb-4 px-3 py-2 bg-pnl-negative/5 border border-pnl-negative/15 rounded-lg flex items-start gap-2">
