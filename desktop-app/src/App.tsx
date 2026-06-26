@@ -8,7 +8,7 @@
  * Desktop: Lokale Speicherung ohne Auth
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { HashRouter, BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
@@ -21,17 +21,17 @@ import { GlobalSearch } from '@/components/ui/GlobalSearch';
 import { QueryProvider } from '@/providers';
 import { AnimatePresence } from 'framer-motion';
 
-// Pages
-import { Dashboard } from '@/pages/Dashboard';
-import { FundedJournal } from '@/pages/FundedJournal';
-import { EKJournal } from '@/pages/EKJournal';
-import { Settings } from '@/pages/Settings';
-import { EquityCurve } from '@/pages/EquityCurve';
-import { Backtest } from '@/pages/Backtest';
-import { Calendar } from '@/pages/Calendar';
-import { StrategyBuilder } from '@/pages/StrategyBuilder';
-import { Outlook } from '@/pages/Outlook';
-import { COTData } from '@/pages/COTData';
+// Pages — lazy geladen → kleinerer Erststart, Seiten-Code erst bei Bedarf
+const Dashboard       = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const FundedJournal   = lazy(() => import('@/pages/FundedJournal').then(m => ({ default: m.FundedJournal })));
+const EKJournal       = lazy(() => import('@/pages/EKJournal').then(m => ({ default: m.EKJournal })));
+const Settings        = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })));
+const EquityCurve     = lazy(() => import('@/pages/EquityCurve').then(m => ({ default: m.EquityCurve })));
+const Backtest        = lazy(() => import('@/pages/Backtest').then(m => ({ default: m.Backtest })));
+const Calendar        = lazy(() => import('@/pages/Calendar').then(m => ({ default: m.Calendar })));
+const StrategyBuilder = lazy(() => import('@/pages/StrategyBuilder').then(m => ({ default: m.StrategyBuilder })));
+const Outlook         = lazy(() => import('@/pages/Outlook').then(m => ({ default: m.Outlook })));
+const COTData         = lazy(() => import('@/pages/COTData').then(m => ({ default: m.COTData })));
 
 // Debug removed - AuthDebug no longer needed
 
@@ -46,15 +46,9 @@ import '@/i18n';
 // ----------------------------------------------------------------------
 // LOGIN SCREEN (nur für Web)
 // ----------------------------------------------------------------------
-interface LoginScreenProps {
-  onSkipLogin: () => void;
-}
-
-function LoginScreen({ onSkipLogin }: LoginScreenProps) {
+function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [nameError, setNameError] = useState('');
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -71,15 +65,6 @@ function LoginScreen({ onSkipLogin }: LoginScreenProps) {
     setLoading(false);
   };
 
-  const handleSkipWithName = () => {
-    if (!displayName.trim()) {
-      setNameError('Bitte gib deinen Namen ein');
-      return;
-    }
-    localStorage.setItem('tradingJournal_displayName', displayName.trim());
-    onSkipLogin();
-  };
-
   return (
     <div className="flex flex-col h-screen bg-background text-text-primary items-center justify-center">
       <div className="w-full max-w-sm p-8 bg-background-surface border border-border rounded-2xl shadow-2xl">
@@ -93,19 +78,6 @@ function LoginScreen({ onSkipLogin }: LoginScreenProps) {
 
         <h1 className="text-xl font-bold mb-1 text-center text-text-primary">Trading Journal</h1>
         <p className="text-sm text-text-muted text-center mb-6">Melde dich an, um fortzufahren</p>
-
-        {/* Name input for skip login */}
-        <div className="mb-4">
-          <label className="input-label">Dein Name</label>
-          <input
-            type="text"
-            className="input"
-            placeholder="z.B. Max"
-            value={displayName}
-            onChange={e => { setDisplayName(e.target.value); setNameError(''); }}
-          />
-          {nameError && <p className="mt-1 text-xs text-pnl-negative">{nameError}</p>}
-        </div>
 
         {/* Google Button */}
         <button
@@ -132,23 +104,6 @@ function LoginScreen({ onSkipLogin }: LoginScreenProps) {
         {error && (
           <p className="mt-3 text-xs text-pnl-negative text-center">{error}</p>
         )}
-
-        {/* Divider */}
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-border" />
-          <span className="text-xs text-text-muted">oder</span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
-
-        <button
-          onClick={handleSkipWithName}
-          className="w-full p-3 bg-background border border-border hover:border-accent-primary/50 text-text-muted hover:text-text-primary rounded-xl transition-colors text-sm"
-        >
-          Ohne Login fortfahren (lokal)
-        </button>
-        <p className="mt-2 text-xs text-text-muted text-center">
-          Daten werden nur im Browser gespeichert
-        </p>
       </div>
     </div>
   );
@@ -163,9 +118,6 @@ function AppContent() {
   const { loadFromSupabase: loadWidgetSettings } = useWidgetSettingsStore();
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [offlineMode, setOfflineMode] = useState(() => {
-    return localStorage.getItem('trading-journal-offline-mode') === 'true';
-  });
   const inElectron = isElectron();
 
   // Auth Check – läuft IMMER (auch wenn offlineMode=true), damit OAuth-Callbacks
@@ -179,32 +131,23 @@ function AppContent() {
 
     // Session beim Start prüfen (inkl. OAuth-Callback im URL-Hash)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        // Eingeloggt → offline-Flag entfernen, damit die App Cloud-Modus nutzt
-        localStorage.removeItem('trading-journal-offline-mode');
-        setOfflineMode(false);
-      }
       setSession(session);
       setAuthLoading(false);
     });
 
     // Auth-Zustandsänderungen (Google-OAuth, Logout, Token-Refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        localStorage.removeItem('trading-journal-offline-mode');
-        setOfflineMode(false);
-        loadWidgetSettings();
-      }
+      if (session) loadWidgetSettings();
       setSession(session);
       setAuthLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, [inElectron]); // offlineMode NICHT als Dep – Auth immer überwachen
+  }, [inElectron]);
 
   // Keyboard Shortcuts
   useEffect(() => {
-    if (!session && !offlineMode && !inElectron) return;
+    if (!session && !inElectron) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -215,13 +158,7 @@ function AppContent() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [session, offlineMode, inElectron]);
-
-  // Skip Login Handler
-  const handleSkipLogin = () => {
-    localStorage.setItem('trading-journal-offline-mode', 'true');
-    setOfflineMode(true);
-  };
+  }, [session, inElectron]);
 
   // Loading State
   if (authLoading) {
@@ -232,9 +169,9 @@ function AppContent() {
     );
   }
 
-  // Show Login (nur für Web, nicht für Electron oder Offline-Mode)
-  if (!inElectron && !session && !offlineMode) {
-    return <LoginScreen onSkipLogin={handleSkipLogin} />;
+  // Show Login (nur für Web, nicht für Electron)
+  if (!inElectron && !session) {
+    return <LoginScreen />;
   }
 
   return (
@@ -254,6 +191,7 @@ function AppContent() {
         <main className="flex-1 overflow-y-auto bg-background">
           <ErrorBoundary>
             <AnimatePresence mode="wait">
+              <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-text-muted text-sm">Lädt…</div>}>
               <Routes location={location} key={location.pathname}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
@@ -267,6 +205,7 @@ function AppContent() {
                 <Route path="/cot" element={<COTData />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
+              </Suspense>
             </AnimatePresence>
           </ErrorBoundary>
         </main>

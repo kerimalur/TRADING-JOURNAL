@@ -31,7 +31,6 @@ import { ProgressRing } from '@/components/ui/ProgressRing';
 import { SparklineChart } from '@/components/ui/SparklineChart';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { OUTLOOK_STATUS_CONFIG } from '@/types';
-import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useWidgetSettingsStore, DEFAULT_WIDGET_SETTINGS } from '@/stores/widgetSettingsStore';
 
 // ── Dashboard-Präferenzen (localStorage) ──────────────────────────────
@@ -48,7 +47,6 @@ interface DashboardPrefs {
   showDetails:          boolean;
   showOutlooks:         boolean;
   showMonthCalendar:    boolean;
-  showWatchlist:        boolean;
   showWidgetUebersicht: boolean;
   showWidgetNews:       boolean;
   showWidgetCOT:        boolean;
@@ -66,7 +64,6 @@ const DEFAULT_PREFS: DashboardPrefs = {
   showDetails:          true,
   showOutlooks:         true,
   showMonthCalendar:    true,
-  showWatchlist:        false,
   showWidgetUebersicht: false,
   showWidgetNews:       false,
   showWidgetCOT:        false,
@@ -84,7 +81,6 @@ const PREF_LABELS: Record<keyof DashboardPrefs, string> = {
   showDetails:          'Performance Details',
   showOutlooks:         'Aktive Outlooks',
   showMonthCalendar:    'Monats-Kalender',
-  showWatchlist:        'Watchlist',
   showWidgetUebersicht: 'Markt: Übersicht',
   showWidgetNews:       'Markt: News',
   showWidgetCOT:        'Markt: COT',
@@ -284,75 +280,6 @@ function WidgetCustomizer({
         ))}
       </div>
     </motion.div>
-  );
-}
-
-// ── Watchlist Widget ───────────────────────────────────────────────────
-function WatchlistWidget({ navigate }: { navigate: (p: string) => void }) {
-  const { watchlists, activeId, dashboardColor } = useWatchlistStore();
-  const activeWatchlist = watchlists.find(w => w.id === activeId) ?? watchlists[0];
-  const CATEGORY_LABELS: Record<string, string> = { forex: 'FX', crypto: 'Crypto', futures: 'Fut', indices: 'Idx' };
-
-  if (!activeWatchlist) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-2">
-        <List size={20} className="text-text-muted" />
-        <p className="text-xs text-text-muted text-center">Keine Watchlist</p>
-        <button onClick={() => navigate('/watchlist')} className="text-[10px] text-accent-primary hover:underline">Erstellen →</button>
-      </div>
-    );
-  }
-
-  // Filter by dashboard color if one is set
-  const displaySymbols = dashboardColor
-    ? activeWatchlist.symbols.filter(s => s.color === dashboardColor)
-    : activeWatchlist.symbols;
-  const symbols = displaySymbols.slice(0, 12);
-  const totalAlerts = activeWatchlist.symbols.reduce((n, s) => n + s.alerts.filter(a => a.active).length, 0);
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-2 px-1">
-        <div className="flex items-center gap-1.5">
-          <List size={12} className="text-accent-primary" />
-          <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">
-            {activeWatchlist.name}
-          </span>
-          {totalAlerts > 0 && (
-            <span className="flex items-center gap-0.5 text-[10px] text-accent-primary">
-              <Bell size={9} />{totalAlerts}
-            </span>
-          )}
-        </div>
-        <button onClick={() => navigate('/watchlist')} className="text-[10px] text-accent-primary hover:underline">Alle →</button>
-      </div>
-      {dashboardColor && displaySymbols.length === 0 && (
-        <p className="text-[10px] text-text-muted/60 italic px-1 mb-1">Keine Symbole mit Dashboard-Farbe</p>
-      )}
-      <div className="flex-1 overflow-y-auto space-y-0.5">
-        {symbols.length === 0 ? (
-          <div className="flex items-center justify-center h-20 text-xs text-text-muted">Keine Symbole</div>
-        ) : (
-          symbols.map(sym => (
-            <div key={sym.id} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-white/[0.03] transition-colors">
-              <div
-                className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-white/10"
-                style={{ backgroundColor: sym.color ?? 'rgba(255,255,255,0.12)' }}
-              />
-              <span className="flex-1 text-xs font-mono font-semibold text-text-primary truncate">{sym.displayName}</span>
-              <span className="text-[9px] text-text-muted bg-background-elevated px-1 py-px rounded flex-shrink-0">
-                {CATEGORY_LABELS[sym.category] ?? sym.category}
-              </span>
-            </div>
-          ))
-        )}
-        {displaySymbols.length > 12 && (
-          <p className="text-[10px] text-text-muted text-center pt-1">
-            +{displaySymbols.length - 12} weitere
-          </p>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -1156,15 +1083,6 @@ export function Dashboard() {
                     <span className={clsx('font-mono font-semibold text-text-primary', color)}>{value}</span>
                   </div>
                 ))}
-              </div>
-            </BentoCell>
-          )}
-
-          {/* WATCHLIST */}
-          {prefs.showWatchlist && (
-            <BentoCell delay={0.47} noPadding>
-              <div className="p-3 h-full">
-                <WatchlistWidget navigate={navigate} />
               </div>
             </BentoCell>
           )}

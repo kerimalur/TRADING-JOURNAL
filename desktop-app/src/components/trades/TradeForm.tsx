@@ -52,7 +52,7 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
     
     return {
       date: new Date().toISOString().split('T')[0],
-      pair: prefill?.pair || 'EUR/USD',
+      pair: prefill?.pair || 'EURUSD',
       direction: prefill?.direction || 'long',
       type: accountType,
       sessionType: 'live',
@@ -122,7 +122,12 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
         const newRiskAmount = calculateRiskAmount(accountConfig.currentBalance, value as number);
         updated.riskAmount = newRiskAmount;
       }
-      
+
+      // Breakeven → R-Multiple auf 0 setzen (gültig, kein Pflichtfeld)
+      if (field === 'result' && value === 'breakeven') {
+        updated.rMultiple = 0;
+      }
+
       return updated;
     });
     
@@ -170,7 +175,8 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
     
     if (!formData.date) newErrors.date = 'Datum erforderlich';
     if (!formData.pair) newErrors.pair = 'Währungspaar erforderlich';
-    if (formData.rMultiple === undefined || formData.rMultiple === 0) newErrors.rMultiple = 'R-Multiple erforderlich';
+    // Breakeven = 0R ist gültig; R-Multiple nur bei Win/Loss verlangen
+    if (formData.result !== 'breakeven' && (formData.rMultiple === undefined || formData.rMultiple === 0)) newErrors.rMultiple = 'R-Multiple erforderlich';
     if (!formData.riskPercent || formData.riskPercent <= 0) newErrors.riskPercent = 'Risiko % erforderlich';
     if (!formData.riskAmount || formData.riskAmount <= 0) newErrors.riskAmount = 'Risikobetrag erforderlich';
     
