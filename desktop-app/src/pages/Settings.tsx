@@ -37,6 +37,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { getApi, isElectron } from '@/services/webApi';
 import { supabase } from '@/lib/supabase';
 import { getConfluences, saveConfluences, getProblems, saveProblems } from '@/types';
+import { loadPref, savePref } from '@/services/preferencesService';
 import type { TransactionType } from '@/types';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { clsx } from 'clsx';
@@ -100,12 +101,30 @@ export function Settings() {
   const [editingProblemIdx, setEditingProblemIdx] = useState<number | null>(null);
   const [editProblemValue, setEditProblemValue]   = useState('');
 
+  // Backend → localStorage-Mirror beim Laden (eingeloggt). Sonst bleibt lokal.
+  useEffect(() => {
+    (async () => {
+      try {
+        const remote = await loadPref<string[]>('problems', []);
+        if (Array.isArray(remote) && remote.length > 0) {
+          setProblems(remote);
+          saveProblems(remote);
+        }
+      } catch { /* nicht kritisch */ }
+    })();
+  }, []);
+
+  const persistProblems = (list: string[]) => {
+    saveProblems(list);
+    savePref('problems', list).catch(e => console.error('Problem-Sync fehlgeschlagen:', e));
+  };
+
   const handleAddProblem = () => {
     const val = newProblem.trim();
     if (!val || problems.includes(val)) return;
     const updated = [...problems, val];
     setProblems(updated);
-    saveProblems(updated);
+    persistProblems(updated);
     setNewProblem('');
     showToast('Problem hinzugefügt', 'success');
   };
@@ -113,7 +132,7 @@ export function Settings() {
   const handleDeleteProblem = (idx: number) => {
     const updated = problems.filter((_, i) => i !== idx);
     setProblems(updated);
-    saveProblems(updated);
+    persistProblems(updated);
   };
 
   const handleStartEditProblem = (idx: number) => {
@@ -127,7 +146,7 @@ export function Settings() {
     if (!val) return;
     const updated = problems.map((p, i) => (i === editingProblemIdx ? val : p));
     setProblems(updated);
-    saveProblems(updated);
+    persistProblems(updated);
     setEditingProblemIdx(null);
     showToast('Problem aktualisiert', 'success');
   };

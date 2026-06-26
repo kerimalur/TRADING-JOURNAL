@@ -35,6 +35,8 @@ import {
 import { clsx } from 'clsx';
 import { useUIStore } from '@/stores/uiStore';
 import { PAIR_LIST, SETUP_DEFINITIONS, getProblems, saveProblems } from '@/types';
+import { loadBacktests, saveBacktest, removeBacktest, isLoggedIn } from '@/services/backtestService';
+import { loadPref, savePref } from '@/services/preferencesService';
 import {
   LineChart,
   Line,
@@ -81,6 +83,12 @@ interface BacktestStats {
 }
 
 const STORAGE_KEY = 'backtestSessions';
+
+const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+const newId = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 /**
  * Verkleinert ein Bild (DataURL) auf max. maxPx Kantenlänge und re-encodet als
@@ -134,17 +142,70 @@ export function Backtest() {
   const pairInputRef = useRef<HTMLSelectElement>(null);
   const screenshotInputRef = useRef<HTMLInputElement>(null);
 
+  // Hybrid-Load: eingeloggt → Supabase (Quelle der Wahrheit), sonst localStorage.
+  // Backend leer + lokale Sessions vorhanden → einmalige Migration nach Supabase.
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setSessions(parsed);
-        if (parsed.length > 0) setCurrentSessionId(parsed[0].id);
-      } catch (e) {
-        console.error('Error loading backtest sessions:', e);
+    let cancelled = false;
+    (async () => {
+      let localSessions: BacktestSession[] = [];
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try { localSessions = JSON.parse(stored); } catch { /* ignore */ }
       }
-    }
+
+      let loggedIn = false;
+      try { loggedIn = await isLoggedIn(); } catch { /* offline */ }
+
+      if (loggedIn) {
+        try {
+          const remote = await loadBacktests();
+          if (cancelled) return;
+          if (remote.length > 0) {
+            setSessions(remote);
+            setCurrentSessionId(remote[0].id);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
+            return;
+          }
+          if (localSessions.length > 0) {
+            // Einmalige Migration: lokale Sessions hochschieben (Alt-IDs → UUID).
+            const migrated = localSessions.map(s => ({ ...s, id: isUuid(s.id) ? s.id : newId() }));
+            setSessions(migrated);
+            setCurrentSessionId(migrated[0].id);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+            for (const s of migrated) {
+              try { await saveBacktest(s); } catch (e) { console.error('Migration einer Session fehlgeschlagen:', e); }
+            }
+            return;
+          }
+        } catch (e) {
+          console.error('Backend-Load fehlgeschlagen, nutze lokal:', e);
+        }
+      }
+
+      // Offline / nicht eingeloggt → localStorage
+      if (cancelled) return;
+      setSessions(localSessions);
+      if (localSessions.length > 0) setCurrentSessionId(localSessions[0].id);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Problem-Liste aus dem Backend hydrieren (überschreibt localStorage-Mirror).
+  useEffect(() => {
+    (async () => {
+      try {
+        const remote = await loadPref<string[]>('problems', []);
+        if (Array.isArray(remote) && remote.length > 0) {
+          setProblemOptions(remote);
+          saveProblems(remote);
+        }
+      } catch { /* nicht kritisch */ }
+    })();
+  }, []);
+
+  // Fire-and-forget Sync einer Session ins Backend (Hybrid; no-op wenn nicht eingeloggt).
+  const persist = useCallback((session: BacktestSession) => {
+    saveBacktest(session).catch(e => console.error('Backtest-Sync fehlgeschlagen:', e));
   }, []);
 
   const currentSession = sessions.find(s => s.id === currentSessionId);
@@ -321,9 +382,10 @@ export function Backtest() {
       elapsedMs: currentSession.elapsedMs + (Date.now() - currentSession.updatedAt),
     };
     saveSessions(sessions.map(s => s.id === currentSessionId ? updatedSession : s));
+    persist(updatedSession);
     setFormData(prev => ({ ...prev, rMultiple: prev.result === 'win' ? 1 : prev.result === 'loss' ? -1 : 0, problems: [], screenshot: '', notes: '' }));
     pairInputRef.current?.focus();
-  }, [formData, currentSession, currentSessionId, sessions, saveSessions]);
+  }, [formData, currentSession, currentSessionId, sessions, saveSessions, persist]);
 
   // Enter speichert (außer im Notizen-Feld → dort Zeilenumbruch via Shift+Enter)
   useEffect(() => {
@@ -371,15 +433,17 @@ export function Backtest() {
       updatedAt: now,
     };
     saveSessions(sessions.map(s => s.id === currentSessionId ? updatedSession : s));
+    persist(updatedSession);
   };
 
   const createNewSession = () => {
     const newSession: BacktestSession = {
-      id: `backtest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: newId(),
       name: `Backtest ${new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}`,
       createdAt: Date.now(), updatedAt: Date.now(), trades: [], isPaused: false, elapsedMs: 0,
     };
     saveSessions([newSession, ...sessions]);
+    persist(newSession);
     setCurrentSessionId(newSession.id);
     setShowSessionList(false);
     showToast('Neue Backtest-Session erstellt', 'success');
@@ -388,6 +452,7 @@ export function Backtest() {
   const deleteSession = (sessionId: string) => {
     const newSessions = sessions.filter(s => s.id !== sessionId);
     saveSessions(newSessions);
+    removeBacktest(sessionId).catch(e => console.error('Backtest-Löschen (Backend) fehlgeschlagen:', e));
     if (currentSessionId === sessionId) setCurrentSessionId(newSessions.length > 0 ? newSessions[0].id : null);
     showToast('Session gelöscht', 'info');
   };
@@ -420,6 +485,7 @@ export function Backtest() {
       const updated = [...problemOptions, val];
       setProblemOptions(updated);
       saveProblems(updated);
+      savePref('problems', updated).catch(e => console.error('Problem-Sync fehlgeschlagen:', e));
     }
     setFormData(prev => ({
       ...prev,
@@ -447,6 +513,7 @@ export function Backtest() {
       elapsedMs: currentSession.elapsedMs + (now - currentSession.updatedAt), updatedAt: now,
     };
     saveSessions(sessions.map(s => s.id === currentSessionId ? updatedSession : s));
+    persist(updatedSession);
     showToast('Session beendet', 'info');
   };
 
@@ -456,6 +523,7 @@ export function Backtest() {
       ...currentSession, isPaused: true, isCompleted: false, updatedAt: Date.now(),
     };
     saveSessions(sessions.map(s => s.id === currentSessionId ? updatedSession : s));
+    persist(updatedSession);
     showToast('Session wieder geöffnet', 'success');
   };
 
@@ -467,6 +535,7 @@ export function Backtest() {
       updatedAt: Date.now(),
     };
     saveSessions(sessions.map(s => s.id === currentSessionId ? updatedSession : s));
+    persist(updatedSession);
     showToast('Trade gelöscht', 'info');
   };
 
