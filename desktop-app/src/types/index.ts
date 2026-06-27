@@ -44,6 +44,8 @@ export interface Trade {
   pnl?: number;
   // Chapter
   chapterId?: string;
+  // Strategie-Verknüpfung (StrategyBuilder)
+  strategyId?: string;
   // Setup flags (legacy)
   htfBias?: boolean;
   d1Zone?: boolean;

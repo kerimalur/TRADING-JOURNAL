@@ -73,6 +73,7 @@ interface BacktestSession {
   isCompleted?: boolean;
   // Session-Konfiguration (beim Erstellen abgefragt)
   pair?: string;
+  strategyId?: string;      // Verknüpfung zur StrategyBuilder-Strategie
   strategy?: string;        // Name aus den eigenen Strategien, oder leer = "keine"
   defaultRR?: number;       // Standard Risk-Reward (z.B. 2 = 1:2)
   riskPercent?: number;     // Risiko pro Trade in %
@@ -157,7 +158,7 @@ export function Backtest() {
   const [strategies, setStrategies] = useState<StrategyRecord[]>([]);
   const [wizardData, setWizardData] = useState({
     pair: 'EURUSD',
-    strategy: '',          // '' = keine
+    strategyId: '',        // '' = keine
     defaultRR: 2,
     riskPercent: 1,
     accountSize: 10000,
@@ -485,20 +486,22 @@ export function Backtest() {
   // Öffnet den Wizard (statt direkt eine Session zu erstellen)
   const openWizard = () => {
     setShowSessionList(false);
-    setWizardData({ pair: 'EURUSD', strategy: '', defaultRR: 2, riskPercent: 1, accountSize: 10000 });
+    setWizardData({ pair: 'EURUSD', strategyId: '', defaultRR: 2, riskPercent: 1, accountSize: 10000 });
     setShowWizard(true);
   };
 
   // Erstellt die Session aus den Wizard-Eingaben
   const createSessionFromWizard = () => {
     const cfg = wizardData;
-    const stratLabel = cfg.strategy ? ` · ${cfg.strategy}` : '';
+    const stratName = strategies.find(s => s.id === cfg.strategyId)?.name;
+    const stratLabel = stratName ? ` · ${stratName}` : '';
     const newSession: BacktestSession = {
       id: newId(),
       name: `${cfg.pair}${stratLabel} · ${new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}`,
       createdAt: Date.now(), updatedAt: Date.now(), trades: [], isPaused: false, elapsedMs: 0,
       pair: cfg.pair,
-      strategy: cfg.strategy || undefined,
+      strategyId: cfg.strategyId || undefined,
+      strategy: stratName || undefined,
       defaultRR: cfg.defaultRR,
       riskPercent: cfg.riskPercent,
       accountSize: cfg.accountSize,
@@ -668,9 +671,9 @@ export function Backtest() {
               </div>
               <div>
                 <label className="input-label">Strategie</label>
-                <select className="input" value={wizardData.strategy} onChange={e => setWizardData(p => ({ ...p, strategy: e.target.value }))}>
+                <select className="input" value={wizardData.strategyId} onChange={e => setWizardData(p => ({ ...p, strategyId: e.target.value }))}>
                   <option value="">— keine —</option>
-                  {strategies.map(s => <option key={s.id || s.name} value={s.name}>{s.name}</option>)}
+                  {strategies.map(s => <option key={s.id || s.name} value={s.id || ''}>{s.name}</option>)}
                 </select>
                 {strategies.length === 0 && <p className="text-[11px] text-text-muted mt-1">Keine eigenen Strategien gefunden — im Strategie-Bereich anlegen, oder „keine" wählen.</p>}
               </div>

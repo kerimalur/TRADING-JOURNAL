@@ -25,6 +25,7 @@ export interface BacktestSession {
   // Session-Konfiguration (im stats-JSONB unter config gespeichert, da die
   // Tabelle keine eigenen Spalten dafür hat → keine zusätzliche Migration nötig)
   pair?: string;
+  strategyId?: string;
   strategy?: string;
   defaultRR?: number;
   riskPercent?: number;
@@ -43,6 +44,7 @@ function rowToSession(r: any): BacktestSession {
     elapsedMs: Number(r.elapsed_ms) || 0,
     isCompleted: r.status === 'completed',
     pair: config.pair,
+    strategyId: config.strategyId,
     strategy: config.strategy,
     defaultRR: config.defaultRR,
     riskPercent: config.riskPercent,
@@ -61,6 +63,7 @@ function sessionToRow(s: BacktestSession, userId: string) {
     stats: {
       config: {
         pair: s.pair,
+        strategyId: s.strategyId,
         strategy: s.strategy,
         defaultRR: s.defaultRR,
         riskPercent: s.riskPercent,

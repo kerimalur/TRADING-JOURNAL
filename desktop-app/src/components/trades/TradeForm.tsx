@@ -13,6 +13,7 @@ import type { Trade, AccountConfig } from '@/types';
 import { PAIR_LIST, getConfluences } from '@/types';
 import { useAccountStore } from '@/stores/accountStore';
 import { calculateRiskAmount, calculateProfitAmount, calcRMultipleFromLevels } from '@/utils/calculations';
+import { loadStrategies, type StrategyRecord } from '@/services/strategyService';
 import { getApi } from '@/services/webApi';
 
 interface TradeFormProps {
@@ -75,6 +76,12 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [strategies, setStrategies] = useState<StrategyRecord[]>([]);
+
+  // Eigene Strategien für die Verknüpfung laden (StrategyBuilder)
+  useEffect(() => {
+    loadStrategies().then(setStrategies).catch(() => { /* offline/nicht eingeloggt */ });
+  }, []);
 
   // Load account config on mount
   useEffect(() => {
@@ -331,6 +338,18 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
                   SHORT
                 </button>
               </div>
+            </div>
+
+            <div>
+              <label className="input-label">Strategie</label>
+              <select
+                className="select"
+                value={formData.strategyId || ''}
+                onChange={(e) => handleChange('strategyId', e.target.value || undefined)}
+              >
+                <option value="">— keine —</option>
+                {strategies.map(s => <option key={s.id || s.name} value={s.id || ''}>{s.name}</option>)}
+              </select>
             </div>
 
           </div>

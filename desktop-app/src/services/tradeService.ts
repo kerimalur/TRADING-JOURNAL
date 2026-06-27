@@ -47,6 +47,7 @@ function mapDbToApp(row: any): Trade {
     updatedAt: row.updated_at || new Date().toISOString(),
     // Chapter support
     chapterId: row.chapter_id ?? row.chapterId,
+    strategyId: row.strategy_id ?? row.strategyId,
   } as Trade;
 }
 
@@ -80,6 +81,7 @@ function mapAppToDb(trade: Partial<Trade> & { id?: string }) {
     setup_3day_gva: trade.setup_3day_gva ?? false,
     confluences: trade.confluences ?? [],
     chapter_id: trade.chapterId,
+    strategy_id: trade.strategyId,  // wird verworfen wenn undefined (kein Strategie-Tag)
   };
 }
 
