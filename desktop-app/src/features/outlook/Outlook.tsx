@@ -688,7 +688,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
 
           {/* Status Dropdown */}
           {showStatusMenu && (
-            <div className="absolute right-0 top-full mt-1 bg-[#0d0f14] border border-black/[0.08] rounded-lg shadow-xl z-10 py-0.5 min-w-[140px]">
+            <div className="absolute right-0 top-full mt-1 bg-background-surface border border-black/[0.08] rounded-lg shadow-xl z-10 py-0.5 min-w-[140px]">
               {Object.entries(OUTLOOK_STATUS_CONFIG).map(([status, config]) => (
                 <button
                   key={status}
@@ -961,7 +961,7 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        className="bg-[#0d0f14] border border-black/[0.06] rounded-lg shadow-2xl w-full max-w-xl"
+        className="bg-background-surface border border-black/[0.06] rounded-lg shadow-2xl w-full max-w-xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/[0.06]">
@@ -1613,7 +1613,7 @@ export function Outlook() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.15 }}
-            className="bg-[#0d0f14] border border-black/[0.06] rounded-lg shadow-2xl p-5 max-w-sm"
+            className="bg-background-surface border border-black/[0.06] rounded-lg shadow-2xl p-5 max-w-sm"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-full bg-pnl-negative/15 flex items-center justify-center">
@@ -1657,7 +1657,7 @@ export function Outlook() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.15 }}
-            className="bg-[#0d0f14] border border-black/[0.06] rounded-xl shadow-2xl p-5 max-w-md w-full"
+            className="bg-background-surface border border-black/[0.06] rounded-xl shadow-2xl p-5 max-w-md w-full"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-full bg-accent-gold/15 flex items-center justify-center">

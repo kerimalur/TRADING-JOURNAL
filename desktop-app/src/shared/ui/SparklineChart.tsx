@@ -16,7 +16,7 @@ export function SparklineChart({
   data,
   width = 80,
   height = 30,
-  color = '#8B5CF6',
+  color = '#2563EB',
   showGradient = true,
   strokeWidth = 1.5,
   className = '',
@@ -49,7 +49,7 @@ export function SparklineChart({
   if (!data.length) return null;
 
   const isPositive = data.length >= 2 && data[data.length - 1] >= data[0];
-  const activeColor = color === '#8B5CF6'
+  const activeColor = color === '#2563EB'
     ? (isPositive ? '#22C55E' : '#EF4444')
     : color;
 

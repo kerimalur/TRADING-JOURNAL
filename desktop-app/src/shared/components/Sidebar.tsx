@@ -100,7 +100,7 @@ export function Sidebar() {
               className="flex items-center gap-2"
             >
               <div className="w-7 h-7 rounded-lg flex items-center justify-center shadow-glow-sm"
-                style={{ background: 'linear-gradient(135deg, #8B5CF6, #06B6D4)' }}
+                style={{ background: 'linear-gradient(135deg, #2563EB, #3B82F6)' }}
               >
                 <span className="text-white font-bold text-xs">TJ</span>
               </div>
@@ -162,7 +162,7 @@ export function Sidebar() {
                       <motion.div
                         layoutId="sidebar-active-indicator"
                         className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
-                        style={{ background: 'linear-gradient(180deg, #8B5CF6, #06B6D4)' }}
+                        style={{ background: 'linear-gradient(180deg, #2563EB, #3B82F6)' }}
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                       />
                     )}

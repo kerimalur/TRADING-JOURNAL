@@ -216,7 +216,7 @@ function WidgetCustomizer({
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="fixed right-4 top-16 z-40 w-64 bg-[#0d0f14] border border-black/[0.08] rounded-xl shadow-2xl p-4"
+      className="fixed right-4 top-16 z-40 w-64 bg-background-surface border border-black/[0.08] rounded-xl shadow-2xl p-4"
     >
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-semibold text-text-primary">Dashboard anpassen</span>
@@ -527,7 +527,7 @@ export function Dashboard() {
           {prefs.showWinRate && (
             <BentoCell delay={0.1}>
               <div className="flex flex-col items-center justify-center h-full">
-                <ProgressRing value={stats.winRate} size={90} strokeWidth={7} color="#8B5CF6" label="WIN RATE" />
+                <ProgressRing value={stats.winRate} size={90} strokeWidth={7} color="#2563EB" label="WIN RATE" />
                 <p className="text-xs text-text-muted mt-2 tabular-nums font-mono">
                   {Math.round(stats.winRate * stats.totalTrades / 100)}W / {stats.totalTrades - Math.round(stats.winRate * stats.totalTrades / 100)}L
                 </p>

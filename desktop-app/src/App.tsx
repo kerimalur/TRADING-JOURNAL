@@ -70,7 +70,7 @@ function LoginScreen() {
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-glow-sm"
-            style={{ background: 'linear-gradient(135deg, #8B5CF6, #06B6D4)' }}>
+            style={{ background: 'linear-gradient(135deg, #2563EB, #3B82F6)' }}>
             <span className="text-white font-bold text-xl">TJ</span>
           </div>
         </div>

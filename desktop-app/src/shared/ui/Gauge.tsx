@@ -23,7 +23,7 @@ function getAutoColor(value: number): string {
 }
 
 const COLORS = {
-  default: '#8B5CF6',
+  default: '#2563EB',
   success: '#22C55E',
   warning: '#F59E0B',
   danger: '#EF4444',
@@ -62,7 +62,7 @@ export function Gauge({
           <path
             d={describeArc(sizes.width / 2, sizes.width / 2 + 5, radius, 180, 360)}
             fill="none"
-            stroke="rgba(255,255,255,0.06)"
+            stroke="rgba(15,23,42,0.08)"
             strokeWidth={sizes.strokeWidth}
             strokeLinecap="round"
           />

@@ -107,7 +107,7 @@ export function EquityChart({
           <div className="space-y-1 text-sm">
             <p className="flex justify-between gap-4">
               <span className="text-text-muted">Balance:</span>
-              <span className="font-mono font-semibold text-accent-gold">
+              <span className="font-mono font-semibold text-accent-primary">
                 ${data.balance.toLocaleString('de-DE')}
               </span>
             </p>
@@ -156,8 +156,8 @@ export function EquityChart({
       <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
         <defs>
           <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#d4af37" stopOpacity={0.3}/>
-            <stop offset="95%" stopColor="#d4af37" stopOpacity={0}/>
+            <stop offset="5%" stopColor="#2563EB" stopOpacity={0.2}/>
+            <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
           </linearGradient>
           <linearGradient id="drawdownGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="#ef4444" stopOpacity={0.5}/>
@@ -167,26 +167,26 @@ export function EquityChart({
         
         <CartesianGrid 
           strokeDasharray="3 3" 
-          stroke="#2a2a35" 
+          stroke="#E2E8F0"
           vertical={false}
         />
         
         <XAxis 
           dataKey="date" 
-          stroke="#666"
-          tick={{ fill: '#9ca3af', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' }}
-          tickLine={{ stroke: '#444' }}
-          axisLine={{ stroke: '#333' }}
+          stroke="#94A3B8"
+          tick={{ fill: '#64748B', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' }}
+          tickLine={{ stroke: '#CBD5E1' }}
+          axisLine={{ stroke: '#E2E8F0' }}
         />
         
         <YAxis 
           yAxisId="balance"
           domain={[minBalance, maxBalance]}
-          stroke="#666"
-          tick={{ fill: '#9ca3af', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' }}
+          stroke="#94A3B8"
+          tick={{ fill: '#64748B', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' }}
           tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-          tickLine={{ stroke: '#444' }}
-          axisLine={{ stroke: '#333' }}
+          tickLine={{ stroke: '#CBD5E1' }}
+          axisLine={{ stroke: '#E2E8F0' }}
         />
         
         {showDrawdown && (
@@ -194,11 +194,11 @@ export function EquityChart({
             yAxisId="drawdown"
             orientation="right"
             domain={[0, 'dataMax']}
-            stroke="#666"
-            tick={{ fill: '#9ca3af', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' }}
+            stroke="#94A3B8"
+            tick={{ fill: '#64748B', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' }}
             tickFormatter={(value) => `${value.toFixed(0)}%`}
-            tickLine={{ stroke: '#444' }}
-            axisLine={{ stroke: '#333' }}
+            tickLine={{ stroke: '#CBD5E1' }}
+            axisLine={{ stroke: '#E2E8F0' }}
           />
         )}
         
@@ -206,18 +206,18 @@ export function EquityChart({
         
         <Legend 
           wrapperStyle={{ paddingTop: '10px', fontFamily: 'Inter, system-ui, sans-serif' }}
-          formatter={(value) => <span style={{ color: '#9ca3af', fontSize: '12px', fontFamily: 'Inter, system-ui, sans-serif' }}>{value}</span>}
+          formatter={(value) => <span style={{ color: '#64748B', fontSize: '12px', fontFamily: 'Inter, system-ui, sans-serif' }}>{value}</span>}
         />
 
         {/* Reference line at start balance */}
         <ReferenceLine 
           yAxisId="balance"
           y={startBalance} 
-          stroke="#666" 
+          stroke="#94A3B8" 
           strokeDasharray="5 5" 
           label={{ 
             value: 'Start', 
-            fill: '#888', 
+            fill: '#64748B', 
             fontSize: 10,
             position: 'left'
           }}
@@ -244,7 +244,7 @@ export function EquityChart({
           dataKey="balance"
           name="Balance"
           fill="url(#balanceGradient)"
-          stroke="#d4af37"
+          stroke="#2563EB"
           strokeWidth={2}
           fillOpacity={1}
           dot={(props: any) => {
@@ -254,21 +254,21 @@ export function EquityChart({
             const color = payload.tradeResult === 'win' 
               ? '#10b981' 
               : payload.tradeResult === 'loss' 
-                ? '#ef4444' 
-                : '#666';
-            
+                ? '#ef4444'
+                : '#94A3B8';
+
             return (
-              <circle 
-                cx={cx} 
-                cy={cy} 
-                r={4} 
-                fill={color} 
-                stroke="#1a1a24" 
+              <circle
+                cx={cx}
+                cy={cy}
+                r={4}
+                fill={color}
+                stroke="#FFFFFF"
                 strokeWidth={2}
               />
             );
           }}
-          activeDot={{ r: 6, stroke: '#d4af37', strokeWidth: 2, fill: '#1a1a24' }}
+          activeDot={{ r: 6, stroke: '#2563EB', strokeWidth: 2, fill: '#FFFFFF' }}
         />
       </ComposedChart>
     </ResponsiveContainer>

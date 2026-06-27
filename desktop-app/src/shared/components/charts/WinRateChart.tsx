@@ -29,7 +29,7 @@ export function WinRateChart({ trades, height = 250 }: WinRateChartProps) {
     return [
       { name: 'Wins', value: wins, color: '#10b981' },
       { name: 'Losses', value: losses, color: '#ef4444' },
-      { name: 'Breakeven', value: breakevens, color: '#666' }
+      { name: 'Breakeven', value: breakevens, color: '#94A3B8' }
     ].filter(d => d.value > 0);
   }, [trades]);
 
@@ -63,7 +63,7 @@ export function WinRateChart({ trades, height = 250 }: WinRateChartProps) {
           x={cx}
           y={cy - 10}
           textAnchor="middle"
-          fill="#888"
+          fill="#64748B"
           fontSize={14}
         >
           Win Rate
@@ -72,7 +72,7 @@ export function WinRateChart({ trades, height = 250 }: WinRateChartProps) {
           x={cx}
           y={cy + 15}
           textAnchor="middle"
-          fill="#d4af37"
+          fill="#2563EB"
           fontSize={28}
           fontWeight="bold"
         >
@@ -108,7 +108,7 @@ export function WinRateChart({ trades, height = 250 }: WinRateChartProps) {
             <Cell 
               key={`cell-${index}`} 
               fill={entry.color}
-              stroke="#1a1a24"
+              stroke="#FFFFFF"
               strokeWidth={2}
             />
           ))}

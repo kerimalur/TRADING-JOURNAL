@@ -71,30 +71,30 @@ export function RMultipleChart({ trades, height = 300, limit = 50 }: RMultipleCh
       <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
         <CartesianGrid 
           strokeDasharray="3 3" 
-          stroke="#2a2a35" 
+          stroke="#E2E8F0" 
           vertical={false}
         />
         
         <XAxis 
           dataKey="index"
-          stroke="#666"
-          tick={{ fill: '#888', fontSize: 11 }}
-          tickLine={{ stroke: '#444' }}
-          axisLine={{ stroke: '#333' }}
+          stroke="#94A3B8"
+          tick={{ fill: '#64748B', fontSize: 11 }}
+          tickLine={{ stroke: '#CBD5E1' }}
+          axisLine={{ stroke: '#E2E8F0' }}
         />
         
         <YAxis 
           domain={[-maxR, maxR]}
-          stroke="#666"
-          tick={{ fill: '#888', fontSize: 12 }}
+          stroke="#94A3B8"
+          tick={{ fill: '#64748B', fontSize: 12 }}
           tickFormatter={(value) => `${value}R`}
-          tickLine={{ stroke: '#444' }}
-          axisLine={{ stroke: '#333' }}
+          tickLine={{ stroke: '#CBD5E1' }}
+          axisLine={{ stroke: '#E2E8F0' }}
         />
         
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(15,23,42,0.05)' }} />
         
-        <ReferenceLine y={0} stroke="#666" />
+        <ReferenceLine y={0} stroke="#94A3B8" />
         
         <Bar 
           dataKey="rMultiple" 
