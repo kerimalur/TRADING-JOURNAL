@@ -255,7 +255,7 @@ export function Settings() {
   const fundedTransactions = getTransactions('funded');
 
   const labelClass = 'block text-[10px] font-semibold text-text-muted uppercase tracking-[0.1em] mb-1.5';
-  const inputClass = 'w-full px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-lg text-text-primary text-sm focus:border-accent-primary focus:outline-none font-mono';
+  const inputClass = 'w-full px-3 py-2 bg-black/[0.03] border border-black/[0.06] rounded-lg text-text-primary text-sm focus:border-accent-primary focus:outline-none font-mono';
 
   return (
     <PageTransition>
@@ -327,9 +327,9 @@ export function Settings() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-xl border border-white/[0.06] overflow-hidden"
+        className="rounded-xl border border-black/[0.06] overflow-hidden"
       >
-        <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
+        <div className="px-5 py-3 border-b border-black/[0.06] flex items-center gap-2">
           <Database size={15} className="text-accent-primary" />
           <span className="text-sm font-bold text-text-primary">Datenspeicher</span>
         </div>
@@ -337,7 +337,7 @@ export function Settings() {
         <div className="p-5 space-y-3">
           {/* Ladeindikator während Auth-Status noch unbekannt */}
           {authLoading ? (
-            <div className="flex items-center gap-3 p-4 rounded-xl border border-white/[0.06] bg-white/[0.02]">
+            <div className="flex items-center gap-3 p-4 rounded-xl border border-black/[0.06] bg-black/[0.02]">
               <RefreshCw size={16} className="text-text-muted animate-spin" />
               <span className="text-xs text-text-muted">Verbindung wird geprüft…</span>
             </div>
@@ -390,7 +390,7 @@ export function Settings() {
                   ) : (
                     <button
                       onClick={handleSwitchToLocal}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-text-muted text-xs font-semibold hover:text-text-primary hover:bg-white/[0.08] transition-colors"
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-black/[0.04] border border-black/[0.08] text-text-muted text-xs font-semibold hover:text-text-primary hover:bg-black/[0.08] transition-colors"
                     >
                       <HardDrive size={13} />
                       Abmelden &amp; lokal speichern
@@ -408,9 +408,9 @@ export function Settings() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.04 }}
-        className="rounded-xl border border-white/[0.06] overflow-hidden"
+        className="rounded-xl border border-black/[0.06] overflow-hidden"
       >
-        <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
+        <div className="px-5 py-3 border-b border-black/[0.06] flex items-center gap-2">
           <User size={15} className="text-accent-blue" />
           <span className="text-sm font-bold text-text-primary">Konto & Login</span>
         </div>
@@ -425,7 +425,7 @@ export function Settings() {
               </div>
             </div>
           ) : authUser ? (
-            <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-black/[0.03] border border-black/[0.06]">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center text-accent-primary font-bold text-sm">
                   {authUser.email?.[0]?.toUpperCase() ?? 'U'}
@@ -441,7 +441,7 @@ export function Settings() {
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] text-text-muted text-xs font-medium hover:bg-pnl-negative/20 hover:text-pnl-negative transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/[0.06] text-text-muted text-xs font-medium hover:bg-pnl-negative/20 hover:text-pnl-negative transition-colors"
               >
                 {isLoggingOut ? <RefreshCw size={12} className="animate-spin" /> : <LogOut size={12} />}
                 Abmelden
@@ -464,9 +464,9 @@ export function Settings() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08 }}
-        className="rounded-xl border border-white/[0.06] overflow-hidden"
+        className="rounded-xl border border-black/[0.06] overflow-hidden"
       >
-        <div className="px-5 py-3 border-b border-white/[0.06] flex items-center justify-between">
+        <div className="px-5 py-3 border-b border-black/[0.06] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <History size={15} className="text-accent-primary" />
             <span className="text-sm font-bold text-text-primary">Transaktionen</span>
@@ -496,7 +496,7 @@ export function Settings() {
                   <div className="text-[10px] font-semibold text-text-muted uppercase tracking-[0.1em] mb-2">{label}</div>
                   <div className="space-y-1">
                     {list.map(tx => (
-                      <div key={tx.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors group">
+                      <div key={tx.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-black/[0.02] hover:bg-black/[0.04] transition-colors group">
                         <div className="flex items-center gap-3">
                           <div className={clsx(
                             'w-6 h-6 rounded-md flex items-center justify-center',
@@ -545,9 +545,9 @@ export function Settings() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="rounded-xl border border-white/[0.06] overflow-hidden"
+        className="rounded-xl border border-black/[0.06] overflow-hidden"
       >
-        <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
+        <div className="px-5 py-3 border-b border-black/[0.06] flex items-center gap-2">
           <Tag size={15} className="text-accent-primary" />
           <span className="text-sm font-bold text-text-primary">Confluences</span>
           <span className="text-[10px] text-text-muted ml-1">— für Trades &amp; Outlooks</span>
@@ -576,7 +576,7 @@ export function Settings() {
           {/* Liste */}
           <div className="space-y-1 max-h-64 overflow-y-auto">
             {confluences.map((c, idx) => (
-              <div key={idx} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] group transition-colors">
+              <div key={idx} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/[0.02] hover:bg-black/[0.04] group transition-colors">
                 {editingIdx === idx ? (
                   <>
                     <input
@@ -621,9 +621,9 @@ export function Settings() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.11 }}
-        className="rounded-xl border border-white/[0.06] overflow-hidden"
+        className="rounded-xl border border-black/[0.06] overflow-hidden"
       >
-        <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
+        <div className="px-5 py-3 border-b border-black/[0.06] flex items-center gap-2">
           <AlertTriangle size={15} className="text-accent-gold" />
           <span className="text-sm font-bold text-text-primary">Probleme</span>
           <span className="text-[10px] text-text-muted ml-1">— Fehler-Tags für Backtest-Trades</span>
@@ -652,7 +652,7 @@ export function Settings() {
           {/* Liste */}
           <div className="space-y-1 max-h-64 overflow-y-auto">
             {problems.map((p, idx) => (
-              <div key={idx} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] group transition-colors">
+              <div key={idx} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/[0.02] hover:bg-black/[0.04] group transition-colors">
                 {editingProblemIdx === idx ? (
                   <>
                     <input
@@ -697,15 +697,15 @@ export function Settings() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.12 }}
-        className="rounded-xl border border-white/[0.06] overflow-hidden"
+        className="rounded-xl border border-black/[0.06] overflow-hidden"
       >
-        <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
+        <div className="px-5 py-3 border-b border-black/[0.06] flex items-center gap-2">
           <Download size={15} className="text-text-muted" />
           <span className="text-sm font-bold text-text-primary">Backup & Wiederherstellung</span>
         </div>
 
         <div className="p-5 grid grid-cols-2 gap-3">
-          <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03]">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-black/[0.03]">
             <div>
               <div className="text-xs font-medium text-text-primary">Exportieren</div>
               <div className="text-[10px] text-text-muted">Alle Daten als JSON</div>
@@ -719,14 +719,14 @@ export function Settings() {
             </button>
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03]">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-black/[0.03]">
             <div>
               <div className="text-xs font-medium text-text-primary">Importieren</div>
               <div className="text-[10px] text-text-muted">Backup wiederherstellen</div>
             </div>
             <button
               onClick={handleImport}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] text-text-secondary text-xs font-medium hover:bg-white/[0.1] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/[0.06] text-text-secondary text-xs font-medium hover:bg-black/[0.1] transition-colors"
             >
               <Upload size={12} />
               Import
@@ -740,9 +740,9 @@ export function Settings() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.16 }}
-        className="rounded-xl border border-white/[0.06] overflow-hidden"
+        className="rounded-xl border border-black/[0.06] overflow-hidden"
       >
-        <div className="px-5 py-3 border-b border-white/[0.06]">
+        <div className="px-5 py-3 border-b border-black/[0.06]">
           <span className="text-sm font-bold text-text-primary">App-Info</span>
         </div>
         <div className="p-5 space-y-2">
@@ -751,7 +751,7 @@ export function Settings() {
             { label: 'Speicher',  value: authLoading ? '…' : isCloud ? 'Supabase Cloud' : 'Lokal' },
             { label: 'Login',     value: authUser ? `Google · ${authUser.email}` : (inElectron ? 'Desktop' : 'Nicht angemeldet') },
           ].map(item => (
-            <div key={item.label} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.03]">
+            <div key={item.label} className="flex items-center justify-between px-3 py-2 rounded-lg bg-black/[0.03]">
               <span className="text-[10px] text-text-muted uppercase tracking-wider">{item.label}</span>
               <span className="text-xs font-medium font-mono text-text-primary">{item.value}</span>
             </div>
@@ -769,7 +769,7 @@ export function Settings() {
           >
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-sm font-bold text-text-primary">Neue Transaktion</h3>
-              <button onClick={() => setShowTransactionForm(false)} className="p-1 rounded-lg hover:bg-white/[0.06]">
+              <button onClick={() => setShowTransactionForm(false)} className="p-1 rounded-lg hover:bg-black/[0.06]">
                 <X size={16} className="text-text-muted" />
               </button>
             </div>
@@ -784,7 +784,7 @@ export function Settings() {
                       className={clsx('flex-1 py-2 rounded-lg text-xs font-medium transition-all',
                         transactionForm.accountType === type
                           ? type === 'ek' ? 'bg-accent-gold/20 text-accent-gold' : 'bg-pnl-positive/20 text-pnl-positive'
-                          : 'bg-white/[0.03] text-text-muted hover:bg-white/[0.06]'
+                          : 'bg-black/[0.03] text-text-muted hover:bg-black/[0.06]'
                       )}>
                       {type === 'ek' ? 'Eigenkapital' : 'Funded'}
                     </button>
@@ -803,7 +803,7 @@ export function Settings() {
                     <button key={opt.value} type="button"
                       onClick={() => setTransactionForm(p => ({ ...p, type: opt.value }))}
                       className={clsx('flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium transition-all',
-                        transactionForm.type === opt.value ? opt.activeClass : 'bg-white/[0.03] text-text-muted hover:bg-white/[0.06]'
+                        transactionForm.type === opt.value ? opt.activeClass : 'bg-black/[0.03] text-text-muted hover:bg-black/[0.06]'
                       )}>
                       {opt.icon}{opt.label}
                     </button>
@@ -829,7 +829,7 @@ export function Settings() {
 
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowTransactionForm(false)}
-                  className="flex-1 py-2 rounded-lg bg-white/[0.03] text-text-muted text-xs font-medium hover:bg-white/[0.06] transition-colors">
+                  className="flex-1 py-2 rounded-lg bg-black/[0.03] text-text-muted text-xs font-medium hover:bg-black/[0.06] transition-colors">
                   Abbrechen
                 </button>
                 <button onClick={handleAddTransaction}

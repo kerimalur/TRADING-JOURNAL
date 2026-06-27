@@ -666,7 +666,7 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
                     onChange={e => setGoalInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSaveGoal()}
                     placeholder="z.B. 50000"
-                    className="w-28 bg-white/[0.04] border border-accent-primary/30 rounded px-2 py-0.5 text-xs font-mono text-text-primary focus:outline-none focus:border-accent-primary/60"
+                    className="w-28 bg-black/[0.04] border border-accent-primary/30 rounded px-2 py-0.5 text-xs font-mono text-text-primary focus:outline-none focus:border-accent-primary/60"
                     autoFocus
                   />
                   <button onClick={handleSaveGoal} className="text-[10px] text-accent-primary hover:text-accent-primary/80 font-semibold">OK</button>
@@ -684,7 +684,7 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
                     Ziel: {goalAmount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} {config.currency || 'USD'}
                   </span>
                 </div>
-                <div className="relative h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
+                <div className="relative h-2.5 rounded-full bg-black/[0.06] overflow-hidden">
                   {(() => {
                     const start = config.initialStartBalance || 0;
                     const current = config.currentBalance;

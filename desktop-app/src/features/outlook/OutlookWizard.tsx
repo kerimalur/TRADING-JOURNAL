@@ -122,7 +122,7 @@ export function OutlookWizard({ symbol, existingOutlook, onSave, onClose }: Outl
             <span className="text-sm font-bold text-text-primary">{symbol}</span>
             <button
               onClick={() => setData(prev => ({ ...prev, isStarred: !prev.isStarred }))}
-              className="p-1 rounded hover:bg-white/[0.06]"
+              className="p-1 rounded hover:bg-black/[0.06]"
             >
               <Star size={14} className={data.isStarred ? 'text-accent-gold fill-accent-gold' : 'text-text-muted'} />
             </button>
@@ -136,15 +136,15 @@ export function OutlookWizard({ symbol, existingOutlook, onSave, onClose }: Outl
                     'w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold transition-colors',
                     i < step ? 'bg-pnl-positive text-white' :
                     i === step ? 'bg-accent-primary text-white' :
-                    'bg-white/[0.06] text-text-muted'
+                    'bg-black/[0.06] text-text-muted'
                   )}>
                     {i < step ? <Check size={10} /> : i + 1}
                   </div>
-                  {i < STEPS.length - 1 && <div className={clsx('w-3 h-px', i < step ? 'bg-pnl-positive' : 'bg-white/[0.08]')} />}
+                  {i < STEPS.length - 1 && <div className={clsx('w-3 h-px', i < step ? 'bg-pnl-positive' : 'bg-black/[0.08]')} />}
                 </div>
               ))}
             </div>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-muted">
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/[0.06] text-text-muted">
               <X size={16} />
             </button>
           </div>
@@ -168,7 +168,7 @@ export function OutlookWizard({ symbol, existingOutlook, onSave, onClose }: Outl
                   <p className="text-[10px] text-text-muted mb-4">Welche Strategie liegt diesem Trade zugrunde?</p>
 
                   {strategies.length === 0 ? (
-                    <div className="p-4 bg-white/[0.02] rounded-lg border border-white/[0.06] text-center">
+                    <div className="p-4 bg-black/[0.02] rounded-lg border border-black/[0.06] text-center">
                       <AlertCircle size={20} className="text-text-muted mx-auto mb-2" />
                       <p className="text-xs text-text-muted">Keine Strategien erstellt.</p>
                       <p className="text-[10px] text-text-muted mt-1">Erstelle Strategien unter "Strategie" in der Sidebar.</p>
@@ -183,16 +183,16 @@ export function OutlookWizard({ symbol, existingOutlook, onSave, onClose }: Outl
                             'text-left p-3 rounded-lg border transition-colors',
                             data.setupId === s.id
                               ? 'border-accent-primary bg-accent-primary/10'
-                              : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]'
+                              : 'border-black/[0.06] bg-black/[0.02] hover:bg-black/[0.04]'
                           )}
                         >
                           <div className="text-xs font-semibold text-text-primary">{s.name}</div>
                           <div className="text-[10px] text-text-muted mt-0.5 line-clamp-2">{s.description || 'Keine Beschreibung'}</div>
                           <div className="flex items-center gap-1 mt-1.5">
-                            <span className="text-[8px] uppercase bg-white/[0.06] px-1 py-0.5 rounded text-text-muted">
+                            <span className="text-[8px] uppercase bg-black/[0.06] px-1 py-0.5 rounded text-text-muted">
                               {s.rules.length} Regeln
                             </span>
-                            <span className="text-[8px] uppercase bg-white/[0.06] px-1 py-0.5 rounded text-text-muted">
+                            <span className="text-[8px] uppercase bg-black/[0.06] px-1 py-0.5 rounded text-text-muted">
                               {s.direction}
                             </span>
                           </div>
@@ -227,7 +227,7 @@ export function OutlookWizard({ symbol, existingOutlook, onSave, onClose }: Outl
                             ? dir === 'long'
                               ? 'border-pnl-positive bg-pnl-positive/10'
                               : 'border-pnl-negative bg-pnl-negative/10'
-                            : 'border-white/[0.06] hover:border-white/[0.15]'
+                            : 'border-black/[0.06] hover:border-black/[0.15]'
                         )}
                       >
                         {dir === 'long' ? <TrendingUp size={32} className="text-pnl-positive" /> : <TrendingDown size={32} className="text-pnl-negative" />}
@@ -260,7 +260,7 @@ export function OutlookWizard({ symbol, existingOutlook, onSave, onClose }: Outl
                           'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
                           data.confluences.includes(c)
                             ? 'border-accent-primary bg-accent-primary/15 text-accent-primary'
-                            : 'border-white/[0.06] text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
+                            : 'border-black/[0.06] text-text-muted hover:text-text-primary hover:bg-black/[0.04]'
                         )}
                       >
                         {c}
@@ -301,7 +301,7 @@ export function OutlookWizard({ symbol, existingOutlook, onSave, onClose }: Outl
                   </p>
 
                   {data.strategyChecklist.length === 0 ? (
-                    <div className="p-4 bg-white/[0.02] rounded-lg border border-white/[0.06] text-center">
+                    <div className="p-4 bg-black/[0.02] rounded-lg border border-black/[0.06] text-center">
                       <p className="text-xs text-text-muted">Keine Regeln vorhanden. Überspringe diesen Schritt.</p>
                     </div>
                   ) : (
@@ -318,13 +318,13 @@ export function OutlookWizard({ symbol, existingOutlook, onSave, onClose }: Outl
                               {items.map(item => (
                                 <label
                                   key={item.ruleId}
-                                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.03] cursor-pointer"
+                                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-black/[0.03] cursor-pointer"
                                 >
                                   <div
                                     onClick={() => toggleChecklist(item.ruleId)}
                                     className={clsx(
                                       'w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors',
-                                      item.checked ? 'bg-pnl-positive' : 'bg-white/[0.06] border border-white/[0.1]'
+                                      item.checked ? 'bg-pnl-positive' : 'bg-black/[0.06] border border-black/[0.1]'
                                     )}
                                   >
                                     {item.checked && <Check size={12} className="text-white" />}
@@ -340,7 +340,7 @@ export function OutlookWizard({ symbol, existingOutlook, onSave, onClose }: Outl
                       })}
 
                       {/* Summary */}
-                      <div className="mt-2 pt-2 border-t border-white/[0.04] text-[10px] text-text-muted">
+                      <div className="mt-2 pt-2 border-t border-black/[0.04] text-[10px] text-text-muted">
                         {data.strategyChecklist.filter(i => i.checked).length} / {data.strategyChecklist.length} Regeln erfüllt
                       </div>
                     </div>
@@ -376,7 +376,7 @@ export function OutlookWizard({ symbol, existingOutlook, onSave, onClose }: Outl
                             onClick={() => setData(prev => ({ ...prev, confidence: level }))}
                             className={clsx(
                               'w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors',
-                              level <= data.confidence ? 'bg-accent-primary text-white' : 'bg-white/[0.06] text-text-muted'
+                              level <= data.confidence ? 'bg-accent-primary text-white' : 'bg-black/[0.06] text-text-muted'
                             )}
                           >
                             {level}

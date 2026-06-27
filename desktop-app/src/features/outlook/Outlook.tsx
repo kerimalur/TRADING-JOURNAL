@@ -245,7 +245,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                 <select
                   value={formData.symbol}
                   onChange={(e) => handleChange('symbol', e.target.value)}
-                  className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded px-3 py-2 text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  className="flex-1 bg-black/[0.03] border border-black/[0.06] rounded px-3 py-2 text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary/50 transition-colors"
                 >
                   {getAllPairs().map(pair => (
                     <option key={pair} value={pair}>{pair}</option>
@@ -259,7 +259,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                       handleChange('symbol', newPair.replace('/', '').toUpperCase());
                     }
                   }}
-                  className="px-2.5 py-2 bg-white/[0.03] border border-white/[0.06] rounded text-text-muted hover:text-accent-primary hover:border-accent-primary/30 transition-colors"
+                  className="px-2.5 py-2 bg-black/[0.03] border border-black/[0.06] rounded text-text-muted hover:text-accent-primary hover:border-accent-primary/30 transition-colors"
                   title="Eigenes Pair hinzufuegen"
                 >
                   <Plus size={16} />
@@ -279,7 +279,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-all',
                     formData.direction === 'long'
                       ? 'bg-pnl-positive/15 border border-pnl-positive/40 text-pnl-positive'
-                      : 'bg-white/[0.03] border border-white/[0.06] text-text-muted hover:border-white/[0.1]'
+                      : 'bg-black/[0.03] border border-black/[0.06] text-text-muted hover:border-black/[0.1]'
                   )}
                 >
                   <TrendingUp size={14} />
@@ -292,7 +292,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-all',
                     formData.direction === 'short'
                       ? 'bg-pnl-negative/15 border border-pnl-negative/40 text-pnl-negative'
-                      : 'bg-white/[0.03] border border-white/[0.06] text-text-muted hover:border-white/[0.1]'
+                      : 'bg-black/[0.03] border border-black/[0.06] text-text-muted hover:border-black/[0.1]'
                   )}
                 >
                   <TrendingDown size={14} />
@@ -304,7 +304,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
 
           {/* COT Bias Preview */}
           {cotBias && (
-            <div className="p-3 bg-white/[0.03] rounded border border-white/[0.06]">
+            <div className="p-3 bg-black/[0.03] rounded border border-black/[0.06]">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted">Stärke-Bias (auto)</span>
                 <span className={clsx(
@@ -344,7 +344,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
               onChange={(e) => handleChange('thesis', e.target.value)}
               placeholder="Beschreibe deine Trading-These..."
               rows={3}
-              className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-3 py-2 text-sm text-text-primary resize-none focus:outline-none focus:border-accent-primary/50 transition-colors placeholder:text-text-muted/40"
+              className="w-full bg-black/[0.03] border border-black/[0.06] rounded px-3 py-2 text-sm text-text-primary resize-none focus:outline-none focus:border-accent-primary/50 transition-colors placeholder:text-text-muted/40"
               required
             />
           </div>
@@ -364,7 +364,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     'flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded text-xs font-medium transition-all',
                     formData.confidence === level
                       ? 'bg-accent-gold/15 border border-accent-gold/40 text-accent-gold'
-                      : 'bg-white/[0.03] border border-white/[0.06] text-text-muted hover:border-white/[0.1]'
+                      : 'bg-black/[0.03] border border-black/[0.06] text-text-muted hover:border-black/[0.1]'
                   )}
                 >
                   <Star
@@ -394,7 +394,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                       'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all',
                       formData.status === status
                         ? `${config.bgColor} ${config.color} border border-current/30`
-                        : 'bg-white/[0.03] border border-white/[0.06] text-text-muted hover:border-white/[0.1]'
+                        : 'bg-black/[0.03] border border-black/[0.06] text-text-muted hover:border-black/[0.1]'
                     )}
                   >
                     {getStatusIcon(status)}
@@ -420,7 +420,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     'flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium transition-all',
                     formData.tags?.includes(tag)
                       ? 'bg-accent-primary/15 border border-accent-primary/40 text-accent-primary'
-                      : 'bg-white/[0.03] border border-white/[0.06] text-text-muted hover:border-white/[0.1]'
+                      : 'bg-black/[0.03] border border-black/[0.06] text-text-muted hover:border-black/[0.1]'
                   )}
                 >
                   <span className={clsx('w-1.5 h-1.5 rounded-full', getTagDotColor(tag))} />
@@ -445,7 +445,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
 
           {/* Advanced Options */}
           {showAdvanced && (
-            <div className="space-y-3 p-3 bg-white/[0.03] rounded border border-white/[0.06]">
+            <div className="space-y-3 p-3 bg-black/[0.03] rounded border border-black/[0.06]">
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted mb-1">
@@ -457,7 +457,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     value={formData.targetEntry || ''}
                     onChange={(e) => handleChange('targetEntry', e.target.value ? parseFloat(e.target.value) : undefined)}
                     placeholder="1.0850"
-                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-primary/50 transition-colors"
+                    className="w-full bg-black/[0.03] border border-black/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-primary/50 transition-colors"
                   />
                 </div>
                 <div>
@@ -470,7 +470,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     value={formData.targetSL || ''}
                     onChange={(e) => handleChange('targetSL', e.target.value ? parseFloat(e.target.value) : undefined)}
                     placeholder="1.0800"
-                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-primary/50 transition-colors"
+                    className="w-full bg-black/[0.03] border border-black/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-primary/50 transition-colors"
                   />
                 </div>
                 <div>
@@ -483,7 +483,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     value={formData.targetTP || ''}
                     onChange={(e) => handleChange('targetTP', e.target.value ? parseFloat(e.target.value) : undefined)}
                     placeholder="1.0950"
-                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-primary/50 transition-colors"
+                    className="w-full bg-black/[0.03] border border-black/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-primary/50 transition-colors"
                   />
                 </div>
               </div>
@@ -496,7 +496,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                   type="date"
                   value={formData.expiresAt || ''}
                   onChange={(e) => handleChange('expiresAt', e.target.value || undefined)}
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  className="w-full bg-black/[0.03] border border-black/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary/50 transition-colors"
                 />
               </div>
 
@@ -511,7 +511,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                   value={formData.interestingZone || ''}
                   onChange={(e) => handleChange('interestingZone', e.target.value ? parseFloat(e.target.value) : undefined)}
                   placeholder="z.B. 1.0820 (erwartete Zone)"
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-gold/50 transition-colors"
+                  className="w-full bg-black/[0.03] border border-black/[0.06] rounded px-2.5 py-1.5 text-xs text-text-primary font-mono tabular-nums focus:outline-none focus:border-accent-gold/50 transition-colors"
                 />
               </div>
 
@@ -525,7 +525,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     <img
                       src={formData.imageData}
                       alt="Chart"
-                      className="w-full max-h-40 object-cover rounded border border-white/[0.06]"
+                      className="w-full max-h-40 object-cover rounded border border-black/[0.06]"
                     />
                     <button
                       type="button"
@@ -536,7 +536,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
                     </button>
                   </div>
                 ) : (
-                  <label className="flex items-center justify-center gap-2 w-full py-4 border border-dashed border-white/[0.12] rounded cursor-pointer hover:border-accent-primary/40 hover:bg-white/[0.02] transition-all">
+                  <label className="flex items-center justify-center gap-2 w-full py-4 border border-dashed border-black/[0.12] rounded cursor-pointer hover:border-accent-primary/40 hover:bg-black/[0.02] transition-all">
                     <Upload size={13} className="text-text-muted" />
                     <span className="text-xs text-text-muted">Bild auswählen</span>
                     <input
@@ -560,11 +560,11 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-2 pt-4 border-t border-white/[0.06]">
+          <div className="flex justify-end gap-2 pt-4 border-t border-black/[0.06]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+              className="px-4 py-2 text-xs font-medium text-text-muted hover:text-text-primary bg-black/[0.03] border border-black/[0.06] rounded hover:border-black/[0.1] transition-colors"
             >
               Abbrechen
             </button>
@@ -620,7 +620,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
 
   return (
     <div className={clsx(
-      'bg-white/[0.03] border border-white/[0.06] rounded-lg overflow-hidden transition-all hover:border-white/[0.1] hover:bg-white/[0.04]',
+      'bg-black/[0.03] border border-black/[0.06] rounded-lg overflow-hidden transition-all hover:border-black/[0.1] hover:bg-black/[0.04]',
       'border-l-2',
       directionColor
     )}>
@@ -632,7 +632,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
           </h3>
           <button
             onClick={(e) => { e.stopPropagation(); toggleStar(outlook.id); }}
-            className="p-0.5 rounded hover:bg-white/[0.06]"
+            className="p-0.5 rounded hover:bg-black/[0.06]"
           >
             <Star size={12} className={outlook.isStarred ? 'text-accent-gold fill-accent-gold' : 'text-text-muted/30'} />
           </button>
@@ -651,7 +651,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
                   'w-1.5 h-1.5 rounded-full transition-colors',
                   level <= outlook.confidence
                     ? 'bg-accent-gold'
-                    : 'bg-white/[0.08]'
+                    : 'bg-black/[0.08]'
                 )}
               />
             ))}
@@ -688,7 +688,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
 
           {/* Status Dropdown */}
           {showStatusMenu && (
-            <div className="absolute right-0 top-full mt-1 bg-[#0d0f14] border border-white/[0.08] rounded-lg shadow-xl z-10 py-0.5 min-w-[140px]">
+            <div className="absolute right-0 top-full mt-1 bg-[#0d0f14] border border-black/[0.08] rounded-lg shadow-xl z-10 py-0.5 min-w-[140px]">
               {Object.entries(OUTLOOK_STATUS_CONFIG).map(([status, config]) => (
                 <button
                   key={status}
@@ -697,8 +697,8 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
                     setShowStatusMenu(false);
                   }}
                   className={clsx(
-                    'w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-left hover:bg-white/[0.05] transition-colors',
-                    outlook.status === status && 'bg-white/[0.05]'
+                    'w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-left hover:bg-black/[0.05] transition-colors',
+                    outlook.status === status && 'bg-black/[0.05]'
                   )}
                 >
                   {getStatusIcon(status as OutlookStatus)}
@@ -717,7 +717,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
 
       {/* COT Bias - horizontal compact */}
       {outlook.cotBias && (
-        <div className="mx-3.5 mb-2 px-2.5 py-1.5 bg-white/[0.02] rounded border border-white/[0.04] flex items-center justify-between">
+        <div className="mx-3.5 mb-2 px-2.5 py-1.5 bg-black/[0.02] rounded border border-black/[0.04] flex items-center justify-between">
           <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted">Stärke</span>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
@@ -728,7 +728,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
               </span>
               <span className="text-[10px] font-mono tabular-nums text-text-muted">{outlook.cotBias.base.percentile}%</span>
             </div>
-            <div className="w-px h-3 bg-white/[0.06]" />
+            <div className="w-px h-3 bg-black/[0.06]" />
             <div className="flex items-center gap-1.5">
               <span className="text-[11px]">{getFlagEmoji(outlook.cotBias.quote.currency)}</span>
               <span className="text-[10px] font-mono text-text-primary">{outlook.cotBias.quote.currency}</span>
@@ -737,7 +737,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
               </span>
               <span className="text-[10px] font-mono tabular-nums text-text-muted">{outlook.cotBias.quote.percentile}%</span>
             </div>
-            <div className="w-px h-3 bg-white/[0.06]" />
+            <div className="w-px h-3 bg-black/[0.06]" />
             <span className={clsx(
               'text-[10px] font-mono tabular-nums font-bold',
               outlook.cotBias.divergenceScore > 20
@@ -804,7 +804,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
           <img
             src={outlook.imageData}
             alt="Chart"
-            className="w-full max-h-32 object-cover rounded border border-white/[0.06] cursor-pointer hover:opacity-90 transition-opacity"
+            className="w-full max-h-32 object-cover rounded border border-black/[0.06] cursor-pointer hover:opacity-90 transition-opacity"
             onClick={(e) => {
               e.stopPropagation();
               window.open(outlook.imageData, '_blank');
@@ -822,7 +822,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
       )}
 
       {/* Actions row - subtle */}
-      <div className="flex items-center justify-between px-3.5 py-2 border-t border-white/[0.04]">
+      <div className="flex items-center justify-between px-3.5 py-2 border-t border-black/[0.04]">
         <div className="flex items-center gap-0.5">
           <span className="text-[10px] text-text-muted font-mono tabular-nums mr-1.5">
             {new Date(outlook.createdAt).toLocaleDateString('de-DE')}
@@ -961,10 +961,10 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        className="bg-[#0d0f14] border border-white/[0.06] rounded-lg shadow-2xl w-full max-w-xl"
+        className="bg-[#0d0f14] border border-black/[0.06] rounded-lg shadow-2xl w-full max-w-xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-black/[0.06]">
           <div className="flex items-center gap-2.5">
             <Upload className="text-accent-primary" size={18} />
             <h2 className="text-sm font-semibold text-text-primary tracking-wide">
@@ -996,8 +996,8 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
               <div className="p-3 bg-accent-primary/5 border border-accent-primary/10 rounded">
                 <p className="text-[11px] text-text-secondary leading-relaxed">
                   <strong className="text-accent-primary">Tipp:</strong> Kopiere deine TradingView Watchlist
-                  oder fuege Symbole wie <code className="bg-white/[0.05] px-1 rounded font-mono text-[10px]">OANDA:EURUSD</code>,
-                  <code className="bg-white/[0.05] px-1 rounded font-mono text-[10px]">EURUSD</code> ein.
+                  oder fuege Symbole wie <code className="bg-black/[0.05] px-1 rounded font-mono text-[10px]">OANDA:EURUSD</code>,
+                  <code className="bg-black/[0.05] px-1 rounded font-mono text-[10px]">EURUSD</code> ein.
                 </p>
               </div>
 
@@ -1008,7 +1008,7 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
                   onChange={(e) => setInputText(e.target.value)}
                   placeholder="Symbole hier einfuegen...&#10;&#10;OANDA:EURUSD&#10;GBPUSD&#10;BTCUSD&#10;..."
                   rows={7}
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded px-3 py-2 text-xs text-text-primary font-mono resize-none focus:outline-none focus:border-accent-primary/50 transition-colors placeholder:text-text-muted/30"
+                  className="w-full bg-black/[0.03] border border-black/[0.06] rounded px-3 py-2 text-xs text-text-primary font-mono resize-none focus:outline-none focus:border-accent-primary/50 transition-colors placeholder:text-text-muted/30"
                 />
                 <button
                   onClick={handlePaste}
@@ -1021,7 +1021,7 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
 
               {/* Preview */}
               {previewSymbols.length > 0 && (
-                <div className="p-3 bg-white/[0.03] rounded border border-white/[0.06]">
+                <div className="p-3 bg-black/[0.03] rounded border border-black/[0.06]">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted">
                       Erkannte Symbole
@@ -1034,7 +1034,7 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
                     {previewSymbols.slice(0, 20).map((symbol, idx) => (
                       <span
                         key={idx}
-                        className="px-1.5 py-0.5 bg-white/[0.05] text-text-primary text-[10px] rounded font-mono"
+                        className="px-1.5 py-0.5 bg-black/[0.05] text-text-primary text-[10px] rounded font-mono"
                       >
                         {symbol}
                       </span>
@@ -1053,10 +1053,10 @@ function ImportModal({ onClose, onImport }: ImportModalProps) {
 
         {/* Footer */}
         {importedCount === null && (
-          <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/[0.06]">
+          <div className="flex justify-end gap-2 px-5 py-4 border-t border-black/[0.06]">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+              className="px-4 py-2 text-xs font-medium text-text-muted hover:text-text-primary bg-black/[0.03] border border-black/[0.06] rounded hover:border-black/[0.1] transition-colors"
             >
               Abbrechen
             </button>
@@ -1309,7 +1309,7 @@ export function Outlook() {
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowStrengthTable(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-text-muted hover:text-text-primary bg-black/[0.03] border border-black/[0.06] rounded hover:border-black/[0.1] transition-colors"
             title="Woher kommen die Stärke-/Bias-Werte? (COT + Zinsen + Saisonalität)"
           >
             <Eye size={13} />
@@ -1317,7 +1317,7 @@ export function Outlook() {
           </button>
           <button
             onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-text-muted hover:text-text-primary bg-black/[0.03] border border-black/[0.06] rounded hover:border-black/[0.1] transition-colors"
             title="TradingView Watchlist importieren"
           >
             <Copy size={13} />
@@ -1325,20 +1325,20 @@ export function Outlook() {
           </button>
           <button
             onClick={handleExport}
-            className="p-1.5 text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+            className="p-1.5 text-text-muted hover:text-text-primary bg-black/[0.03] border border-black/[0.06] rounded hover:border-black/[0.1] transition-colors"
             title="Als JSON exportieren"
           >
             <Download size={14} />
           </button>
           <button
             onClick={handleFileImport}
-            className="p-1.5 text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+            className="p-1.5 text-text-muted hover:text-text-primary bg-black/[0.03] border border-black/[0.06] rounded hover:border-black/[0.1] transition-colors"
             title="JSON importieren"
           >
             <Upload size={14} />
           </button>
           {/* View Toggle */}
-          <div className="flex items-center bg-white/[0.03] rounded-lg p-0.5 border border-white/[0.06]">
+          <div className="flex items-center bg-black/[0.03] rounded-lg p-0.5 border border-black/[0.06]">
             <button
               onClick={() => setViewMode('watchlist')}
               className={clsx('px-2.5 py-1 rounded text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors',
@@ -1368,7 +1368,7 @@ export function Outlook() {
       </div>
 
       {/* Compact Stats Strip */}
-      <div className="flex items-end gap-8 px-4 py-3 mb-5 bg-white/[0.03] border border-white/[0.06] rounded-lg">
+      <div className="flex items-end gap-8 px-4 py-3 mb-5 bg-black/[0.03] border border-black/[0.06] rounded-lg">
         <MetricDisplay label="Gesamt" value={stats.total} size="sm" />
         <MetricDisplay label="Aktiv" value={stats.active} size="sm" />
         <MetricDisplay label="Wartend" value={stats.waiting} size="sm" />
@@ -1389,7 +1389,7 @@ export function Outlook() {
                   const outlook = outlooks.find(o => o.symbol === pair && o.status !== 'executed' && o.status !== 'cancelled');
                   const statusColor = outlook
                     ? outlook.status === 'active' ? 'bg-pnl-positive' : outlook.status === 'waiting' ? 'bg-accent-gold' : 'bg-accent-blue'
-                    : 'bg-white/[0.06]';
+                    : 'bg-black/[0.06]';
 
                   return (
                     <button
@@ -1406,8 +1406,8 @@ export function Outlook() {
                       className={clsx(
                         'relative px-3 py-2.5 rounded-lg border text-left transition-all hover:scale-[1.02]',
                         outlook
-                          ? 'border-white/[0.1] bg-white/[0.04]'
-                          : 'border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03]'
+                          ? 'border-black/[0.1] bg-black/[0.04]'
+                          : 'border-black/[0.04] bg-black/[0.01] hover:bg-black/[0.03]'
                       )}
                     >
                       <div className="flex items-center justify-between">
@@ -1451,7 +1451,7 @@ export function Outlook() {
                   'px-2.5 py-1 rounded-full text-[11px] font-medium transition-all',
                   filters.status === status
                     ? 'bg-accent-primary text-white'
-                    : 'text-text-muted hover:text-text-primary hover:bg-white/[0.05]'
+                    : 'text-text-muted hover:text-text-primary hover:bg-black/[0.05]'
                 )}
               >
                 {status === 'all' ? 'Alle' : OUTLOOK_STATUS_CONFIG[status as OutlookStatus].label}
@@ -1474,7 +1474,7 @@ export function Outlook() {
                 'flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all',
                 filters.direction === option.value
                   ? 'bg-accent-primary text-white'
-                  : 'text-text-muted hover:text-text-primary hover:bg-white/[0.05]'
+                  : 'text-text-muted hover:text-text-primary hover:bg-black/[0.05]'
               )}
             >
               {option.icon}
@@ -1490,7 +1490,7 @@ export function Outlook() {
             const [sortBy, sortOrder] = e.target.value.split('-') as ['date' | 'confidence' | 'symbol', 'asc' | 'desc'];
             setFilters({ sortBy, sortOrder });
           }}
-          className="bg-white/[0.03] border border-white/[0.06] rounded-full px-2.5 py-1 text-[11px] text-text-muted focus:outline-none focus:border-accent-primary/50 transition-colors"
+          className="bg-black/[0.03] border border-black/[0.06] rounded-full px-2.5 py-1 text-[11px] text-text-muted focus:outline-none focus:border-accent-primary/50 transition-colors"
         >
           <option value="date-desc">Neueste zuerst</option>
           <option value="date-asc">Aelteste zuerst</option>
@@ -1506,7 +1506,7 @@ export function Outlook() {
             type="checkbox"
             checked={filters.showArchived}
             onChange={(e) => setFilters({ showArchived: e.target.checked })}
-            className="rounded border-white/[0.1] bg-white/[0.03] w-3 h-3"
+            className="rounded border-black/[0.1] bg-black/[0.03] w-3 h-3"
           />
           Archiv
         </label>
@@ -1613,7 +1613,7 @@ export function Outlook() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.15 }}
-            className="bg-[#0d0f14] border border-white/[0.06] rounded-lg shadow-2xl p-5 max-w-sm"
+            className="bg-[#0d0f14] border border-black/[0.06] rounded-lg shadow-2xl p-5 max-w-sm"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-full bg-pnl-negative/15 flex items-center justify-center">
@@ -1627,7 +1627,7 @@ export function Outlook() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+                className="px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-primary bg-black/[0.03] border border-black/[0.06] rounded hover:border-black/[0.1] transition-colors"
               >
                 Abbrechen
               </button>
@@ -1657,7 +1657,7 @@ export function Outlook() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.15 }}
-            className="bg-[#0d0f14] border border-white/[0.06] rounded-xl shadow-2xl p-5 max-w-md w-full"
+            className="bg-[#0d0f14] border border-black/[0.06] rounded-xl shadow-2xl p-5 max-w-md w-full"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-full bg-accent-gold/15 flex items-center justify-center">
@@ -1675,7 +1675,7 @@ export function Outlook() {
                 { key: 'ek' as const, label: 'Eigenkapital-Journal' },
                 { key: 'funded' as const, label: 'Funded-Journal' },
               ]).map(({ key, label }) => (
-                <label key={key} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-white/[0.06] hover:border-accent-primary/30 cursor-pointer transition-colors">
+                <label key={key} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-black/[0.06] hover:border-accent-primary/30 cursor-pointer transition-colors">
                   <input
                     type="checkbox"
                     checked={closeAccounts[key]}
@@ -1696,14 +1696,14 @@ export function Outlook() {
                   setCloseAccounts({ ek: false, funded: false });
                   showToast('Outlook abgeschlossen (ohne Journal)', 'success');
                 }}
-                className="px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+                className="px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-primary bg-black/[0.03] border border-black/[0.06] rounded hover:border-black/[0.1] transition-colors"
               >
                 Ohne Journal schließen
               </button>
               <div className="flex gap-2">
                 <button
                   onClick={() => { setCloseDialog(null); setCloseAccounts({ ek: false, funded: false }); }}
-                  className="px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+                  className="px-3 py-1.5 text-xs font-medium text-text-muted hover:text-text-primary bg-black/[0.03] border border-black/[0.06] rounded hover:border-black/[0.1] transition-colors"
                 >
                   Abbrechen
                 </button>
@@ -1726,7 +1726,7 @@ export function Outlook() {
           <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-background-surface border border-border rounded-xl shadow-2xl p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-semibold flex items-center gap-2"><Eye size={16} className="text-accent-primary" /> Währungsstärke — Datenherkunft</h3>
-              <button onClick={() => setShowStrengthTable(false)} className="p-1 hover:bg-white/[0.06] rounded"><X size={16} /></button>
+              <button onClick={() => setShowStrengthTable(false)} className="p-1 hover:bg-black/[0.06] rounded"><X size={16} /></button>
             </div>
             <p className="text-[11px] text-text-muted mb-3 leading-relaxed">
               Die Bias-/Prozentwerte im Outlook (z.B. „EUR 88%") stammen aus dieser Berechnung:

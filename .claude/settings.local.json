@@ -27,7 +27,17 @@
       "Bash(gh pr *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git ls-remote *)",
+      "Bash(git commit --allow-empty -m ' *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\)\")",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__list_tables",
+      "Bash(ls *.tsx *.ts)",
+      "Bash(grep -rl \"Routes\\\\|<Route\\\\|RouterProvider\\\\|createBrowserRouter\\\\|createHashRouter\" . --include=*.tsx --include=*.ts)",
+      "Bash(xargs -0 sed -i -e 's#@/components/ui/#@/shared/ui/#g' -e 's#@/components/layout/Sidebar#@/shared/components/Sidebar#g' -e 's#@/components/charts/#@/shared/components/charts/#g' -e 's#@/components/trades/#@/features/journal/#g' -e 's#@/components/journal/#@/features/journal/#g' -e 's#@/components/outlook/#@/features/outlook/#g' -e 's#@/services/#@/shared/services/#g' -e 's#@/stores/#@/shared/stores/#g' -e 's#@/lib/#@/shared/lib/#g' -e 's#@/config/#@/shared/config/#g' -e 's#@/utils#@/shared/utils#g' -e 's#@/types#@/shared/types#g' -e 's#@/pages/Dashboard#@/features/dashboard/Dashboard#g' -e 's#@/pages/FundedJournal#@/features/journal/FundedJournal#g' -e 's#@/pages/EKJournal#@/features/journal/EKJournal#g' -e 's#@/pages/Backtest#@/features/backtest/Backtest#g' -e 's#@/pages/Outlook#@/features/outlook/Outlook#g' -e 's#@/pages/StrategyBuilder#@/features/strategy/StrategyBuilder#g' -e 's#@/pages/Calendar#@/features/calendar/Calendar#g' -e 's#@/pages/EquityCurve#@/features/equity/EquityCurve#g' -e 's#@/pages/Settings#@/features/settings/Settings#g')",
+      "Bash(git rm *)",
+      "Bash(rmdir components/layout components/trades components)"
     ]
   }
 }

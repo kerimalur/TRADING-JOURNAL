@@ -441,7 +441,7 @@ export function StrategyBuilder() {
                       <h2 className="text-lg font-bold">{selectedStrategy.name}</h2>
                       <span className={clsx(
                         'px-2 py-0.5 rounded-full text-[10px] font-semibold',
-                        selectedStrategy.isActive ? 'bg-pnl-positive/15 text-pnl-positive' : 'bg-white/[0.05] text-text-muted'
+                        selectedStrategy.isActive ? 'bg-pnl-positive/15 text-pnl-positive' : 'bg-black/[0.05] text-text-muted'
                       )}>
                         {selectedStrategy.isActive ? 'Aktiv' : 'Inaktiv'}
                       </span>
@@ -514,7 +514,7 @@ export function StrategyBuilder() {
                             'px-2 py-0.5 text-[10px] rounded-md font-medium transition-colors',
                             (formData.timeframes || []).includes(tf)
                               ? 'bg-accent-primary text-white'
-                              : 'bg-white/[0.04] text-text-muted hover:bg-white/[0.08]'
+                              : 'bg-black/[0.04] text-text-muted hover:bg-black/[0.08]'
                           )}
                         >
                           {tf}
@@ -551,7 +551,7 @@ export function StrategyBuilder() {
                               ? dir === 'long' ? 'bg-pnl-positive text-white' :
                                 dir === 'short' ? 'bg-pnl-negative text-white' :
                                 'bg-accent-primary text-white'
-                              : 'bg-white/[0.04] text-text-muted hover:bg-white/[0.08]'
+                              : 'bg-black/[0.04] text-text-muted hover:bg-black/[0.08]'
                           )}
                         >
                           {dir === 'long' && <TrendingUp size={10} />}
@@ -582,7 +582,7 @@ export function StrategyBuilder() {
                       onClick={() => setFormData(prev => ({ ...prev, isActive: !prev.isActive }))}
                       className={clsx(
                         'px-2 py-0.5 text-[10px] rounded-md font-medium transition-colors',
-                        formData.isActive ? 'bg-pnl-positive/15 text-pnl-positive' : 'bg-white/[0.04] text-text-muted'
+                        formData.isActive ? 'bg-pnl-positive/15 text-pnl-positive' : 'bg-black/[0.04] text-text-muted'
                       )}
                     >
                       {formData.isActive ? 'Aktiv' : 'Inaktiv'}
@@ -598,10 +598,10 @@ export function StrategyBuilder() {
                   const colors = RULE_COLORS[type];
 
                   return (
-                    <div key={type} className="rounded-lg bg-white/[0.02] border border-white/[0.04] overflow-hidden">
+                    <div key={type} className="rounded-lg bg-black/[0.02] border border-black/[0.04] overflow-hidden">
                       <button
                         onClick={() => toggleSection(type)}
-                        className="w-full px-3 py-2 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                        className="w-full px-3 py-2 flex items-center justify-between hover:bg-black/[0.02] transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           {getRuleTypeIcon(type)}
@@ -646,13 +646,13 @@ export function StrategyBuilder() {
                           )}
 
                           {isEditing && (
-                            <div className="pt-1.5 mt-1 border-t border-white/[0.04]">
+                            <div className="pt-1.5 mt-1 border-t border-black/[0.04]">
                               <div className="flex flex-wrap gap-1 mb-1.5">
                                 {RULE_TEMPLATES[type].slice(0, 3).map((template, i) => (
                                   <button
                                     key={i}
                                     onClick={() => addRule(type, template)}
-                                    className="px-1.5 py-0.5 text-[9px] rounded bg-white/[0.03] text-text-muted hover:bg-white/[0.06] hover:text-text-primary transition-colors truncate max-w-[140px]"
+                                    className="px-1.5 py-0.5 text-[9px] rounded bg-black/[0.03] text-text-muted hover:bg-black/[0.06] hover:text-text-primary transition-colors truncate max-w-[140px]"
                                     title={template}
                                   >
                                     + {template.slice(0, 25)}...
@@ -690,7 +690,7 @@ export function StrategyBuilder() {
                     placeholder="Backtesting-Ergebnisse, Beobachtungen..."
                   />
                 ) : (
-                  <div className="p-3 rounded-lg bg-white/[0.02] text-xs text-text-secondary whitespace-pre-wrap min-h-[60px]">
+                  <div className="p-3 rounded-lg bg-black/[0.02] text-xs text-text-secondary whitespace-pre-wrap min-h-[60px]">
                     {selectedStrategy.notes || <span className="text-text-muted">Keine Notizen</span>}
                   </div>
                 )}
@@ -817,7 +817,7 @@ export function StrategyBuilder() {
                         'px-2.5 py-1 text-xs rounded-md transition-colors',
                         (formData.timeframes || []).includes(tf)
                           ? 'bg-accent-primary text-white'
-                          : 'bg-white/[0.04] text-text-muted hover:bg-white/[0.08]'
+                          : 'bg-black/[0.04] text-text-muted hover:bg-black/[0.08]'
                       )}
                     >
                       {tf}
@@ -839,7 +839,7 @@ export function StrategyBuilder() {
                           ? dir === 'long' ? 'bg-pnl-positive text-white' :
                             dir === 'short' ? 'bg-pnl-negative text-white' :
                             'bg-accent-primary text-white'
-                          : 'bg-white/[0.04] text-text-muted hover:bg-white/[0.08]'
+                          : 'bg-black/[0.04] text-text-muted hover:bg-black/[0.08]'
                       )}
                     >
                       {dir === 'long' && <TrendingUp size={13} />}
@@ -892,7 +892,7 @@ function StrategyCard({ strategy, isSelected, onClick }: {
         'w-full text-left p-3 rounded-lg transition-all border',
         isSelected
           ? 'bg-accent-primary/5 border-accent-primary/30'
-          : 'bg-white/[0.02] border-transparent hover:bg-white/[0.04]'
+          : 'bg-black/[0.02] border-transparent hover:bg-black/[0.04]'
       )}
     >
       <div className="flex items-center justify-between mb-1">

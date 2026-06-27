@@ -152,7 +152,7 @@ function MonthCalendar({ heatmapData }: { heatmapData: HeatmapDay[] }) {
                 'rounded text-center py-0.5 px-0.5',
                 data
                   ? data.value > 0 ? 'bg-pnl-positive/15' : data.value < 0 ? 'bg-pnl-negative/15' : 'bg-accent-gold/15'
-                  : 'bg-white/[0.02]',
+                  : 'bg-black/[0.02]',
                 isToday && 'ring-1 ring-accent-primary ring-offset-0'
               )}
             >
@@ -216,7 +216,7 @@ function WidgetCustomizer({
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="fixed right-4 top-16 z-40 w-64 bg-[#0d0f14] border border-white/[0.08] rounded-xl shadow-2xl p-4"
+      className="fixed right-4 top-16 z-40 w-64 bg-[#0d0f14] border border-black/[0.08] rounded-xl shadow-2xl p-4"
     >
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-semibold text-text-primary">Dashboard anpassen</span>
@@ -226,13 +226,13 @@ function WidgetCustomizer({
       </div>
 
       {/* Background Image */}
-      <div className="mb-3 pb-3 border-b border-white/[0.06]">
+      <div className="mb-3 pb-3 border-b border-black/[0.06]">
         <span className="text-[10px] uppercase tracking-[0.1em] text-text-muted font-semibold">Hintergrundbild</span>
         <div className="flex items-center gap-2 mt-1.5">
           <input ref={bgInputRef} type="file" accept="image/*" onChange={handleBgUpload} className="hidden" />
           <button
             onClick={() => bgInputRef.current?.click()}
-            className="text-[10px] px-2 py-1 rounded bg-white/[0.06] text-text-muted hover:text-text-primary hover:bg-white/[0.1] transition-colors"
+            className="text-[10px] px-2 py-1 rounded bg-black/[0.06] text-text-muted hover:text-text-primary hover:bg-black/[0.1] transition-colors"
           >
             {dashboardBg ? 'Ändern' : 'Bild wählen'}
           </button>
@@ -246,18 +246,18 @@ function WidgetCustomizer({
           )}
         </div>
         {dashboardBg && (
-          <img src={dashboardBg} alt="" className="mt-1.5 w-full h-12 object-cover rounded border border-white/[0.06]" />
+          <img src={dashboardBg} alt="" className="mt-1.5 w-full h-12 object-cover rounded border border-black/[0.06]" />
         )}
       </div>
 
       <div className="space-y-1">
         {(Object.keys(DEFAULT_PREFS) as (keyof DashboardPrefs)[]).map(key => (
-          <label key={key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.04] cursor-pointer transition-colors">
+          <label key={key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-black/[0.04] cursor-pointer transition-colors">
             <div
               onClick={() => onChange({ ...prefs, [key]: !prefs[key] })}
               className={clsx(
                 'w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors',
-                prefs[key] ? 'bg-accent-primary' : 'bg-white/[0.06] border border-white/[0.1]'
+                prefs[key] ? 'bg-accent-primary' : 'bg-black/[0.06] border border-black/[0.1]'
               )}
             >
               {prefs[key] && <Check size={10} className="text-white" />}
@@ -657,7 +657,7 @@ export function Dashboard() {
                     activeOutlooks.map(outlook => {
                       const cfg = OUTLOOK_STATUS_CONFIG[outlook.status];
                       return (
-                        <div key={outlook.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+                        <div key={outlook.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-black/[0.02] hover:bg-black/[0.04] transition-colors">
                           <span className={clsx(
                             'text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full flex-shrink-0',
                             cfg.bgColor, cfg.color
@@ -697,7 +697,7 @@ export function Dashboard() {
                   </div>
                   <div className="flex-1 space-y-1 overflow-hidden">
                     {starred.slice(0, 6).map(o => (
-                      <div key={o.id} className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white/[0.03]">
+                      <div key={o.id} className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-black/[0.03]">
                         <span className={clsx('text-[10px] font-bold', o.direction === 'long' ? 'text-pnl-positive' : 'text-pnl-negative')}>
                           {o.direction === 'long' ? '↑' : '↓'}
                         </span>

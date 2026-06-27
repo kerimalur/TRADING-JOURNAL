@@ -629,7 +629,7 @@ export function Backtest() {
                   <div className="p-4 text-center text-text-muted">Keine Sessions vorhanden</div>
                 ) : sessions.map(session => (
                   <div key={session.id}
-                    className={clsx('flex items-center justify-between p-3 hover:bg-white/[0.03] cursor-pointer', session.id === currentSessionId && 'bg-accent-primary/10')}
+                    className={clsx('flex items-center justify-between p-3 hover:bg-black/[0.03] cursor-pointer', session.id === currentSessionId && 'bg-accent-primary/10')}
                     onClick={() => { setCurrentSessionId(session.id); setShowSessionList(false); }}>
                     <div className="flex items-center gap-2">
                       <div>
@@ -660,7 +660,7 @@ export function Backtest() {
           <div className="w-full max-w-md bg-background-surface border border-border rounded-xl shadow-2xl p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold flex items-center gap-2"><FlaskConical size={18} className="text-accent-primary" /> Neue Backtest-Session</h3>
-              <button onClick={() => setShowWizard(false)} className="p-1 hover:bg-white/[0.06] rounded"><X size={16} /></button>
+              <button onClick={() => setShowWizard(false)} className="p-1 hover:bg-black/[0.06] rounded"><X size={16} /></button>
             </div>
             <div className="space-y-4">
               <div>
@@ -978,7 +978,7 @@ export function Backtest() {
                   </thead>
                   <tbody>
                     {setupStats.map(s => (
-                      <tr key={s.key} className={clsx('border-b border-border/50 hover:bg-white/[0.03]', !s.reliable && 'opacity-50')}>
+                      <tr key={s.key} className={clsx('border-b border-border/50 hover:bg-black/[0.03]', !s.reliable && 'opacity-50')}>
                         <td className="py-2 px-3 font-medium">
                           <span className="inline-flex items-center gap-2">
                             {s.color && <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }} />}
@@ -1032,7 +1032,7 @@ export function Backtest() {
                   <tbody>
                     {[...currentSession.trades].reverse().map((trade, i) => (
                       <Fragment key={trade.id}>
-                      <tr className="border-b border-border/50 hover:bg-white/[0.03]">
+                      <tr className="border-b border-border/50 hover:bg-black/[0.03]">
                         <td className="py-2 px-3 text-text-muted">{currentSession.trades.length - i}</td>
                         <td className="py-2 px-3 font-mono text-xs text-text-muted whitespace-nowrap">{trade.date}</td>
                         <td className="py-2 px-3 font-medium">{trade.pair}</td>
