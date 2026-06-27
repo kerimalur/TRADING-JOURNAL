@@ -23,8 +23,17 @@ ALTER TABLE strategies
 ALTER TABLE strategies
   ADD COLUMN IF NOT EXISTS direction TEXT NOT NULL DEFAULT 'both';
 
--- 3) Cleanup (optional): alter Geopolitik-Flag aus der COT-Zeit
-DELETE FROM user_preferences WHERE key = 'geoRisk';
+-- 3) Cleanup (optional): alter Geopolitik-Flag aus der COT-Zeit.
+-- Sicher gegen abweichende user_preferences-Schemata (nur löschen wenn key-Spalte existiert).
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'user_preferences' AND column_name = 'key'
+  ) THEN
+    DELETE FROM user_preferences WHERE key = 'geoRisk';
+  END IF;
+END $$;
 
 -- Indizes für die Verknüpfungs-Abfragen
 CREATE INDEX IF NOT EXISTS idx_trades_strategy   ON trades(strategy_id);

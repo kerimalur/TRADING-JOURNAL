@@ -387,9 +387,13 @@ export function Dashboard() {
     [filteredTrades]
   );
 
-  // Aktive & wartende Outlooks für Dashboard-Widget
+  // Outlooks fürs Dashboard: alle "lebenden" Thesen (auch frisch erstellte =
+  // Beobachtung), nur erledigte/abgebrochene ausblenden. Neueste zuerst.
   const activeOutlooks = useMemo(() =>
-    outlooks.filter(o => o.status === 'active' || o.status === 'waiting').slice(0, 5),
+    outlooks
+      .filter(o => o.status !== 'executed' && o.status !== 'cancelled')
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, 5),
     [outlooks]
   );
 

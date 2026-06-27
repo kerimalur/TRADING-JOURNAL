@@ -21,6 +21,10 @@ export interface StrategyRecord {
   sessions?: string[];
   isActive?: boolean;
   stats?: Record<string, any>;
+  // StrategyBuilder-Felder
+  notes?: string;
+  direction?: 'long' | 'short' | 'both';
+  images?: string[];
   createdAt?: string;
   updatedAt?: string;
 }

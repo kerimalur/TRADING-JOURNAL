@@ -21,10 +21,17 @@ import {
   Copy,
   BarChart3,
   Clock,
-  Zap
+  Zap,
+  Image as ImageIcon
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { PageTransition } from '@/components/ui/PageTransition';
+import {
+  loadStrategies as svcLoadStrategies,
+  saveStrategy as svcSaveStrategy,
+  removeStrategy as svcRemoveStrategy,
+  type StrategyRecord,
+} from '@/services/strategyService';
 
 interface StrategyRule {
   id: string;
@@ -42,10 +49,64 @@ interface Strategy {
   direction: 'long' | 'short' | 'both';
   rules: StrategyRule[];
   notes: string;
+  images: string[];
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
 }
+
+/** Verkleinert ein Bild (DataURL) für kompakte Speicherung. */
+function downscaleImage(src: string, maxPx = 1100, quality = 0.72): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(src); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      try { resolve(canvas.toDataURL('image/jpeg', quality)); } catch { resolve(src); }
+    };
+    img.onerror = () => resolve(src);
+    img.src = src;
+  });
+}
+
+// Mapping StrategyBuilder.Strategy <-> strategyService.StrategyRecord (Supabase)
+function recordToStrategy(r: any): Strategy {
+  return {
+    id: r.id,
+    name: r.name || '',
+    description: r.description || '',
+    timeframes: Array.isArray(r.timeframes) ? r.timeframes : [],
+    pairs: Array.isArray(r.pairs) ? r.pairs : [],
+    direction: r.direction || 'both',
+    rules: Array.isArray(r.rules) ? r.rules : [],
+    notes: r.notes || '',
+    images: Array.isArray(r.images) ? r.images : [],
+    createdAt: r.createdAt || new Date().toISOString(),
+    updatedAt: r.updatedAt || new Date().toISOString(),
+    isActive: r.isActive ?? true,
+  };
+}
+function strategyToRecord(s: Strategy): StrategyRecord {
+  return {
+    id: isUuid(s.id) ? s.id : undefined,
+    name: s.name,
+    description: s.description,
+    timeframes: s.timeframes,
+    pairs: s.pairs,
+    direction: s.direction,
+    rules: s.rules,
+    notes: s.notes,
+    images: s.images,
+    isActive: s.isActive,
+  };
+}
+const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
 
 const TIMEFRAMES = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1'];
 
@@ -100,26 +161,48 @@ export function StrategyBuilder() {
   });
   const [formData, setFormData] = useState<Partial<Strategy>>({
     name: '', description: '', timeframes: [], pairs: [],
-    direction: 'both', rules: [], notes: '', isActive: true,
+    direction: 'both', rules: [], notes: '', images: [], isActive: true,
   });
 
-  useEffect(() => { loadStrategies(); }, []);
+  useEffect(() => { loadStrategies(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  const loadStrategies = () => {
-    const saved = localStorage.getItem('tradingStrategies');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setStrategies(parsed);
-      if (parsed.length > 0 && !selectedStrategy) setSelectedStrategy(parsed[0]);
-    }
+  // Hybrid: localStorage als Mirror, Supabase als Quelle der Wahrheit (eingeloggt).
+  const loadStrategies = async () => {
+    let local: Strategy[] = [];
+    try { const s = localStorage.getItem('tradingStrategies'); if (s) local = JSON.parse(s); } catch { /* ignore */ }
+
+    try {
+      const remote = await svcLoadStrategies();
+      if (remote.length > 0) {
+        const mapped = remote.map(recordToStrategy);
+        saveStrategies(mapped);
+        if (!selectedStrategy) setSelectedStrategy(mapped[0]);
+        return;
+      }
+      // Supabase leer + lokale vorhanden → einmalige Migration hoch
+      if (local.length > 0) {
+        for (const s of local) {
+          try { await svcSaveStrategy(strategyToRecord({ ...s, id: '' } as Strategy)); } catch { /* skip */ }
+        }
+        const after = await svcLoadStrategies();
+        const mapped = after.length ? after.map(recordToStrategy) : local;
+        saveStrategies(mapped);
+        if (!selectedStrategy && mapped.length) setSelectedStrategy(mapped[0]);
+        return;
+      }
+    } catch { /* offline / nicht eingeloggt → lokal */ }
+
+    setStrategies(local);
+    if (local.length > 0 && !selectedStrategy) setSelectedStrategy(local[0]);
   };
 
+  // localStorage-Mirror + State
   const saveStrategies = (newStrategies: Strategy[]) => {
     localStorage.setItem('tradingStrategies', JSON.stringify(newStrategies));
     setStrategies(newStrategies);
   };
 
-  const createStrategy = () => {
+  const createStrategy = async () => {
     if (!formData.name) return;
     const newStrategy: Strategy = {
       id: Date.now().toString(),
@@ -130,6 +213,7 @@ export function StrategyBuilder() {
       direction: formData.direction || 'both',
       rules: formData.rules || [],
       notes: formData.notes || '',
+      images: formData.images || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       isActive: true,
@@ -139,27 +223,33 @@ export function StrategyBuilder() {
     setSelectedStrategy(newStrategy);
     setShowNewModal(false);
     resetForm();
+    try {
+      const saved = await svcSaveStrategy(strategyToRecord(newStrategy));
+      if (saved?.id) {
+        const withId = recordToStrategy(saved);
+        saveStrategies(updated.map(s => s.id === newStrategy.id ? withId : s));
+        setSelectedStrategy(withId);
+      }
+    } catch { /* offline → bleibt lokal */ }
   };
 
-  const updateStrategy = () => {
+  const updateStrategy = async () => {
     if (!selectedStrategy || !formData.name) return;
-    const updated = strategies.map(s =>
-      s.id === selectedStrategy.id
-        ? { ...s, ...formData, updatedAt: new Date().toISOString() }
-        : s
-    );
-    saveStrategies(updated);
-    setSelectedStrategy({ ...selectedStrategy, ...formData, updatedAt: new Date().toISOString() } as Strategy);
+    const merged = { ...selectedStrategy, ...formData, updatedAt: new Date().toISOString() } as Strategy;
+    saveStrategies(strategies.map(s => s.id === selectedStrategy.id ? merged : s));
+    setSelectedStrategy(merged);
     setIsEditing(false);
+    try { await svcSaveStrategy(strategyToRecord(merged)); } catch { /* offline */ }
   };
 
-  const deleteStrategy = (id: string) => {
+  const deleteStrategy = async (id: string) => {
     const updated = strategies.filter(s => s.id !== id);
     saveStrategies(updated);
     if (selectedStrategy?.id === id) setSelectedStrategy(updated[0] || null);
+    try { if (isUuid(id)) await svcRemoveStrategy(id); } catch { /* offline */ }
   };
 
-  const duplicateStrategy = (strategy: Strategy) => {
+  const duplicateStrategy = async (strategy: Strategy) => {
     const newStrategy: Strategy = {
       ...strategy,
       id: Date.now().toString(),
@@ -167,12 +257,37 @@ export function StrategyBuilder() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    saveStrategies([...strategies, newStrategy]);
+    const updated = [...strategies, newStrategy];
+    saveStrategies(updated);
     setSelectedStrategy(newStrategy);
+    try {
+      const saved = await svcSaveStrategy(strategyToRecord(newStrategy));
+      if (saved?.id) {
+        const withId = recordToStrategy(saved);
+        saveStrategies(updated.map(s => s.id === newStrategy.id ? withId : s));
+        setSelectedStrategy(withId);
+      }
+    } catch { /* offline */ }
   };
 
   const resetForm = () => {
-    setFormData({ name: '', description: '', timeframes: [], pairs: [], direction: 'both', rules: [], notes: '', isActive: true });
+    setFormData({ name: '', description: '', timeframes: [], pairs: [], direction: 'both', rules: [], notes: '', images: [], isActive: true });
+  };
+
+  // Bild hinzufügen (Upload oder Strg+V) + entfernen
+  const addImage = async (dataUrl: string) => {
+    const small = await downscaleImage(dataUrl);
+    setFormData(prev => ({ ...prev, images: [...(prev.images || []), small] }));
+  };
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => addImage(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+  const removeImage = (idx: number) => {
+    setFormData(prev => ({ ...prev, images: (prev.images || []).filter((_, i) => i !== idx) }));
   };
 
   const startEditing = () => {
@@ -578,6 +693,48 @@ export function StrategyBuilder() {
                   <div className="p-3 rounded-lg bg-white/[0.02] text-xs text-text-secondary whitespace-pre-wrap min-h-[60px]">
                     {selectedStrategy.notes || <span className="text-text-muted">Keine Notizen</span>}
                   </div>
+                )}
+              </div>
+
+              {/* Bilder */}
+              <div className="mt-4">
+                <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1.5">Bilder</div>
+                {isEditing ? (
+                  <div
+                    onPaste={(e) => {
+                      const items = e.clipboardData?.items;
+                      for (const it of items || []) {
+                        if (it.type.startsWith('image/')) {
+                          const f = it.getAsFile();
+                          if (f) { const r = new FileReader(); r.onloadend = () => addImage(r.result as string); r.readAsDataURL(f); }
+                        }
+                      }
+                    }}
+                  >
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {(formData.images || []).map((img, i) => (
+                        <div key={i} className="relative">
+                          <img src={img} alt="" className="h-20 w-28 object-cover rounded border border-border" />
+                          <button type="button" onClick={() => removeImage(i)} className="absolute -top-1.5 -right-1.5 p-0.5 bg-pnl-negative rounded-full text-white">
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <label className="btn-secondary text-xs cursor-pointer inline-flex items-center">
+                      <ImageIcon size={13} className="inline mr-1" /> Bild hinzufügen (oder Strg+V)
+                      <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                    </label>
+                  </div>
+                ) : (
+                  (selectedStrategy.images && selectedStrategy.images.length > 0) ? (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedStrategy.images.map((img, i) => (
+                        <img key={i} src={img} alt="" className="h-24 w-32 object-cover rounded border border-border cursor-pointer hover:opacity-80"
+                          onClick={() => window.open(img, '_blank')} />
+                      ))}
+                    </div>
+                  ) : <span className="text-xs text-text-muted">Keine Bilder</span>
                 )}
               </div>
 

@@ -4,6 +4,7 @@
  * ========================================================================
  */
 
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -38,8 +39,8 @@ const BASE_ITEMS: NavItem[] = [
   { path: '/equity',      label: 'Equity Curve',  icon: <TrendingUp size={18} />,      group: 'Übersicht' },
   { path: '/calendar',    label: 'Kalender',       icon: <Calendar size={18} />,        group: 'Übersicht' },
   { path: '/ek',          label: 'Eigenkapital',   icon: <Wallet size={18} />,          group: 'Trading'   },
-  { path: '/outlook',     label: 'Outlook',         icon: <Crosshair size={18} />,       group: 'Trading'   },
   { path: '/strategy',    label: 'Strategie',      icon: <Lightbulb size={18} />,       group: 'Tools'     },
+  { path: '/outlook',     label: 'Outlook',         icon: <Crosshair size={18} />,       group: 'Tools'     },
   { path: '/backtest',    label: 'Backtest',       icon: <Zap size={18} />,             group: 'Tools'     },
   { path: '/settings',    label: 'Einstellungen',  icon: <Settings size={18} />,        group: 'System'    },
 ];
@@ -65,15 +66,21 @@ export function Sidebar() {
       }))
     : [{ path: '/funded', label: 'Funded', icon: <DollarSign size={18} />, group: 'Trading' }];
 
-  // Alle Items zusammenführen: Trading-Reihenfolge EK → Funded → Outlook
+  // Alle Items zusammenführen: Trading-Reihenfolge EK → Funded
   const tradingEk      = BASE_ITEMS.filter(i => i.group === 'Trading' && i.path === '/ek');
-  const tradingOutlook = BASE_ITEMS.filter(i => i.group === 'Trading' && i.path === '/outlook');
   const nonTrading     = BASE_ITEMS.filter(i => i.group !== 'Trading');
-  const allItems = [...nonTrading, ...tradingEk, ...fundedItems, ...tradingOutlook];
+  const allItems = [...nonTrading, ...tradingEk, ...fundedItems];
   const groupedItems = GROUP_ORDER.reduce((acc, group) => {
     acc[group] = allItems.filter(i => i.group === group);
     return acc;
   }, {} as Record<string, NavItem[]>);
+
+  // Aufklappbare Gruppen: aktive Gruppe (mit aktueller Route) initial offen
+  const activeGroup = GROUP_ORDER.find(g => (groupedItems[g] || []).some(i => i.path === location.pathname));
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  useEffect(() => { if (activeGroup) setOpenGroups(prev => ({ ...prev, [activeGroup]: true })); }, [activeGroup]);
+  const toggleGroup = (g: string) => setOpenGroups(prev => ({ ...prev, [g]: !prev[g] }));
+  const isOpen = (g: string) => sidebarCollapsed || (openGroups[g] ?? g === activeGroup);
 
   return (
     <motion.aside
@@ -117,22 +124,19 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 overflow-y-auto">
-        {Object.entries(groupedItems).map(([group, items]) => (
-          <div key={group} className="mb-4">
-            <AnimatePresence mode="wait">
-              {!sidebarCollapsed && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.1 }}
-                  className="px-4 mb-1.5 text-[10px] font-medium text-text-muted uppercase tracking-wider"
-                >
-                  {group}
-                </motion.div>
-              )}
-            </AnimatePresence>
+        {Object.entries(groupedItems).map(([group, items]) => items.length === 0 ? null : (
+          <div key={group} className="mb-2">
+            {!sidebarCollapsed && (
+              <button
+                onClick={() => toggleGroup(group)}
+                className="w-full flex items-center justify-between px-4 mb-1 text-[10px] font-medium text-text-muted uppercase tracking-wider hover:text-text-primary transition-colors"
+              >
+                <span>{group}</span>
+                <ChevronRight size={12} className={clsx('transition-transform duration-200', isOpen(group) && 'rotate-90')} />
+              </button>
+            )}
 
+            {isOpen(group) && (
             <div className="space-y-0.5 px-2">
               {items.map((item) => {
                 const isActive = location.pathname === item.path;
@@ -190,6 +194,7 @@ export function Sidebar() {
                 );
               })}
             </div>
+            )}
           </div>
         ))}
       </nav>
