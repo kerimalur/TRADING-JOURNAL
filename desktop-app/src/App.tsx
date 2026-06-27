@@ -31,7 +31,6 @@ const Backtest        = lazy(() => import('@/pages/Backtest').then(m => ({ defau
 const Calendar        = lazy(() => import('@/pages/Calendar').then(m => ({ default: m.Calendar })));
 const StrategyBuilder = lazy(() => import('@/pages/StrategyBuilder').then(m => ({ default: m.StrategyBuilder })));
 const Outlook         = lazy(() => import('@/pages/Outlook').then(m => ({ default: m.Outlook })));
-const COTData         = lazy(() => import('@/pages/COTData').then(m => ({ default: m.COTData })));
 
 // Debug removed - AuthDebug no longer needed
 
@@ -202,7 +201,6 @@ function AppContent() {
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/strategy" element={<StrategyBuilder />} />
                 <Route path="/outlook" element={<Outlook />} />
-                <Route path="/cot" element={<COTData />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
               </Suspense>

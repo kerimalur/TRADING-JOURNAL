@@ -31,7 +31,6 @@ import { ProgressRing } from '@/components/ui/ProgressRing';
 import { SparklineChart } from '@/components/ui/SparklineChart';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { OUTLOOK_STATUS_CONFIG } from '@/types';
-import { useWidgetSettingsStore, DEFAULT_WIDGET_SETTINGS } from '@/stores/widgetSettingsStore';
 
 // ── Dashboard-Präferenzen (localStorage) ──────────────────────────────
 const PREFS_KEY = 'tradingJournal_dashboardPrefs';
@@ -47,10 +46,6 @@ interface DashboardPrefs {
   showDetails:          boolean;
   showOutlooks:         boolean;
   showMonthCalendar:    boolean;
-  showWidgetUebersicht: boolean;
-  showWidgetNews:       boolean;
-  showWidgetCOT:        boolean;
-  showWidgetZinsen:     boolean;
 }
 
 const DEFAULT_PREFS: DashboardPrefs = {
@@ -64,10 +59,6 @@ const DEFAULT_PREFS: DashboardPrefs = {
   showDetails:          true,
   showOutlooks:         true,
   showMonthCalendar:    true,
-  showWidgetUebersicht: false,
-  showWidgetNews:       false,
-  showWidgetCOT:        false,
-  showWidgetZinsen:     false,
 };
 
 const PREF_LABELS: Record<keyof DashboardPrefs, string> = {
@@ -81,10 +72,6 @@ const PREF_LABELS: Record<keyof DashboardPrefs, string> = {
   showDetails:          'Performance Details',
   showOutlooks:         'Aktive Outlooks',
   showMonthCalendar:    'Monats-Kalender',
-  showWidgetUebersicht: 'Markt: Übersicht',
-  showWidgetNews:       'Markt: News',
-  showWidgetCOT:        'Markt: COT',
-  showWidgetZinsen:     'Markt: Zinsen',
 };
 
 function loadPrefs(): DashboardPrefs {
@@ -283,333 +270,6 @@ function WidgetCustomizer({
   );
 }
 
-// ── News Mini-Widget ──────────────────────────────────────────────────
-const IMPACT_COLORS = { high: '#EF4444', medium: '#FF9800', low: '#787B86' } as const;
-const ALL_NEWS_CCY = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'NZD', 'CAD', 'CHF'];
-
-function NewsWidget({ navigate }: { navigate: (p: string) => void }) {
-  const { settings, updateNews } = useWidgetSettingsStore();
-  const ns = settings.news;
-  const [showSettings, setShowSettings] = useState(false);
-
-  const today    = new Date().toISOString().split('T')[0];
-  const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })();
-
-  const events = (() => {
-    try {
-      const raw = localStorage.getItem('trading-journal-calendar-cache');
-      if (!raw) return [];
-      const cache = JSON.parse(raw);
-      const allEvents: any[] = cache.data ?? [];
-      return allEvents
-        .filter((e: any) => {
-          const inDates = e.date === today || e.date === tomorrow;
-          const inImpact = ns.impact === 'all' ? true : e.impact === ns.impact || (ns.impact === 'medium' && e.impact === 'high');
-          const inCcy = ns.currencies.length === 0 || ns.currencies.includes(e.currency);
-          return inDates && inImpact && inCcy;
-        })
-        .sort((a: any, b: any) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
-        .slice(0, 4);
-    } catch { return []; }
-  })();
-
-  const toggleCcy = (ccy: string) => {
-    const next = ns.currencies.includes(ccy)
-      ? ns.currencies.filter(c => c !== ccy)
-      : [...ns.currencies, ccy];
-    updateNews({ currencies: next });
-  };
-
-  return (
-    <div className="flex flex-col h-full w-full">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <button onClick={() => navigate('/news')} className="flex items-center gap-1.5 flex-1 text-left group">
-          <div className="p-1.5 rounded-lg bg-amber-500/10 group-hover:bg-amber-500/15 transition-colors">
-            <Newspaper size={14} className="text-amber-400" />
-          </div>
-          <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">News / Kalender</span>
-        </button>
-        <button onClick={() => setShowSettings(p => !p)} className="p-1 rounded hover:bg-white/5 transition-colors flex-shrink-0">
-          <Settings2 size={11} className={showSettings ? 'text-accent-primary' : 'text-text-muted/50'} />
-        </button>
-      </div>
-
-      {/* Settings panel */}
-      {showSettings && (
-        <div className="mb-2 p-2 rounded-lg bg-white/[0.04] border border-white/[0.07] space-y-1.5">
-          <div className="flex flex-wrap gap-1">
-            {ALL_NEWS_CCY.map(ccy => {
-              const active = ns.currencies.includes(ccy) || ns.currencies.length === 0;
-              return (
-                <button key={ccy} onClick={() => toggleCcy(ccy)}
-                  className={clsx('text-[9px] px-1.5 py-0.5 rounded font-semibold transition-colors',
-                    ns.currencies.length === 0 ? 'bg-amber-500/20 text-amber-400' :
-                    active ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-text-muted/50')}>
-                  {ccy}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex gap-1">
-            {(['high', 'medium', 'all'] as const).map(lvl => (
-              <button key={lvl} onClick={() => updateNews({ impact: lvl })}
-                className={clsx('text-[9px] px-1.5 py-0.5 rounded capitalize transition-colors',
-                  ns.impact === lvl ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-text-muted/50')}>
-                {lvl === 'high' ? 'Hoch' : lvl === 'medium' ? 'Mittel' : 'Alle'}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Events */}
-      <div className="flex-1 space-y-1 overflow-hidden">
-        {events.length === 0 ? (
-          <p className="text-[11px] text-text-muted/60 italic">Keine Events heute/morgen{ns.currencies.length > 0 ? ' (Filter aktiv)' : ''} — News-Seite öffnen zum Laden</p>
-        ) : (
-          events.map((e: any, i: number) => (
-            <button key={i} onClick={() => navigate('/news')} className="flex items-center gap-1.5 w-full text-left hover:opacity-80">
-              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: IMPACT_COLORS[e.impact as keyof typeof IMPACT_COLORS] ?? '#787B86' }} />
-              <span className="text-[10px] font-mono text-text-muted w-10 flex-shrink-0">{e.time ?? '??:??'}</span>
-              <span className="text-[10px] font-semibold text-text-muted flex-shrink-0 w-7">{e.currency}</span>
-              <span className="text-[10px] text-text-primary truncate">{e.event}</span>
-            </button>
-          ))
-        )}
-      </div>
-      <button onClick={() => navigate('/news')} className="text-[11px] text-accent-primary hover:text-accent-secondary transition-colors font-medium mt-1 text-left">
-        Öffnen →
-      </button>
-    </div>
-  );
-}
-
-// ── Zinsen Mini-Widget ────────────────────────────────────────────────
-const ALL_ZINSEN_CCY = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'NZD', 'CAD', 'CHF'];
-
-function ZinsenWidget({ navigate }: { navigate: (p: string) => void }) {
-  const { settings, updateZinsen } = useWidgetSettingsStore();
-  const zs = settings.zinsen;
-  const [showSettings, setShowSettings] = useState(false);
-
-  const rates = (() => {
-    try {
-      const raw = localStorage.getItem('trading-journal-interest-rates-cache');
-      if (!raw) return null;
-      const cache = JSON.parse(raw);
-      return cache.data as Record<string, { rate: number; change: string }> | null;
-    } catch { return null; }
-  })();
-
-  const toggleCcy = (ccy: string) => {
-    const next = zs.currencies.includes(ccy)
-      ? zs.currencies.filter(c => c !== ccy)
-      : [...zs.currencies, ccy];
-    updateZinsen({ currencies: next });
-  };
-
-  return (
-    <div className="flex flex-col h-full w-full">
-      <div className="flex items-center justify-between mb-2">
-        <button onClick={() => navigate('/zinsen')} className="flex items-center gap-1.5 flex-1 text-left group">
-          <div className="p-1.5 rounded-lg bg-accent-primary/10 group-hover:bg-accent-primary/15 transition-colors">
-            <Percent size={14} className="text-accent-primary" />
-          </div>
-          <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">Zinsen</span>
-        </button>
-        <button onClick={() => setShowSettings(p => !p)} className="p-1 rounded hover:bg-white/5 transition-colors flex-shrink-0">
-          <Settings2 size={11} className={showSettings ? 'text-accent-primary' : 'text-text-muted/50'} />
-        </button>
-      </div>
-
-      {showSettings && (
-        <div className="mb-2 p-2 rounded-lg bg-white/[0.04] border border-white/[0.07] flex flex-wrap gap-1">
-          {ALL_ZINSEN_CCY.map(ccy => (
-            <button key={ccy} onClick={() => toggleCcy(ccy)}
-              className={clsx('text-[9px] px-1.5 py-0.5 rounded font-semibold transition-colors',
-                zs.currencies.includes(ccy) ? 'bg-accent-primary/20 text-accent-secondary' : 'bg-white/5 text-text-muted/50')}>
-              {ccy}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="flex-1 space-y-0.5 overflow-hidden">
-        {!rates ? (
-          <p className="text-[11px] text-text-muted/60 italic">Zinsdaten noch nicht geladen</p>
-        ) : (
-          zs.currencies.map(ccy => {
-            const r = rates[ccy];
-            if (!r) return null;
-            const changeColor = r.change === 'up' ? '#22C55E' : r.change === 'down' ? '#EF4444' : '#787B86';
-            const arrow = r.change === 'up' ? '↑' : r.change === 'down' ? '↓' : '→';
-            return (
-              <div key={ccy} className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-text-muted w-8 flex-shrink-0">{ccy}</span>
-                <span className="flex-1 text-[10px] font-mono text-text-primary">{r.rate.toFixed(2)}%</span>
-                <span className="text-[10px] font-bold flex-shrink-0" style={{ color: changeColor }}>{arrow}</span>
-              </div>
-            );
-          })
-        )}
-      </div>
-      <button onClick={() => navigate('/zinsen')} className="text-[11px] text-accent-primary hover:text-accent-secondary transition-colors font-medium mt-1 text-left">
-        Öffnen →
-      </button>
-    </div>
-  );
-}
-
-// ── Smart COT Mini-Widget ─────────────────────────────────────────────
-const ALL_COT_CCY = ['DXY', 'EUR', 'GBP', 'JPY', 'AUD', 'NZD', 'CAD', 'CHF'];
-
-function COTWidget({ navigate }: { navigate: (p: string) => void }) {
-  const { settings, updateCOT } = useWidgetSettingsStore();
-  const cs = settings.cot;
-  const [showSettings, setShowSettings] = useState(false);
-
-  const allRows = (() => {
-    try {
-      const raw = localStorage.getItem('cotData');
-      if (!raw) return null;
-      const data = JSON.parse(raw);
-      if (!Array.isArray(data)) return null;
-      return data as Array<{ currency: string; commercialsNet: number; weeklyChange: number; percentileRank?: number; signal?: string }>;
-    } catch { return null; }
-  })();
-
-  const rows = allRows
-    ? allRows.filter(r => cs.currencies.includes(r.currency))
-    : null;
-
-  const toggleCcy = (ccy: string) => {
-    const next = cs.currencies.includes(ccy)
-      ? cs.currencies.filter(c => c !== ccy)
-      : [...cs.currencies, ccy];
-    updateCOT({ currencies: next });
-  };
-
-  const getScoreColor = (net: number, signal?: string) => {
-    if (signal === 'strong_long') return '#22C55E';
-    if (signal === 'long') return '#86efac';
-    if (signal === 'strong_short') return '#EF4444';
-    if (signal === 'short') return '#fca5a5';
-    if (net > 0) return '#22C55E';
-    if (net < 0) return '#EF4444';
-    return '#787B86';
-  };
-
-  return (
-    <div className="flex flex-col h-full w-full">
-      <div className="flex items-center justify-between mb-2">
-        <button onClick={() => navigate('/cot')} className="flex items-center gap-1.5 flex-1 text-left group">
-          <div className="p-1.5 rounded-lg bg-pnl-positive/10 group-hover:bg-pnl-positive/15 transition-colors">
-            <BarChart2 size={14} className="text-pnl-positive" />
-          </div>
-          <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">Smart COT</span>
-        </button>
-        <button onClick={() => setShowSettings(p => !p)} className="p-1 rounded hover:bg-white/5 transition-colors flex-shrink-0">
-          <Settings2 size={11} className={showSettings ? 'text-accent-primary' : 'text-text-muted/50'} />
-        </button>
-      </div>
-
-      {showSettings && (
-        <div className="mb-2 p-2 rounded-lg bg-white/[0.04] border border-white/[0.07] flex flex-wrap gap-1">
-          {ALL_COT_CCY.map(ccy => (
-            <button key={ccy} onClick={() => toggleCcy(ccy)}
-              className={clsx('text-[9px] px-1.5 py-0.5 rounded font-semibold transition-colors',
-                cs.currencies.includes(ccy) ? 'bg-pnl-positive/20 text-pnl-positive' : 'bg-white/5 text-text-muted/50')}>
-              {ccy}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="flex-1 space-y-0.5 overflow-hidden">
-        {!rows ? (
-          <p className="text-[11px] text-text-muted/60 italic">COT-Daten noch nicht geladen — COT-Seite öffnen</p>
-        ) : rows.length === 0 ? (
-          <p className="text-[11px] text-text-muted/60 italic">Keine Währungen ausgewählt</p>
-        ) : (
-          rows.map(({ currency, commercialsNet, weeklyChange, signal }) => {
-            const color = getScoreColor(commercialsNet, signal);
-            const label = `${commercialsNet > 0 ? '+' : ''}${(commercialsNet / 1000).toFixed(0)}K`;
-            const chgColor = weeklyChange > 0 ? '#22C55E' : weeklyChange < 0 ? '#EF4444' : '#787B86';
-            return (
-              <div key={currency} className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-text-muted w-8 flex-shrink-0">{currency}</span>
-                <span className="flex-1 text-[10px] font-mono" style={{ color }}>{label}</span>
-                <span className="text-[9px] flex-shrink-0" style={{ color: chgColor }}>
-                  {weeklyChange > 0 ? '+' : ''}{(weeklyChange / 1000).toFixed(0)}K
-                </span>
-              </div>
-            );
-          })
-        )}
-      </div>
-      <button onClick={() => navigate('/cot')} className="text-[11px] text-accent-primary hover:text-accent-secondary transition-colors font-medium mt-1 text-left">
-        Smart COT →
-      </button>
-    </div>
-  );
-}
-
-// ── Übersicht Mini-Widget ─────────────────────────────────────────────
-function UebersichtWidget({ navigate }: { navigate: (p: string) => void }) {
-  return (
-    <button onClick={() => navigate('/fundamentals')} className="flex flex-col h-full w-full text-left group">
-      <div className="flex items-center gap-1.5 mb-2">
-        <div className="p-1.5 rounded-lg bg-accent-cyan/10 group-hover:bg-accent-cyan/15 transition-colors">
-          <Globe2 size={14} className="text-accent-cyan" />
-        </div>
-        <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">Markt-Übersicht</span>
-      </div>
-      <div className="flex-1 flex flex-col justify-center gap-1.5">
-        {['Fundamentaldaten', 'Währungsstärke', 'Marktstruktur', 'Saisonalität'].map(item => (
-          <div key={item} className="flex items-center gap-1.5">
-            <div className="w-1 h-1 rounded-full bg-accent-cyan/60 flex-shrink-0" />
-            <span className="text-[11px] text-text-muted">{item}</span>
-          </div>
-        ))}
-      </div>
-      <span className="text-[11px] text-accent-primary group-hover:text-accent-secondary transition-colors font-medium mt-1">
-        Öffnen →
-      </span>
-    </button>
-  );
-}
-
-// ── Markt-Navigation Widget (generisch) ──────────────────────────────
-function DashNavWidget({
-  navigate, path, title, description, icon,
-}: {
-  navigate: (p: string) => void;
-  path: string;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={() => navigate(path)}
-      className="flex flex-col h-full w-full items-start gap-3 group text-left"
-    >
-      <div className="flex items-center gap-1.5">
-        <div className="p-1.5 rounded-lg bg-white/[0.05] group-hover:bg-white/[0.09] transition-colors">
-          {icon}
-        </div>
-        <span className="text-[0.65rem] font-semibold text-text-muted uppercase tracking-[0.1em]">{title}</span>
-      </div>
-      <div className="flex-1 flex flex-col justify-center">
-        <p className="text-xs text-text-muted leading-relaxed">{description}</p>
-      </div>
-      <span className="text-[11px] text-accent-primary group-hover:text-accent-secondary transition-colors font-medium">
-        Öffnen →
-      </span>
-    </button>
-  );
-}
 
 // ── Haupt-Komponente ───────────────────────────────────────────────────
 export function Dashboard() {
@@ -1084,34 +744,6 @@ export function Dashboard() {
                   </div>
                 ))}
               </div>
-            </BentoCell>
-          )}
-
-          {/* MARKT: ÜBERSICHT */}
-          {prefs.showWidgetUebersicht && (
-            <BentoCell delay={0.48}>
-              <UebersichtWidget navigate={navigate} />
-            </BentoCell>
-          )}
-
-          {/* MARKT: NEWS */}
-          {prefs.showWidgetNews && (
-            <BentoCell delay={0.49}>
-              <NewsWidget navigate={navigate} />
-            </BentoCell>
-          )}
-
-          {/* MARKT: COT */}
-          {prefs.showWidgetCOT && (
-            <BentoCell delay={0.50}>
-              <COTWidget navigate={navigate} />
-            </BentoCell>
-          )}
-
-          {/* MARKT: ZINSEN */}
-          {prefs.showWidgetZinsen && (
-            <BentoCell delay={0.51}>
-              <ZinsenWidget navigate={navigate} />
             </BentoCell>
           )}
 

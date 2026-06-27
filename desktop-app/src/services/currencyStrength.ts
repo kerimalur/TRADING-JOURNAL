@@ -1,15 +1,13 @@
 /**
  * ========================================================================
- * Smart COT Analysis Engine
+ * Währungsstärke-Engine (intern für Outlook)
  * ========================================================================
- * Analysiert CFTC COT-Daten und berechnet:
- * - Momentum (1W/4W/8W)
- * - Extremzonen + Wochen-an-Extrem
- * - Change of Character (Richtungswechsel)
- * - Spec vs. Commercial Divergenz
- * - Open Interest Trend + Divergenz
- * - Composite Smart Score (-100 bis +100)
- * - Pair-Empfehlungen mit Begründung
+ * Berechnet pro Währung eine fundamentale Stärke/Bias aus:
+ *   - COT-Positionierung (Commercial-Net-Perzentil)
+ *   - Zins-Differenz (Carry)
+ *   - Saisonalität
+ * Speist ausschließlich den Outlook (Bias-Anzeige + Herkunfts-Tabelle).
+ * Hat KEINE eigene Seite/Navigation mehr.
  */
 
 import { supabase } from '@/lib/supabase';
@@ -226,7 +224,7 @@ export async function loadSnapshots(currency?: string): Promise<COTSnapshot[]> {
 }
 
 // ============================================================
-// ANALYSIS ENGINE — Smart COT Berechnung
+// ANALYSIS ENGINE — Währungsstärke-Berechnung
 // ============================================================
 
 export function analyzeCurrency(
@@ -427,7 +425,7 @@ export function generatePairSignals(
 // FULL REFRESH — Analyse + Persistenz
 // ============================================================
 
-export async function runSmartCOTAnalysis(
+export async function runStrengthAnalysis(
   allSnapshots: COTSnapshot[],
 ): Promise<{ analyses: CurrencyAnalysis[]; pairSignals: PairSignal[] }> {
   const analyses = SMART_COT_CURRENCIES.map(ccy =>
@@ -499,7 +497,7 @@ async function persistAnalyses(analyses: CurrencyAnalysis[]): Promise<void> {
     .from('cot_currency_analysis')
     .upsert(payloads, { onConflict: 'user_id,currency' });
 
-  if (error) console.error('Smart COT analysis persist error:', error);
+  if (error) console.error('Strength analysis persist error:', error);
 }
 
 async function persistPairSignals(signals: PairSignal[]): Promise<void> {
@@ -526,7 +524,7 @@ async function persistPairSignals(signals: PairSignal[]): Promise<void> {
     .from('cot_pair_signals')
     .upsert(payloads, { onConflict: 'user_id,pair' });
 
-  if (error) console.error('Smart COT pair signals persist error:', error);
+  if (error) console.error('Strength pair signals persist error:', error);
 }
 
 export async function loadCachedAnalyses(): Promise<CurrencyAnalysis[]> {
@@ -1414,4 +1412,52 @@ function computeFinalConviction(params: {
   }
 
   return Math.max(-100, Math.min(100, Math.round(score)));
+}
+
+// ============================================================
+// WÄHRUNGSSTÄRKE-CACHE (für Outlook + Herkunfts-Tabelle)
+// ============================================================
+
+export interface StrengthRow {
+  currency: string;
+  signal: COTSignal;
+  percentile: number;   // COT Commercial-Net-Perzentil
+  rateDiff: number;     // Zins-Differenz (Carry)
+  seasonal: number;     // -100..100 saisonaler Bias
+  strength: number;     // kombinierte Stärke (-100..100)
+}
+
+/**
+ * Lädt die gecachten Analysen (Supabase) und schreibt den schlanken Stärke-Cache,
+ * den der Outlook liest: localStorage 'cotData' (Bias) + 'strengthBreakdown' (Tabelle).
+ */
+export async function refreshStrengthCache(): Promise<StrengthRow[]> {
+  let analyses: CurrencyAnalysis[] = [];
+  try { analyses = await loadCachedAnalyses(); } catch { analyses = []; }
+
+  const rows: StrengthRow[] = analyses
+    .filter(a => a.latestDate)
+    .map(a => ({
+      currency: a.currency,
+      signal: a.currentSignal,
+      percentile: Math.round(a.currentPercentile),
+      rateDiff: a.rateDifferential ?? 0,
+      seasonal: a.seasonalStrength
+        ? (a.seasonalBias === 'bearish' ? -a.seasonalStrength : a.seasonalBias === 'bullish' ? a.seasonalStrength : 0)
+        : 0,
+      strength: a.finalConviction ?? 0,
+    }));
+
+  try {
+    const cot = rows.map(r => ({ currency: r.currency, signal: r.signal, percentileRank: r.percentile }));
+    localStorage.setItem('cotData', JSON.stringify(cot));
+    localStorage.setItem('strengthBreakdown', JSON.stringify(rows));
+  } catch { /* ignore */ }
+
+  return rows;
+}
+
+/** Synchroner Zugriff auf die zuletzt berechnete Stärke-Aufschlüsselung (für die Tabelle). */
+export function getStrengthBreakdown(): StrengthRow[] {
+  try { return JSON.parse(localStorage.getItem('strengthBreakdown') || '[]'); } catch { return []; }
 }

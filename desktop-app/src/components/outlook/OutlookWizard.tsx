@@ -285,7 +285,7 @@ export function OutlookWizard({ symbol, existingOutlook, onSave, onClose }: Outl
                   <textarea
                     value={data.fundamentalOutlook}
                     onChange={e => setData(prev => ({ ...prev, fundamentalOutlook: e.target.value }))}
-                    placeholder="COT-Bias, Zinsentscheid, News-Events, Saisonalität..."
+                    placeholder="Währungsstärke, Zinsentscheid, News-Events, Saisonalität..."
                     className="input min-h-[120px] text-sm"
                     rows={5}
                   />

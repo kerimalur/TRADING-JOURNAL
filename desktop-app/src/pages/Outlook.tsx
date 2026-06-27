@@ -5,7 +5,7 @@
  *
  * Verwaltet Trading-Thesen mit:
  * - Symbol, Richtung, Thesis, Confidence, Status
- * - Automatische COT-Bias Anzeige
+ * - Automatische Währungsstärke-Bias Anzeige
  * - Upcoming High-Impact News
  * - Journal-Integration
  */
@@ -43,6 +43,7 @@ import { useOutlookStore, getUpcomingHighImpactNews, getCurrenciesFromSymbol, ty
 import { useUIStore } from '@/stores/uiStore';
 import type { Outlook, OutlookStatus, ConfidenceLevel, OutlookTag } from '@/types';
 import { OUTLOOK_STATUS_CONFIG, getConfluences, getAllPairs, addCustomPair, PAIR_GROUPS } from '@/types';
+import { refreshStrengthCache, getStrengthBreakdown, type StrengthRow } from '@/services/currencyStrength';
 import { OutlookWizard } from '@/components/outlook/OutlookWizard';
 import { PageTransition } from '@/components/ui/PageTransition';
 import { MetricDisplay } from '@/components/ui/MetricDisplay';
@@ -305,7 +306,7 @@ function OutlookForm({ outlook, onSave, onClose }: OutlookFormProps) {
           {cotBias && (
             <div className="p-3 bg-white/[0.03] rounded border border-white/[0.06]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted">COT Bias (auto)</span>
+                <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted">Stärke-Bias (auto)</span>
                 <span className={clsx(
                   'text-xs font-mono tabular-nums font-semibold',
                   cotBias.divergenceScore > 20 ? 'text-pnl-positive' :
@@ -717,7 +718,7 @@ function OutlookCard({ outlook, onEdit, onDelete, onStatusChange, onTransfer, on
       {/* COT Bias - horizontal compact */}
       {outlook.cotBias && (
         <div className="mx-3.5 mb-2 px-2.5 py-1.5 bg-white/[0.02] rounded border border-white/[0.04] flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted">COT</span>
+          <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-text-muted">Stärke</span>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
               <span className="text-[11px]">{getFlagEmoji(outlook.cotBias.base.currency)}</span>
@@ -1169,8 +1170,14 @@ export function Outlook() {
   const [wizardSymbol, setWizardSymbol] = useState<string | null>(null);
   const [wizardOutlook, setWizardOutlook] = useState<any>(null);
 
+  // Währungsstärke (speist die Bias-Anzeige) + Herkunfts-Tabelle
+  const [showStrengthTable, setShowStrengthTable] = useState(false);
+  const [strengthRows, setStrengthRows] = useState<StrengthRow[]>(() => getStrengthBreakdown());
+
   useEffect(() => {
     loadOutlooks();
+    // Stärke-Cache aktualisieren (schreibt cotData für die Bias-Anzeige)
+    refreshStrengthCache().then(setStrengthRows).catch(() => { /* offline ok */ });
   }, []);
 
   // Handle TradingView import - create outlook for each symbol
@@ -1300,6 +1307,14 @@ export function Outlook() {
         </div>
 
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowStrengthTable(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
+            title="Woher kommen die Stärke-/Bias-Werte? (COT + Zinsen + Saisonalität)"
+          >
+            <Eye size={13} />
+            Stärke-Daten
+          </button>
           <button
             onClick={() => setShowImportModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-text-muted hover:text-text-primary bg-white/[0.03] border border-white/[0.06] rounded hover:border-white/[0.1] transition-colors"
@@ -1702,6 +1717,53 @@ export function Outlook() {
               </div>
             </div>
           </motion.div>
+        </div>
+      )}
+
+      {/* Stärke-Daten — Herkunft der Bias-/Prozentwerte */}
+      {showStrengthTable && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowStrengthTable(false)}>
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-background-surface border border-border rounded-xl shadow-2xl p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold flex items-center gap-2"><Eye size={16} className="text-accent-primary" /> Währungsstärke — Datenherkunft</h3>
+              <button onClick={() => setShowStrengthTable(false)} className="p-1 hover:bg-white/[0.06] rounded"><X size={16} /></button>
+            </div>
+            <p className="text-[11px] text-text-muted mb-3 leading-relaxed">
+              Die Bias-/Prozentwerte im Outlook (z.B. „EUR 88%") stammen aus dieser Berechnung:
+              <strong className="text-text-secondary"> COT-Positionierung (Commercial-Net-Perzentil) + Zins-Differenz (Carry) + Saisonalität</strong>.
+              Das Perzentil ist der Hauptwert; Zinsen und Saisonalität justieren die Gesamt-Stärke.
+            </p>
+            {strengthRows.length === 0 ? (
+              <p className="text-xs text-text-muted py-6 text-center">Noch keine Stärke-Daten geladen (eingeloggt? Daten werden aus dem Cache geladen).</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-text-muted">
+                    <th className="text-left py-2 px-2 font-medium">Währung</th>
+                    <th className="text-left py-2 px-2 font-medium">Signal</th>
+                    <th className="text-right py-2 px-2 font-medium">COT-Perzentil</th>
+                    <th className="text-right py-2 px-2 font-medium">Zinsdiff.</th>
+                    <th className="text-right py-2 px-2 font-medium">Saison.</th>
+                    <th className="text-right py-2 px-2 font-medium">Stärke</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...strengthRows].sort((a, b) => b.strength - a.strength).map(r => (
+                    <tr key={r.currency} className="border-b border-border/50">
+                      <td className="py-2 px-2 font-bold text-text-primary">{r.currency}</td>
+                      <td className="py-2 px-2 text-xs">{r.signal.replace('_', ' ').toUpperCase()}</td>
+                      <td className="py-2 px-2 text-right font-mono">{r.percentile}%</td>
+                      <td className="py-2 px-2 text-right font-mono">{r.rateDiff > 0 ? '+' : ''}{r.rateDiff.toFixed(2)}%</td>
+                      <td className="py-2 px-2 text-right font-mono">{r.seasonal > 0 ? '+' : ''}{Math.round(r.seasonal)}</td>
+                      <td className={clsx('py-2 px-2 text-right font-mono font-bold', r.strength >= 0 ? 'text-pnl-positive' : 'text-pnl-negative')}>
+                        {r.strength > 0 ? '+' : ''}{r.strength}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
     </div>
