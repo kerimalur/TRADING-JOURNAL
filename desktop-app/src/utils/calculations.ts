@@ -366,6 +366,57 @@ export function calculateRMultiple(
   return Math.round((profitAmount / riskAmount) * 100) / 100;
 }
 
+/**
+ * Geplantes R:R aus Entry / Stop-Loss / Take-Profit.
+ * R = Reward-Distanz / Risk-Distanz. Richtung dient nur der Plausi-Prüfung
+ * (bei Long muss SL < Entry < TP, bei Short umgekehrt) — liefert sonst null.
+ */
+export function calcRMultipleFromLevels(
+  entry?: number,
+  stopLoss?: number,
+  takeProfit?: number,
+  direction: 'long' | 'short' = 'long'
+): number | null {
+  if (entry == null || stopLoss == null || takeProfit == null) return null;
+  const riskDist = Math.abs(entry - stopLoss);
+  const rewardDist = Math.abs(takeProfit - entry);
+  if (riskDist === 0) return null;
+  // Plausibilität: TP muss auf der Gewinnseite liegen
+  const valid = direction === 'long' ? (takeProfit > entry && stopLoss < entry)
+                                      : (takeProfit < entry && stopLoss > entry);
+  if (!valid) return null;
+  return Math.round((rewardDist / riskDist) * 100) / 100;
+}
+
+/**
+ * Rechnet die Kontostand-Historie ALLER Trades chronologisch neu durch.
+ * Behebt #11: beim Bearbeiten/Löschen eines älteren Trades werden
+ * accountBalanceBefore/After + runningBalance für diesen UND alle nachfolgenden
+ * Trades konsistent neu gesetzt. Reihenfolge: date, dann createdAt.
+ * `startBalance` = Kontostand VOR dem ersten Trade (z.B. Start-Kapital + Ein-/Auszahlungen).
+ */
+export function recomputeBalances(
+  trades: Trade[],
+  startBalance: number
+): { trades: Trade[]; finalBalance: number } {
+  const sorted = [...trades].sort((a, b) => {
+    const d = new Date(a.date).getTime() - new Date(b.date).getTime();
+    if (d !== 0) return d;
+    return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+  });
+
+  let bal = startBalance;
+  const out = sorted.map(t => {
+    const profit = t.profitAmount ?? calculateProfitAmount(t.rMultiple || 0, t.riskAmount || 0, t.result);
+    const before = Math.round(bal * 100) / 100;
+    const after = Math.round((bal + profit) * 100) / 100;
+    bal = after;
+    return { ...t, accountBalanceBefore: before, accountBalanceAfter: after, runningBalance: after };
+  });
+
+  return { trades: out, finalBalance: Math.round(bal * 100) / 100 };
+}
+
 // ============================================================
 // MEMOIZATION HELPER
 // ============================================================

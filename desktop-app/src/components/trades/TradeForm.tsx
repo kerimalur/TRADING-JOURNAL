@@ -12,7 +12,7 @@ import { clsx } from '@/utils';
 import type { Trade, AccountConfig } from '@/types';
 import { PAIR_LIST, getConfluences } from '@/types';
 import { useAccountStore } from '@/stores/accountStore';
-import { calculateRiskAmount, calculateProfitAmount } from '@/utils/calculations';
+import { calculateRiskAmount, calculateProfitAmount, calcRMultipleFromLevels } from '@/utils/calculations';
 import { getApi } from '@/services/webApi';
 
 interface TradeFormProps {
@@ -102,6 +102,23 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
     return calculateProfitAmount(rMultiple, riskAmount, result);
   }, [formData.riskAmount, formData.rMultiple, formData.result]);
 
+  // Geplantes R:R automatisch aus Entry/SL/TP (#12)
+  const plannedR = useMemo(
+    () => calcRMultipleFromLevels(
+      formData.entryPrice, formData.stopLoss, formData.takeProfit,
+      (formData.direction as 'long' | 'short') || 'long',
+    ),
+    [formData.entryPrice, formData.stopLoss, formData.takeProfit, formData.direction]
+  );
+
+  // Auto-übernehmen, solange R-Multiple noch leer/0 ist (überschreibt keine manuelle Eingabe)
+  useEffect(() => {
+    if (plannedR != null && (!formData.rMultiple || formData.rMultiple === 0)) {
+      setFormData(prev => ({ ...prev, rMultiple: plannedR }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plannedR]);
+
   // Load screenshot if editing
   useEffect(() => {
     if (trade?.id) {
@@ -117,10 +134,14 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       
-      // Bei Änderung von riskPercent -> automatisch riskAmount berechnen
-      if (field === 'riskPercent' && accountConfig?.currentBalance) {
-        const newRiskAmount = calculateRiskAmount(accountConfig.currentBalance, value as number);
-        updated.riskAmount = newRiskAmount;
+      // Bei Änderung von riskPercent -> riskAmount berechnen.
+      // Beim BEARBEITEN: aus dem historischen Kontostand zum Trade-Zeitpunkt (#12),
+      // nicht aus dem heutigen currentBalance.
+      if (field === 'riskPercent') {
+        const base = (isEditing && trade?.accountBalanceBefore)
+          ? trade.accountBalanceBefore
+          : accountConfig?.currentBalance;
+        if (base) updated.riskAmount = calculateRiskAmount(base, value as number);
       }
 
       // Breakeven → R-Multiple auf 0 setzen (gültig, kein Pflichtfeld)
@@ -363,6 +384,16 @@ export function TradeForm({ trade, accountType, onSave, onClose }: TradeFormProp
                 placeholder="z.B. 2.5"
               />
               {errors.rMultiple && <p className="text-xs text-pnl-negative mt-1">{errors.rMultiple}</p>}
+              {plannedR != null && (
+                <button
+                  type="button"
+                  onClick={() => handleChange('rMultiple', plannedR)}
+                  className="mt-1 text-[10px] text-accent-primary hover:underline"
+                  title="Geplantes R:R aus Entry / Stop-Loss / Take-Profit"
+                >
+                  = {plannedR}R aus Entry/SL/TP
+                </button>
+              )}
             </div>
 
             <div>

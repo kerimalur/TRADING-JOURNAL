@@ -23,6 +23,7 @@ import { useAccountStore } from '@/stores/accountStore';
 import { useUIStore } from '@/stores/uiStore';
 import type { Trade, AccountType, TradeResult, AccountConfig } from '@/types';
 import { PAIR_LIST, SETUP_DEFINITIONS } from '@/types';
+import { recomputeBalances } from '@/utils/calculations';
 
 type ViewMode = 'cards' | 'table';
 
@@ -33,7 +34,7 @@ interface JournalPageProps {
 }
 
 export function JournalPage({ accountType, title, icon }: JournalPageProps) {
-  const { loadConfigs, configs, saveConfig, createAccount, deleteAccount, setActiveAccount, getFundedAccounts, getEkAccounts } = useAccountStore();
+  const { loadConfigs, configs, saveConfig, createAccount, deleteAccount, setActiveAccount, getFundedAccounts, getEkAccounts, getTransactions } = useAccountStore();
   const { showToast } = useUIStore();
 
   // Trade data state
@@ -144,68 +145,38 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
   // ============================================================
   // HANDLERS
   // ============================================================
+
+  // Rechnet die Balance-Historie des aktiven Kontos chronologisch neu durch (#11).
+  // Baseline = Start-Kapital + Netto-Ein-/Auszahlungen. Schreibt nur geänderte
+  // Trades zurück und aktualisiert currentBalance.
+  const recomputeAccount = async () => {
+    const cfg = configs?.[accountType];
+    if (!cfg) return;
+    const all = await tradeService.loadTrades(accountType);
+    const txs = getTransactions(accountType);
+    const netTx = txs.reduce((s, t) => s + (t.transactionType === 'deposit' ? t.amount : -t.amount), 0);
+    const baseline = (cfg.initialStartBalance || 0) + netTx;
+    const { trades: recomputed, finalBalance } = recomputeBalances(all, baseline);
+    for (const t of recomputed) {
+      const orig = all.find(o => o.id === t.id);
+      if (!orig) continue;
+      if (orig.accountBalanceBefore !== t.accountBalanceBefore
+        || orig.accountBalanceAfter !== t.accountBalanceAfter
+        || orig.runningBalance !== t.runningBalance) {
+        try { await tradeService.saveTrade(t as any); } catch (e) { console.error('Balance-Update fehlgeschlagen:', e); }
+      }
+    }
+    if (Math.round((cfg.currentBalance || 0) * 100) !== Math.round(finalBalance * 100)) {
+      await saveConfig({ ...cfg, currentBalance: finalBalance });
+    }
+  };
+
   const handleSaveTrade = async (tradeData: Omit<Trade, 'id'> & { id?: string }): Promise<Trade | null> => {
     try {
-      const isNewTrade = !tradeData.id;
-      const oldTrade = isNewTrade ? null : trades.find(t => t.id === tradeData.id);
+      // Trade speichern; Balance-Felder werden danach zentral neu gerechnet (#11)
+      const savedTrade = await tradeService.saveTrade({ ...tradeData, type: accountType });
+      await recomputeAccount();
 
-      // Calculate profit before saving so we can set balance fields
-      const calculatedProfit = tradeData.profitAmount ?? ((tradeData.riskAmount || 0) * (tradeData.rMultiple || 0));
-      const currentConfig = configs?.[accountType];
-
-      // Auto-fill accountBalanceBefore / accountBalanceAfter
-      let enrichedTradeData = { ...tradeData, type: accountType };
-      if (isNewTrade && currentConfig) {
-        enrichedTradeData.accountBalanceBefore = currentConfig.currentBalance;
-        enrichedTradeData.accountBalanceAfter = Math.round((currentConfig.currentBalance + calculatedProfit) * 100) / 100;
-      } else if (!isNewTrade && currentConfig && oldTrade) {
-        const oldProfit = oldTrade.profitAmount || ((oldTrade.riskAmount || 0) * (oldTrade.rMultiple || 0));
-        const balanceBefore = Math.round((currentConfig.currentBalance - oldProfit) * 100) / 100;
-        enrichedTradeData.accountBalanceBefore = balanceBefore;
-        enrichedTradeData.accountBalanceAfter = Math.round((balanceBefore + calculatedProfit) * 100) / 100;
-      }
-
-      const savedTrade = await tradeService.saveTrade(enrichedTradeData);
-
-      console.log('💰 Balance Update:', { 
-        hasConfig: !!currentConfig,
-        currentBalance: currentConfig?.currentBalance,
-        result: tradeData.result, 
-        profitAmount: tradeData.profitAmount,
-        calculatedProfit,
-        rMultiple: tradeData.rMultiple,
-        riskAmount: tradeData.riskAmount,
-        isNewTrade
-      });
-      
-      // Update account balance based on profit/loss (except for breakeven)
-      if (currentConfig && tradeData.result !== 'breakeven') {
-        const profitAmount = calculatedProfit;
-        let balanceChange = profitAmount;
-        
-        // If editing, reverse the old trade's effect first
-        if (oldTrade && oldTrade.result !== 'breakeven') {
-          const oldProfit = oldTrade.profitAmount || ((oldTrade.riskAmount || 0) * (oldTrade.rMultiple || 0));
-          balanceChange = profitAmount - oldProfit;
-        }
-        
-        const newBalance = currentConfig.currentBalance + (isNewTrade ? profitAmount : balanceChange);
-        
-        console.log('💰 Calculated balance change:', { 
-          oldBalance: currentConfig.currentBalance, 
-          profitAmount, 
-          balanceChange,
-          newBalance
-        });
-        
-        if (balanceChange !== 0 || isNewTrade) {
-          const success = await saveConfig({ ...currentConfig, currentBalance: Math.round(newBalance * 100) / 100 });
-          console.log('💰 Balance update result:', success, 'New balance:', newBalance);
-        }
-      } else {
-        console.log('⚠️ Balance not updated:', { hasConfig: !!currentConfig, result: tradeData.result });
-      }
-      
       showToast(tradeData.id ? 'Trade aktualisiert' : 'Trade gespeichert', 'success');
       setShowTradeForm(false);
       setEditingTrade(undefined);
@@ -223,25 +194,8 @@ export function JournalPage({ accountType, title, icon }: JournalPageProps) {
     if (confirm(`Trade vom ${trade.date} wirklich löschen?`)) {
       try {
         await tradeService.deleteTrade(trade.id);
-        
-        // Get fresh config from store
-        const currentConfig = configs?.[accountType];
-        
-        // Reverse the balance change (except for breakeven)
-        if (currentConfig && trade.result !== 'breakeven') {
-          // Calculate profit if not stored
-          const profitAmount = trade.profitAmount || ((trade.riskAmount || 0) * (trade.rMultiple || 0));
-          const newBalance = currentConfig.currentBalance - profitAmount;
-          
-          console.log('💰 Delete - Reversing balance:', {
-            oldBalance: currentConfig.currentBalance,
-            profitAmount,
-            newBalance
-          });
-          
-          await saveConfig({ ...currentConfig, currentBalance: Math.round(newBalance * 100) / 100 });
-        }
-        
+        // Balance-Historie komplett neu durchrechnen (#11)
+        await recomputeAccount();
         showToast('Trade erfolgreich gelöscht', 'success');
         setTrades(prev => prev.filter(t => t.id !== trade.id));
         await loadConfigs();
