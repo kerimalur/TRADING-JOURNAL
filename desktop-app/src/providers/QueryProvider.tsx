@@ -8,7 +8,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode } from 'react';
-import { CACHE } from '@/config/constants';
+import { CACHE } from '@/shared/config/constants';
 
 // Query Client Konfiguration
 export const queryClient = new QueryClient({

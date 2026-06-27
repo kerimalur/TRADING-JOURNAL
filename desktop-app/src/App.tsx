@@ -11,33 +11,33 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { HashRouter, BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/shared/lib/supabase';
 
 // Components
-import { Sidebar } from '@/components/layout/Sidebar';
-import { Toaster } from '@/components/ui/Toaster';
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
-import { GlobalSearch } from '@/components/ui/GlobalSearch';
+import { Sidebar } from '@/shared/components/Sidebar';
+import { Toaster } from '@/shared/ui/Toaster';
+import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
+import { GlobalSearch } from '@/shared/ui/GlobalSearch';
 import { QueryProvider } from '@/providers';
 import { AnimatePresence } from 'framer-motion';
 
 // Pages — lazy geladen → kleinerer Erststart, Seiten-Code erst bei Bedarf
-const Dashboard       = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
-const FundedJournal   = lazy(() => import('@/pages/FundedJournal').then(m => ({ default: m.FundedJournal })));
-const EKJournal       = lazy(() => import('@/pages/EKJournal').then(m => ({ default: m.EKJournal })));
-const Settings        = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })));
-const EquityCurve     = lazy(() => import('@/pages/EquityCurve').then(m => ({ default: m.EquityCurve })));
-const Backtest        = lazy(() => import('@/pages/Backtest').then(m => ({ default: m.Backtest })));
-const Calendar        = lazy(() => import('@/pages/Calendar').then(m => ({ default: m.Calendar })));
-const StrategyBuilder = lazy(() => import('@/pages/StrategyBuilder').then(m => ({ default: m.StrategyBuilder })));
-const Outlook         = lazy(() => import('@/pages/Outlook').then(m => ({ default: m.Outlook })));
+const Dashboard       = lazy(() => import('@/features/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
+const FundedJournal   = lazy(() => import('@/features/journal/FundedJournal').then(m => ({ default: m.FundedJournal })));
+const EKJournal       = lazy(() => import('@/features/journal/EKJournal').then(m => ({ default: m.EKJournal })));
+const Settings        = lazy(() => import('@/features/settings/Settings').then(m => ({ default: m.Settings })));
+const EquityCurve     = lazy(() => import('@/features/equity/EquityCurve').then(m => ({ default: m.EquityCurve })));
+const Backtest        = lazy(() => import('@/features/backtest/Backtest').then(m => ({ default: m.Backtest })));
+const Calendar        = lazy(() => import('@/features/calendar/Calendar').then(m => ({ default: m.Calendar })));
+const StrategyBuilder = lazy(() => import('@/features/strategy/StrategyBuilder').then(m => ({ default: m.StrategyBuilder })));
+const Outlook         = lazy(() => import('@/features/outlook/Outlook').then(m => ({ default: m.Outlook })));
 
 // Debug removed - AuthDebug no longer needed
 
 // Utils
-import { isElectron } from '@/services/webApi';
+import { isElectron } from '@/shared/services/webApi';
 
-import { useWidgetSettingsStore } from '@/stores/widgetSettingsStore';
+import { useWidgetSettingsStore } from '@/shared/stores/widgetSettingsStore';
 
 // i18n
 import '@/i18n';
